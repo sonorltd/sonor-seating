@@ -473,7 +473,7 @@ const SonorPdf = (function () {
     // to 0 (the title block painter still rendered the pills with empty
     // counts). Bryn directive: "revision clouds wchich have meta data and
     // text entry - red / green / orrange like in the title block".
-    let revAdded = 0, revChanged = 0, revRemoved = 0, revRfi = 0;
+    let revAdded = 0, revChanged = 0, revRemoved = 0, revRfi = 0, revNote = 0;
     let _revCountsAll = null;   // v5.136.0/v5.143.0 — FULL registry-driven map (re-applied to root master)
     try {
       if (typeof _countRevisionClouds === 'function') {
@@ -483,6 +483,7 @@ const SonorPdf = (function () {
         revChanged = c.changed || 0;
         revRemoved = c.removed || 0;
         revRfi     = c.rfi     || 0;   // 2026-07-12 — purple RFI clouds
+        revNote    = c.note    || 0;   // v5.172.0 — charcoal Note clouds
       }
     } catch (_) {}
 
@@ -632,7 +633,7 @@ const SonorPdf = (function () {
       // `revMoved` kept as alias of `revChanged` for back-compat with the
       // pre-v2.1.0 painter (which read meta.revMoved). Both painters now
       // render the pill as "Changed" semantically.
-      revAdded, revChanged, revMoved: revChanged, revRemoved, revRfi,
+      revAdded, revChanged, revMoved: revChanged, revRemoved, revRfi, revNote,
       revCounts: _revCountsAll,   // v5.136.0/v5.143.0 — cover panel + footer pills
       appVersion: (typeof APP_VERSION === 'string') ? APP_VERSION : ''
     };
@@ -995,13 +996,15 @@ const SonorPdf = (function () {
           { label: 'Added',   count: meta.revAdded   != null ? meta.revAdded   : 0, hex: '#78ba57' },
           { label: 'Moved',   count: meta.revMoved   != null ? meta.revMoved   : 0, hex: '#f5d05c' },
           { label: 'Removed', count: meta.revRemoved != null ? meta.revRemoved : 0, hex: '#ec6061' },
-          { label: 'RFI',     count: meta.revRfi     != null ? meta.revRfi     : 0, hex: '#8058a1' }
+          { label: 'RFI',     count: meta.revRfi     != null ? meta.revRfi     : 0, hex: '#8058a1' },
+          { label: 'Note',    count: meta.revNote    != null ? meta.revNote    : 0, hex: '#302f2e' }
         ]
       : [
           { label: '+', count: meta.revAdded   != null ? meta.revAdded   : 0, hex: '#78ba57' },
           { label: '~', count: meta.revMoved   != null ? meta.revMoved   : 0, hex: '#f5d05c' },
           { label: '-', count: meta.revRemoved != null ? meta.revRemoved : 0, hex: '#ec6061' },
-          { label: '?', count: meta.revRfi     != null ? meta.revRfi     : 0, hex: '#8058a1' }
+          { label: '?', count: meta.revRfi     != null ? meta.revRfi     : 0, hex: '#8058a1' },
+          { label: 'i', count: meta.revNote    != null ? meta.revNote    : 0, hex: '#302f2e' }
         ];
     let pX = xD + 8;
     const pY = FY + 70;
@@ -2731,6 +2734,7 @@ const SonorPdf = (function () {
           revMoved: (meta.revMoved != null ? meta.revMoved : meta.revChanged) || 0,
           revRemoved: meta.revRemoved || 0,
           revRfi: meta.revRfi || 0,
+          revNote: meta.revNote || 0,
           appName: 'Takeoffs',
           appVersion: meta.appVersion,
           accentHex: '#ad9978',   // v5.138.0/v5.143.0 — SONOR GOLD (re-applied to root master)
@@ -3844,7 +3848,8 @@ const SonorPdf = (function () {
         { label: 'Added',   count: meta.revAdded   != null ? meta.revAdded   : 0, hex: '#78ba57' },
         { label: 'Moved',   count: meta.revMoved   != null ? meta.revMoved   : 0, hex: '#f5d05c' },
         { label: 'Removed', count: meta.revRemoved != null ? meta.revRemoved : 0, hex: '#ec6061' },
-        { label: 'RFI', glyph: '?', count: meta.revRfi != null ? meta.revRfi : 0, hex: '#8058a1' }
+        { label: 'RFI', glyph: '?', count: meta.revRfi != null ? meta.revRfi : 0, hex: '#8058a1' },
+        { label: 'Note', glyph: 'i', count: meta.revNote != null ? meta.revNote : 0, hex: '#302f2e' }
       ];
       let pX = c4X + padX4;
       const pY = BY + 30;
@@ -5065,6 +5070,7 @@ const SonorPdf = (function () {
         revMoved:   meta.revMoved   || 0,
         revRemoved: meta.revRemoved || 0,
         revRfi:     meta.revRfi     || 0,
+        revNote:    meta.revNote    || 0,
         // Body
         canvasDataUrl: dataUrl,
         floorName,
@@ -5601,12 +5607,20 @@ const SonorPdf = (function () {
     // The owner camera Groups stay in place; only the cone Paths come
     // off and back. resyncAll() rebuilds them fresh from sym.viewCone.
     const stash = [];
+    // v5.172.0 (Bryn: "dont show circuit links on combined plans") — LC/LKP
+    // circuit curves + id tags belong on the LIGHTING/LKP plans only; on the
+    // combined snapshot they are visibility-stashed for the capture window.
+    const _lcStash = [];
     canvas.getObjects().slice().forEach(o => {
       if (!o) return;
       if (o._sonorViewCone === true) {
         stash.push({ owner: o._sonorViewConeOwner });
         try { canvas.remove(o); } catch (e) {}
         if (o._sonorViewConeOwner) o._sonorViewConeOwner._sonorViewCone = null;
+      }
+      if (o._sonorCircuitLink === true && o.visible !== false) {
+        _lcStash.push(o);
+        o.visible = false;
       }
     });
     canvas.renderAll();
@@ -5619,6 +5633,7 @@ const SonorPdf = (function () {
       // Re-attach via the module so cones come back at the correct
       // bearing + z-order. Falls back to legacy _resyncAllViewCones for
       // older non-modular sessions.
+      try { _lcStash.forEach(o => { o.visible = true; }); } catch (_) {}   // v5.172.0 — circuit links back on-screen
       try {
         if (typeof SonorCctv !== 'undefined' && SonorCctv.resyncAll) SonorCctv.resyncAll();
         else if (typeof _resyncAllViewCones === 'function') _resyncAllViewCones();
@@ -6995,6 +7010,19 @@ const SonorPdf = (function () {
         const snap = _snapshotCanvasNoCctvCones();
         const legend = (typeof opts.buildLegendForActive === 'function') ? opts.buildLegendForActive() : (opts.legend || []);
         const summary = (typeof opts.buildSummaryForActive === 'function') ? opts.buildSummaryForActive() : (opts.summary || []);
+        // v5.172.0 (Bryn: "only show a total luminaires in the combined plans
+        // with a note to see lighting plan for details") — circuit links are
+        // stashed off the combined snapshot; the SUMMARY panel points at the
+        // Lighting plan instead.
+        try {
+          const _lumN = canvas.getObjects().filter(o => o && o.sonorSymbol
+            && ((typeof window !== 'undefined' && typeof window._isLuminaire === 'function')
+                ? window._isLuminaire(o.sonorSymbol)
+                : String(o.sonorSymbol.service_nn || '') === '04')).length;
+          if (_lumN > 0 && Array.isArray(legend)) {
+            legend.push({ kind: 'group', level: 'sub', label: 'Luminaires \u00d7' + _lumN + ' \u2014 LC circuits: see Lighting plan' });
+          }
+        } catch (_) {}
         captured.push({ floor: f, snap, legend, summary });
         // v5.4.40 — log captured snapshot meta for diagnosis. Always logs
         // (not just on duplicate) so user can see what's happening.
@@ -8699,7 +8727,8 @@ const SonorPdf = (function () {
       { label: 'Added',   count: meta.revAdded   != null ? meta.revAdded   : 0, hex: '#78ba57' },
       { label: 'Moved',   count: meta.revMoved   != null ? meta.revMoved   : 0, hex: '#f5d05c' },
       { label: 'Removed', count: meta.revRemoved != null ? meta.revRemoved : 0, hex: '#ec6061' },
-      { label: 'RFI', glyph: '?', count: meta.revRfi != null ? meta.revRfi : 0, hex: '#8058a1' }
+      { label: 'RFI', glyph: '?', count: meta.revRfi != null ? meta.revRfi : 0, hex: '#8058a1' },
+      { label: 'Note', glyph: 'i', count: meta.revNote != null ? meta.revNote : 0, hex: '#302f2e' }
     ];
     let pX = c4X + padX4;
     const pTopY = 30;
@@ -10157,6 +10186,7 @@ const SonorPdf = (function () {
         revMoved: (meta.revMoved != null ? meta.revMoved : meta.revChanged) || 0,
         revRemoved: meta.revRemoved || 0,
         revRfi: meta.revRfi || 0,
+        revNote: meta.revNote || 0,
         appName: 'Takeoffs',
         appVersion: meta.appVersion,
         accentHex: '#ad9978',   // v5.138.0/v5.143.0 — SONOR GOLD (re-applied to root master)
@@ -11108,6 +11138,7 @@ const SonorPdf = (function () {
           revMoved: (meta.revMoved != null ? meta.revMoved : meta.revChanged) || 0,
           revRemoved: meta.revRemoved || 0,
           revRfi: meta.revRfi || 0,
+          revNote: meta.revNote || 0,
           appName: 'Takeoffs',
           appVersion: meta.appVersion,
           accentHex: '#ad9978',   // v5.138.0/v5.143.0 — SONOR GOLD (re-applied to root master)
@@ -11272,6 +11303,7 @@ const SonorPdf = (function () {
             revMoved:   meta.revMoved   || 0,
             revRemoved: meta.revRemoved || 0,
             revRfi:     meta.revRfi     || 0,
+            revNote:    meta.revNote    || 0,
             revisionGeneralComments: meta.revisionGeneralComments || '',   // v5.102.0
             revisionHistory: (meta.revisionHistory || []).map(r => ({
               code: r.code || '', date: r.date || '',
@@ -11815,7 +11847,7 @@ const SonorPdf = (function () {
               address: meta.address, revision: meta.revision, issueDate: meta.dateUk || meta.date,
               pageNum: _reqPage || 0, pageTotal: _planFinalTotal,
               services: _servicesForChrome,
-              revAdded: meta.revAdded || 0, revMoved: meta.revMoved || 0, revRemoved: meta.revRemoved || 0, revRfi: meta.revRfi || 0,
+              revAdded: meta.revAdded || 0, revMoved: meta.revMoved || 0, revRemoved: meta.revRemoved || 0, revRfi: meta.revRfi || 0, revNote: meta.revNote || 0,
               elec
             });
             if (_res && _res.dataUrl) {
@@ -12255,6 +12287,7 @@ const SonorPdf = (function () {
               revMoved:   meta.revMoved   || 0,
               revRemoved: meta.revRemoved || 0,
               revRfi:     meta.revRfi     || 0,
+              revNote:    meta.revNote    || 0,
               // v5.4.75 — forward optional per-aspect headerBadge (e.g.
               // "Total cables: 88" on the Cable Estimate). Only the first
               // page of a multi-page aspect carries the badge so it
@@ -12430,6 +12463,7 @@ const SonorPdf = (function () {
               revMoved:   meta.revMoved   || 0,
               revRemoved: meta.revRemoved || 0,
               revRfi:     meta.revRfi     || 0,
+              revNote:    meta.revNote    || 0,
               // v5.4.75 — forward optional per-aspect headerBadge
               // (first page only — matches the bundle-emission site).
               headerBadge: (isFirst && a.headerBadge) ? a.headerBadge : null,

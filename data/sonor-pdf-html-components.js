@@ -283,6 +283,7 @@
     const revMoved   = (o.revMoved   != null) ? o.revMoved   : 0;
     const revRemoved = (o.revRemoved != null) ? o.revRemoved : 0;
     const revRfi     = (o.revRfi     != null) ? o.revRfi     : 0;   // 2026-07-12 — purple RFI clouds
+    const revNote    = (o.revNote    != null) ? o.revNote    : 0;   // v5.172.0 — charcoal Note clouds
 
     // v5.25.0 — FULL TITLE-BLOCK FOOTER ONCE PER DOCUMENT (Bryn 2026-06-14
     // "we dont need the whole title footer on every page, just the page
@@ -347,7 +348,7 @@
           </div>
           <div class="page-footer-col page-footer-revisions">
             <div class="page-footer-cap">REVISIONS</div>
-            ${revPillsPanel(o.revCounts || { added: revAdded, changed: revMoved, removed: revRemoved, rfi: revRfi })}
+            ${revPillsPanel(o.revCounts || { added: revAdded, changed: revMoved, removed: revRemoved, rfi: revRfi, note: revNote })}
           </div>
         </div>
         <div class="page-footer-contactline">

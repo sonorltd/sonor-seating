@@ -2635,6 +2635,7 @@ body {
 .rev-row-cloudgroup-rem .rev-row-cloudgroup-head { color: #b4373a; }
 .rev-row-cloudgroup-rfi .rev-row-cloudgroup-head { color: #5e3d7d; }   /* 2026-07-12 — RFI cloud */
 .rev-row-cloudgroup-note .rev-row-cloudgroup-head { color: #302f2e; }   /* v5.165.0 — charcoal note cloud */
+.rev-cloud-pill.rev-cloud-note { background: #302f2e22; color: #302f2e; }   /* v5.172.0 — note pill */
 .rev-row-cloudlist {
   margin: 0;
   padding-left: 18px;

@@ -656,11 +656,14 @@
     const _projectMoved   = (o.revMoved   != null) ? Number(o.revMoved)   : 0;
     const _projectRemoved = (o.revRemoved != null) ? Number(o.revRemoved) : 0;
     const _projectRfi     = (o.revRfi     != null) ? Number(o.revRfi)     : 0;
-    const _renderCloudPills = (a, m, r, q) => `
+    const _projectNote    = (o.revNote    != null) ? Number(o.revNote)    : 0;   // v5.172.0 — note clouds
+    // v5.172.0 — CANONICAL CLOUD ORDER: added, moved, removed, RFI, note.
+    const _renderCloudPills = (a, m, r, q, n) => `
       <span class="rev-cloud-pill rev-cloud-add">+ ${h.esc(String(a))}</span>
       <span class="rev-cloud-pill rev-cloud-mov">~ ${h.esc(String(m))}</span>
       <span class="rev-cloud-pill rev-cloud-rem">− ${h.esc(String(r))}</span>
       <span class="rev-cloud-pill rev-cloud-rfi">? ${h.esc(String(q == null ? 0 : q))}</span>
+      <span class="rev-cloud-pill rev-cloud-note">i ${h.esc(String(n == null ? 0 : n))}</span>
     `;
     // v5.4.70 — Bryn directive 2026-05-10: revision rows now show the
     // freeform notes per revision + the revision-cloud notes grouped
@@ -731,9 +734,10 @@
         const m = (r.moved   != null) ? Number(r.moved)   : (i === lastIdx ? _projectMoved   : null);
         const x = (r.removed != null) ? Number(r.removed) : (i === lastIdx ? _projectRemoved : null);
         const q = (r.rfi     != null) ? Number(r.rfi)     : (i === lastIdx ? _projectRfi     : null);
+        const nn2 = (r.note  != null) ? Number(r.note)    : (i === lastIdx ? _projectNote    : null);   // v5.172.0
         const cloudsHtml = (a == null && m == null && x == null && q == null)
           ? '<span class="rev-cloud-pill rev-cloud-empty">—</span>'
-          : _renderCloudPills(a == null ? '—' : a, m == null ? '—' : m, x == null ? '—' : x, q == null ? '—' : q);
+          : _renderCloudPills(a == null ? '—' : a, m == null ? '—' : m, x == null ? '—' : x, q == null ? '—' : q, nn2 == null ? '—' : nn2);
         // Per-revision freeform note (from metadata.notes) + grouped
         // cloud-note bullets (from canvas-walked clouds keyed by id).
         const notesHtml = (r.notes && String(r.notes).trim())
@@ -766,7 +770,7 @@
               <span class="rev-row-label">CURRENT — UNRELEASED</span>
               <span class="rev-row-date">—</span>
             </div>
-            <div class="rev-row-clouds">${_renderCloudPills(_projectAdded, _projectMoved, _projectRemoved, _projectRfi)}</div>
+            <div class="rev-row-clouds">${_renderCloudPills(_projectAdded, _projectMoved, _projectRemoved, _projectRfi, _projectNote)}</div>
           </div>
           ${_renderCloudNotesGrouped(buckets)}
         </div>
