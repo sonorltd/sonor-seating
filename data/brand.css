@@ -1,0 +1,130 @@
+/**
+ * Sonor Smart Homes — Brand CSS Custom Properties
+ * Auto-generated from brand-core.xml on 2026-04-21
+ * Do NOT edit — run: python3 generate-brand.py
+ */
+
+/* ═══ Service Colours ═══ */
+:root {
+  --purple: #8058a1;  /* Home Cinema */
+  --aqua: #4bb9d3;  /* Multiroom Audio */
+  --green: #78ba57;  /* TV Everywhere */
+  --yellow: #f5d05c;  /* Smart Lighting */
+  --terracotta: #e37c59;  /* Home Automation */
+  --red: #ec6061;  /* Climate */
+  --pink: #e67eb1;  /* Control */
+  --gold: #ad9978;  /* CCTV & Security */
+  --silver: #b7b1a7;  /* Whole Home WiFi */
+  --charcoal: #302f2e;  /* Design & Cabling */
+  --accent: #2d718b;  /* App accent */
+  --nav-chrome-deep: #0a1929;  /* Nav Ink Deep */
+  --nav-chrome-mid: #0f2a44;  /* Nav Ink Mid */
+  --nav-chrome-mix-pct: 22%;  /* Aqua-into-navy mix % for gradient endpoint */
+}
+
+/* ═══ Positional Service Aliases (Spine S-4.14) ═══ */
+/* Use for positional cycles (tab underlines, :nth-child loops). */
+/* Canonical order: 01 purple → 10 charcoal. Never reassign. */
+:root {
+  --s01: var(--purple);  /* Home Cinema */
+  --s02: var(--aqua);  /* Multiroom Audio */
+  --s03: var(--green);  /* TV Everywhere */
+  --s04: var(--yellow);  /* Smart Lighting */
+  --s05: var(--terracotta);  /* Home Automation */
+  --s06: var(--red);  /* Climate */
+  --s07: var(--pink);  /* Control */
+  --s08: var(--gold);  /* CCTV & Security */
+  --s09: var(--silver);  /* Whole Home WiFi */
+  --s10: var(--charcoal);  /* Design & Cabling */
+}
+
+/* ═══ Earthy Theme — s-vars (Homepage, About, Pricing, all Service pages) ═══ */
+:root,
+[data-theme='earthy'] {
+  --paper: #2C2218;
+  --s1: #F2EDE5;
+  --s2: #EDE6D9;
+  --s3: #E6DDD0;
+  --s4: #D9CFC0;
+  --text-primary: #2C2218;
+  --text-secondary: #5a4e3e;
+  --text-muted: #8B7D6B;
+  --border: rgba(44,34,24,0.12);
+  --border-strong: rgba(44,34,24,0.22);
+  --footer-bg: #141008;
+}
+
+/* ═══ Earthy Theme — bg-vars (All Location pages) ═══ */
+[data-scheme='bg-vars'] {
+  --bg-0: #F2EDE5;
+  --bg-1: #EDE6D9;
+  --bg-2: #E6DDD0;
+  --bg-3: #D9CFC0;
+  --bg-4: #C8BC9C;
+  --bg-6: #2C2218;
+}
+
+/* ═══ Dark Theme ═══ */
+[data-theme='dark'] {
+  --body: #141008;
+  --wordmark: #f4f1ec;
+  --back-wordmark: #8B7D6B;
+  --text-primary: #F4F1EC;
+  --text-secondary: #b0a898;
+  --text-muted: #7a7464;
+}
+
+/* ═══ Nocturne Theme ═══ */
+[data-theme='nocturne'] {
+  --bg-0: #090807;
+  --bg-1: #111010;
+  --bg-2: #1a1814;
+  --bg-3: #222018;
+  --bg-4: #2a2826;
+  --bg-5: #555045;
+  --bg-6: #F4F1EC;
+  --text-primary: #F4F1EC;
+  --text-secondary: #b0a898;
+  --text-muted: #7a7464;
+  --text-faint: #444038;
+  --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.13);
+  --surface-deep: #050403;
+  --surface-bar: rgba(9,8,7,0.97);
+  --surface-text: #F4F1EC;
+  --surface-hover: #ad9978;
+  --cta-bg: #151310;
+  --cta-text: #F4F1EC;
+  --cta-hover: #ad9978;
+  --scrim: rgba(9,8,7,0.85);
+  --nav-chrome-deep: #050a14;
+  --nav-chrome-mid: #0a1a2e;
+  --nav-chrome-mix-pct: 18%;  /* Aqua-into-navy mix % override */
+}
+
+/* ═══ Slate Theme ═══ */
+[data-theme='slate'] {
+  --bg-0: #D1D6DD;
+  --bg-1: #DDE1E7;
+  --bg-2: #BEC4CD;
+  --bg-3: #AAB1BC;
+  --bg-4: #8E96A3;
+  --bg-5: #636C7A;
+  --bg-6: #1A1F28;
+  --text-primary: #1A1F28;
+  --text-secondary: #475161;
+  --text-muted: #636C7A;
+  --text-faint: #A8B0BC;
+  --border: rgba(20,30,50,0.10);
+  --border-strong: rgba(20,30,50,0.18);
+  --surface-deep: #151A22;
+  --surface-bar: rgba(21,26,34,0.97);
+  --surface-text: #F4F5F8;
+  --surface-hover: #4B5668;
+  --cta-bg: #1C222B;
+  --cta-text: #F4F5F8;
+  --cta-hover: #4B5668;
+  --scrim: rgba(21,26,34,0.85);
+  --wordmark: #1A1F28;
+}
+

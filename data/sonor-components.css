@@ -1,0 +1,715 @@
+/* sonor-components.css — shared component styles per Spine rule S-4.4.
+   Synced to every "APP - {slug}"/data/sonor-components.css via sync-everything.sh.
+   Edit here ONLY — never edit a per-app copy.
+
+   Rules (Spine v1.2):
+   - Pure CSS — no app-specific selectors, no brand hex values.
+   - All colours reference CSS custom properties defined upstream in data/brand.css
+     + data/app-vars.css (aliases).
+   - Tinted variants use color-mix() against semantic tokens — never raw hex.
+   - Apps extend via their local <style> block, they do not override here.
+
+   Component index (classes shipped by this file):
+     .card                   — padded bordered surface block (var(--surface-card))
+     .card-header            — flex row for card title + actions
+     .grid, .grid-2/3/4      — responsive auto-fit grid helpers
+     .kpi, .kpi-label/value/sub — KPI tile (label, big value, sub line)
+     .progress, .progress-bar — thin progress bar, accent-gradient fill
+     .pill                   — small uppercase status pill (base)
+     .pill-red/yellow/green/grey/blue/purple — semantic tinted pills
+     .service-pill           — service-coloured pill (uses --bg inline style)
+     .btn                    — default ghost-surface button
+     .btn-primary            — filled accent button
+     .btn-ghost              — transparent borderless button
+     .btn-sm                 — compact size modifier
+     .input, .textarea, .select — form field base
+     .field-label            — uppercase form label
+     .table                  — full-width row-striped table
+     .badge                  — neutral inline badge
+     .status-indicator       — dot + label (connecting/live/offline/error)
+     .status-dot             — just the dot (sibling of .status-label)
+     .empty-state            — centred muted placeholder block
+     .tab-bar                — horizontal tab row
+     .tab-btn                — individual tab button
+     .tab-count              — numeric count inside a tab button
+     .nav-actions            — right-aligned actions container (margin-left:auto)
+     .modal-backdrop         — fixed full-screen dim layer
+     .modal-card             — centred card inside backdrop
+     .modal-actions          — flex-end row of buttons inside a modal
+     .modal-close            — absolute top-right X button
+     .source-toggle          — Drive / GitHub segmented control
+     .role-toggle            — generic segmented control (mirrors source-toggle)
+     .row, .spread           — flex helpers
+     .muted, .small, .tiny   — text utilities
+     .hidden                 — display:none !important utility
+*/
+
+/* ======================================================
+   Cards
+   ====================================================== */
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.card h2 { margin-top: 0; }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.card-header h2 { margin-bottom: 0; }
+
+/* ======================================================
+   Grid helpers
+   ====================================================== */
+.grid { display: grid; gap: 14px; }
+.grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.grid-4 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+
+/* ======================================================
+   KPI tiles
+   ====================================================== */
+.kpi {
+  background: var(--section-1);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 12px 14px;
+}
+.kpi .kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.kpi .kpi-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 4px;
+}
+.kpi .kpi-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ======================================================
+   Progress bar
+   ====================================================== */
+.progress {
+  height: 8px;
+  background: var(--section-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+}
+
+/* ======================================================
+   Pills / badges
+
+   Semantic tints use color-mix() so they always ride the
+   active theme. Text colour darkens from the same seed.
+   ====================================================== */
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 11px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* danger / warn / ok / info / muted / accent-tinted pills — all driven by theme tokens */
+.pill-red {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: color-mix(in srgb, var(--danger) 72%, var(--text-primary));
+}
+.pill-yellow {
+  background: color-mix(in srgb, var(--warn) 24%, transparent);
+  color: color-mix(in srgb, var(--warn) 60%, var(--text-primary));
+}
+.pill-green {
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: color-mix(in srgb, var(--ok) 60%, var(--text-primary));
+}
+.pill-grey {
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  color: var(--text-secondary);
+}
+.pill-blue {
+  background: color-mix(in srgb, var(--info) 18%, transparent);
+  color: color-mix(in srgb, var(--info) 60%, var(--text-primary));
+}
+.pill-purple {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-primary));
+}
+
+/* Service-coloured pill — inline style="--bg:var(--sNN)" sets the dot colour */
+.service-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 5px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--section-1);
+  border: 1px solid var(--border);
+}
+.service-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bg, var(--text-muted));
+}
+
+/* Neutral inline badge (smaller cousin of .pill — no uppercase) */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--section-2);
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* ======================================================
+   Buttons
+   ====================================================== */
+.btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.12s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--cta-text, var(--body));
+  border-color: var(--accent);
+}
+.btn-primary:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-light);
+  color: var(--cta-text, var(--body));
+}
+.btn-sm {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+.btn-ghost:hover {
+  background: var(--section-1);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+/* ======================================================
+   Form fields
+   ====================================================== */
+.input,
+.textarea,
+.select {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 7px 10px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: var(--accent);
+}
+.textarea {
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+}
+.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+/* ======================================================
+   Tables
+   ====================================================== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--section-1);
+}
+.table tr:hover td {
+  background: var(--section-1);
+}
+
+/* ======================================================
+   DB / status indicator (dot + label)
+   Used by SonorApp.updateDbStatusIndicator().
+   ====================================================== */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--clay, var(--text-secondary));
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  transition: background 0.3s;
+}
+.status-indicator.live .status-dot    { background: var(--ok); }
+.status-indicator.offline .status-dot { background: var(--text-muted); }
+.status-indicator.error .status-dot   { background: var(--danger); }
+.status-label { letter-spacing: 0.02em; }
+
+/* ======================================================
+   Empty state
+   ====================================================== */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ======================================================
+   Tabs (tab bar + buttons) — CANONICAL Master-Hub pattern (Spine S-4.14)
+   --------------------------------------------------------
+   Reference: sonor-master/index.html.
+   Contract:
+     - Container: <nav class="tab-bar"> or <div class="tab-bar">
+     - Children:  <button> | <button class="tab-btn"> | <div class="tab">
+     - Active state: .active (any of the above children)
+     - Right-rail actions: .nav-actions | .tab-actions (MUST be LAST child)
+   Visual language:
+     - Light strip (section-1 bg) sitting under the dark shared header
+     - Each tab underlined 3px with its POSITIONAL service colour
+       (tab #1 → --s01 purple, tab #2 → --s02 aqua, … tab #10 → --s10 charcoal)
+     - Tabs 11+ DO NOT repeat the cycle — they tail off into shades of grey,
+       cascading from --muted (warm grey) toward --body (brand white).
+       Design intent: service colours identify Sonor scope (max 10);
+       anything beyond is overflow and should visually recede.
+     - Active tab: darker text, bolder weight — NO background change
+   Positional service colour order is the workspace-wide default.
+   See Spine S-4.14 in SONOR-APP-SPINE.md.
+   ====================================================== */
+.tab-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--section-1);
+  color: var(--text-primary);
+  padding: 0 16px;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+/* Match naked <button> children, explicit .tab-btn, AND legacy <div class="tab"> */
+.tab-bar > button,
+.tab-bar .tab-btn,
+.tab-bar .tab {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  background: none;
+  color: var(--text-muted);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  padding: 10px 16px;
+  min-height: 40px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-bottom-color 0.15s, font-weight 0.15s;
+  display: inline-flex;
+  align-items: center;
+}
+.tab-bar > button:hover,
+.tab-bar .tab-btn:hover,
+.tab-bar .tab:hover {
+  color: var(--text-primary);
+  background: none;
+}
+.tab-bar > button.active,
+.tab-bar .tab-btn.active,
+.tab-bar .tab.active {
+  color: var(--text-primary);
+  font-weight: 700;
+  background: none;
+}
+.tab-bar .tab-btn .tab-count,
+.tab-bar > button .tab-count,
+.tab-bar .tab .tab-count {
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.75;
+}
+
+/* ── Positional service-colour underlines (Spine S-4.14) ──
+   Uses --s01..--s10 from brand.css (canonical 01 → 10 order).
+   Cycles every 10 children. Requires .nav-actions / .tab-actions to be LAST. */
+.tab-bar > :nth-child(10n+1) { border-bottom-color: var(--s01); }
+.tab-bar > :nth-child(10n+2) { border-bottom-color: var(--s02); }
+.tab-bar > :nth-child(10n+3) { border-bottom-color: var(--s03); }
+.tab-bar > :nth-child(10n+4) { border-bottom-color: var(--s04); }
+.tab-bar > :nth-child(10n+5) { border-bottom-color: var(--s05); }
+.tab-bar > :nth-child(10n+6) { border-bottom-color: var(--s06); }
+.tab-bar > :nth-child(10n+7) { border-bottom-color: var(--s07); }
+.tab-bar > :nth-child(10n+8) { border-bottom-color: var(--s08); }
+.tab-bar > :nth-child(10n+9) { border-bottom-color: var(--s09); }
+.tab-bar > :nth-child(10n+10) { border-bottom-color: var(--s10); }
+
+/* Overflow tail — tabs 11+ fade into brand white rather than repeating
+   --s01 (Cinema purple). Cascade: --muted → --body. Later-rule-wins over
+   the 10n+N cycle above. Positioned AFTER the cycle by design. */
+.tab-bar > :nth-child(11)  { border-bottom-color: color-mix(in srgb, var(--muted), var(--body) 30%); }
+.tab-bar > :nth-child(12)  { border-bottom-color: color-mix(in srgb, var(--muted), var(--body) 50%); }
+.tab-bar > :nth-child(13)  { border-bottom-color: color-mix(in srgb, var(--muted), var(--body) 65%); }
+.tab-bar > :nth-child(14)  { border-bottom-color: color-mix(in srgb, var(--muted), var(--body) 80%); }
+.tab-bar > :nth-child(15)  { border-bottom-color: color-mix(in srgb, var(--muted), var(--body) 90%); }
+.tab-bar > :nth-child(n+16) { border-bottom-color: color-mix(in srgb, var(--muted), var(--body) 95%); }
+
+/* Right-aligned actions container (must be LAST child so nth-child
+   positional colours land on the real tabs, not the actions rail). */
+.nav-actions,
+.tab-bar .tab-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+/* Clear the positional underline on the actions rail — it's not a tab. */
+.tab-bar > .nav-actions,
+.tab-bar > .tab-actions {
+  border-bottom: 0 !important;
+}
+.tab-bar .nav-actions select,
+.tab-bar .tab-actions select,
+.tab-bar .nav-actions > button:not(.tab-btn),
+.tab-bar .tab-actions > button:not(.tab-btn) {
+  font-family: inherit;
+  font-size: 12px;
+  background: var(--body);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  height: auto;
+}
+.tab-bar .nav-actions select,
+.tab-bar .tab-actions select { min-width: 180px; }
+.tab-bar .nav-actions > button:not(.tab-btn):hover,
+.tab-bar .tab-actions > button:not(.tab-btn):hover {
+  background: var(--section-2);
+}
+
+/* ======================================================
+   Sidebar nav — CANONICAL vertical equivalent (Spine S-4.14)
+   --------------------------------------------------------
+   For apps with a left-rail nav (Accounts, Project Master).
+   Same positional service-colour rule, rotated 90°:
+     - 3px LEFT-EDGE bar per item (instead of bottom underline)
+     - Same :nth-child(10n+N) positional cycle, same --s01..--s10
+     - Items 11+ tail off into shades of grey (same overflow
+       behaviour as .tab-bar) — no modulo wrap back to --s01
+   ====================================================== */
+.sidebar-nav > button,
+.sidebar-nav .nav-btn,
+.sidebar-nav .nav-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  background: none;
+  color: var(--text-muted);
+  border: 0;
+  border-left: 3px solid transparent;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: color 0.15s, border-left-color 0.15s, background 0.15s, font-weight 0.15s;
+}
+.sidebar-nav > button:hover,
+.sidebar-nav .nav-btn:hover,
+.sidebar-nav .nav-item:hover {
+  color: var(--text-primary);
+  background: var(--section-1);
+}
+.sidebar-nav > button.active,
+.sidebar-nav .nav-btn.active,
+.sidebar-nav .nav-item.active {
+  color: var(--text-primary);
+  font-weight: 700;
+  background: var(--section-1);
+}
+
+/* Positional left-edge bars — identical cycle to .tab-bar. */
+.sidebar-nav > :nth-child(10n+1) { border-left-color: var(--s01); }
+.sidebar-nav > :nth-child(10n+2) { border-left-color: var(--s02); }
+.sidebar-nav > :nth-child(10n+3) { border-left-color: var(--s03); }
+.sidebar-nav > :nth-child(10n+4) { border-left-color: var(--s04); }
+.sidebar-nav > :nth-child(10n+5) { border-left-color: var(--s05); }
+.sidebar-nav > :nth-child(10n+6) { border-left-color: var(--s06); }
+.sidebar-nav > :nth-child(10n+7) { border-left-color: var(--s07); }
+.sidebar-nav > :nth-child(10n+8) { border-left-color: var(--s08); }
+.sidebar-nav > :nth-child(10n+9) { border-left-color: var(--s09); }
+.sidebar-nav > :nth-child(10n+10) { border-left-color: var(--s10); }
+
+/* Overflow tail — items 11+ fade into brand white rather than repeating
+   --s01 (Cinema purple). Same cascade as .tab-bar but applied to
+   border-left-color. Later-rule-wins over the 10n+N cycle above.
+   Design intent: service colours identify Sonor scope (max 10);
+   anything beyond is overflow and should visually recede. */
+.sidebar-nav > :nth-child(11)  { border-left-color: color-mix(in srgb, var(--muted), var(--body) 30%); }
+.sidebar-nav > :nth-child(12)  { border-left-color: color-mix(in srgb, var(--muted), var(--body) 50%); }
+.sidebar-nav > :nth-child(13)  { border-left-color: color-mix(in srgb, var(--muted), var(--body) 65%); }
+.sidebar-nav > :nth-child(14)  { border-left-color: color-mix(in srgb, var(--muted), var(--body) 80%); }
+.sidebar-nav > :nth-child(15)  { border-left-color: color-mix(in srgb, var(--muted), var(--body) 90%); }
+.sidebar-nav > :nth-child(n+16) { border-left-color: color-mix(in srgb, var(--muted), var(--body) 95%); }
+
+/* ======================================================
+   Segmented toggles (source, role, any 2-way switch)
+   ====================================================== */
+.source-toggle,
+.role-toggle {
+  display: inline-flex;
+  background: var(--body);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+}
+.source-toggle button,
+.role-toggle button {
+  font-family: inherit;
+  font-size: 11px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 0;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.role-toggle button { font-size: 12px; font-weight: 500; padding: 4px 10px; }
+.source-toggle button.active,
+.role-toggle button.active {
+  background: var(--accent);
+  color: var(--cta-text, var(--body));
+}
+.source-toggle svg { width: 11px; height: 11px; }
+
+/* ======================================================
+   Modals (backdrop + card)
+   ====================================================== */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: color-mix(in srgb, var(--footer-bg) 70%, transparent);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-backdrop.show { display: flex; }
+.modal-card {
+  background: var(--surface-card);
+  border-radius: 8px;
+  padding: 20px 22px;
+  max-width: 440px;
+  width: 100%;
+  position: relative;
+  box-shadow: 0 10px 40px color-mix(in srgb, var(--footer-bg) 30%, transparent);
+}
+.modal-card h3 {
+  font-size: 15px;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.modal-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.modal-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.modal-close:hover {
+  background: var(--section-1);
+  color: var(--text-primary);
+}
+
+/* ======================================================
+   Layout helpers
+   ====================================================== */
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.spread {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ======================================================
+   Text utilities
+   ====================================================== */
+.muted { color: var(--text-muted); }
+.small { font-size: 12px; }
+.tiny  { font-size: 11px; }
+.hidden { display: none !important; }
+
+/* ======================================================
+   Follow-up status pills (.fu-pill) — shared by Leads + Follow-up Portal
+   ──────────────────────────────────────────────────────
+   Per CONTACTS-ARCHITECTURE.md visual style contract. Both apps render the
+   same pill for the same status string so users see identical signals
+   wherever a contact is viewed.
+
+   Usage:
+     <span class="fu-pill fu-pill--{status}">{label}</span>
+   Where {status} is one of: queued | drafted | draft_gmail | sent |
+   replied | meeting | no_response | closed | dnc
+
+   Colours alias to the brand service palette (defined in brand.css) so a
+   theme swap (slate / earthy / nocturne) flows through automatically.
+   Hex fallbacks match the Sonor 10-service brand for apps loading this
+   file before brand.css has settled. The `--fu-*` token layer in any app's
+   `data/app-vars.css` (e.g. Follow-up Portal) is preserved — it just
+   re-exports the same brand aliases under a clearer name.
+   ====================================================== */
+.fu-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  white-space: nowrap;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+/* v0.7.1 — TRAFFIC-LIGHT scheme REGRADED + REVERSED. Per Bryn directive 2026-05-28.
+   Pipeline progress: queued=RED (cold start, needs action) → drafted=ORANGE →
+   draft_gmail=AMBER → no_response=YELLOW (waiting) → sent=LIME → replied=GREEN-LT
+   → meeting=GREEN (best outcome). closed/dnc = terminal-dark/grey.
+   Each status has its OWN distinct shade — no two pills are the same colour. */
+.fu-pill--queued        { background: var(--fu-queued,        #d63838); color: #fff; }
+.fu-pill--drafted       { background: var(--fu-drafted,       #e8731c); color: #fff; }
+.fu-pill--draft_gmail,
+.fu-pill--draft-gmail   { background: var(--fu-draft-gmail,   #e8a02c); color: #fff; }
+.fu-pill--no_response,
+.fu-pill--no-response   { background: var(--fu-no-response,   #d4a52e); color: #fff; }
+.fu-pill--sent          { background: var(--fu-sent,          #7caf2e); color: #fff; }
+.fu-pill--replied       { background: var(--fu-replied,       #4caf50); color: #fff; }
+.fu-pill--meeting       { background: var(--fu-meeting,       #2e8b3d); color: #fff; }
+.fu-pill--closed        { background: var(--fu-closed,        #2f2e2c); color: #fff; }
+.fu-pill--dnc           { background: var(--fu-dnc,           #8a8985); color: #fff; }
+
+/* Cold-call status pills (.cc-pill) — same family, separate axis.
+   Stored in contacts.metadata.followup.cold_call_status. */
+.cc-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  white-space: nowrap;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+.cc-pill--pending       { background: var(--cc-pending,   var(--silver, #b7b1a7)); color: #2C2218; }
+.cc-pill--called        { background: var(--cc-called,    var(--green,  #78ba57)); }
+.cc-pill--no_answer,
+.cc-pill--no-answer     { background: var(--cc-no-answer, var(--yellow, #f5d05c)); color: #2C2218; }
+.cc-pill--declined      { background: var(--cc-declined,  var(--red,    #ec6061)); }
