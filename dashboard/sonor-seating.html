@@ -34,7 +34,7 @@
        (S-4.1 respected) and is intentional per the "keep the Cineca luxury look,
        Sonor branding only" brief. */
     body { background: var(--bg-0); color: var(--text-primary); font-family: 'DM Sans', system-ui, sans-serif; margin: 0; -webkit-font-smoothing: antialiased; }
-    main { max-width: 1240px; margin: 0 auto; padding: 18px 22px 40px; }
+    main { max-width: none; margin: 0; padding: 0; }
 
     /* ── Scoped luxury configurator surface ─────────────────────────── */
     .seating-cfg {
@@ -42,8 +42,8 @@
       --sc-gold:#c9a85c; --sc-gold2:#e8c97a; --sc-cream:#e8e0cc; --sc-dim:#3a3028;
       --sc-muted:#7a7060; --sc-cin:#8058a1; --sc-good:#5aad60; --sc-warn:#d4883a;
       --sc-brd:rgba(201,168,92,.12); --sc-brd2:rgba(255,255,255,.06); --sc-r:4px; --sc-r2:8px;
-      background:var(--sc-bg); color:var(--sc-cream); border-radius:14px; overflow:hidden;
-      border:1px solid var(--sc-brd); box-shadow:0 24px 60px rgba(0,0,0,.28);
+      background:var(--sc-bg); color:var(--sc-cream); overflow:hidden;
+      min-height:calc(100vh - 56px); display:flex; flex-direction:column;
     }
     .seating-cfg *{ box-sizing:border-box; }
 
@@ -71,7 +71,7 @@
     .sp-arr { color:var(--sc-dim); font-size:10px; padding:0 2px; }
 
     .step-wrap { display:none; }
-    .step-wrap.active { display:block; }
+    .step-wrap.active { display:block; flex:1 1 auto; }
     .step-heading { font-size:22px; font-weight:400; letter-spacing:.05em; color:var(--sc-cream); font-family:Georgia,serif; margin-bottom:5px; }
     .step-sub { font-size:12.5px; color:var(--sc-muted); margin-bottom:24px; line-height:1.55; }
     .loading-wrap { padding:50px; text-align:center; color:var(--sc-muted); }
