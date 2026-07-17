@@ -1,31 +1,32 @@
-/* Sonor Seating Configurator — static config
-   window.__SEATING_CONFIG__
-   UI rules + label maps only. Catalogue DATA lives in Supabase (seating_*)
-   with a Tier-2 fallback in seating-catalogue.js. Project data → Supabase.
+/* Sonor Seating Configurator — static flow config (v0.2.0)
+   window.__SEATING_CONFIG__ — UI rules + labels only. Catalogue = Library SSOT.
+   Flow: Layout → Recommended Ranges → Configure → Summary. MSRP only (trade later).
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.1.0',
-    buildDate: '2026-07-16',
-
-    // Wizard steps (Manufacturer + Range are the new multi-manufacturer front doors)
-    steps: ['Manufacturer', 'Range', 'Upholstery', 'Build', 'Summary'],
-
-    // Row layout is deliberately standard for v0.1.0 (per brief: "rows etc initially standard")
-    rowOptions: [1, 2, 3],
-
-    // Motor + accessory presentation labels (values come from the data)
-    motorLabels: { fixed: 'Fixed Recliner', '1motor': '1-Motor', '2motor': '2-Motor Luxury' },
+    version: '0.2.0',
+    buildDate: '2026-07-17',
+    steps: ['Layout', 'Choose Range', 'Configure', 'Summary'],
+    // Step 1 generic setup — standard defaults per the brief
+    rowOptions: [1, 2, 3, 4],
+    seatsPerRowOptions: [2, 3, 4, 5, 6],
+    // sensible default room (mm)
+    defaultRoom: { widthMm: 4000, lengthMm: 6000, rows: 2, seatsPerRow: 3 },
+    // clearance rules used by the recommender (mm)
+    clearance: { sideWallMm: 150, aisleMm: 0, rowGapMm: 600, seatFallbackWidthMm: 650 },
+    prefs: [
+      { id: 'reclining', label: 'Powered recliners', hint: 'Motorised recline' },
+      { id: 'daybed', label: 'Daybed / lounger', hint: 'A chaise or day-bed style seat' },
+      { id: 'sofa', label: 'Sofa / loveseat style', hint: 'Wider shared seating' }
+    ],
+    motorLabels: { fixed: 'Fixed', '1motor': '1-Motor', '2motor': '2-Motor' },
+    // item types treated as optional add-ons in Configure (not seats/armrests)
+    accessoryTypes: ['ottoman', 'corner', 'chaise', 'headrest', 'bean_bag', 'stool', 'accessory'],
     accLabels: {
       ottoman: 'Ottoman', corner: 'Corner Unit', chaise: 'Chaise Longue',
-      headrest: 'Motorised Headrest Upgrade', bean_bag: 'Bean Bag',
-      stool: 'Bar Stool', accessory: 'Accessory'
+      headrest: 'Motorised Headrest', bean_bag: 'Bean Bag', stool: 'Bar Stool', accessory: 'Accessory'
     },
-    // Item types treated as optional add-ons in the Build step (everything that is not seat/armrest)
-    accessoryTypes: ['ottoman', 'corner', 'chaise', 'headrest', 'bean_bag', 'stool', 'accessory'],
-    accMax: { chaise: 1, _default: 6 },
-
-    // localStorage key for the Tier-3 cache
-    cacheKey: 'sonor_seating_catalogue_v1'
+    accMax: { chaise: 2, _default: 8 },
+    cacheKey: 'sonor_seating_ssot_v2'
   };
 })();

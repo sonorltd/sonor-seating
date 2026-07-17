@@ -1,470 +1,274 @@
-/* Sonor Seating Configurator — wizard UI + seating-plan SVG + boot
-   Renders the Manufacturer → Range → Upholstery → Build → Summary flow.
-   All catalogue reads go through SonorSeating (data engine). No per-range code.
+/* Sonor Seating Configurator — wizard UI + plan (v0.2.0)
+   SeatingApp — Layout → Choose Range → Configure → Summary.
+   Consumes SonorSeating (SSOT) + SonorRecommend. MSRP only.
 */
 (function (global) {
   'use strict';
-
   var CFG = global.__SEATING_CONFIG__ || {};
-  var E = global.SonorSeating;
-  var STEP_LABELS = CFG.steps || ['Manufacturer', 'Range', 'Upholstery', 'Build', 'Summary'];
-  var ROW_OPTS = CFG.rowOptions || [1, 2, 3];
-
+  var E, R;
+  var STEPS = CFG.steps;
   var cfg = {
-    step: 1, manufacturer: null, range: null, material: null, colour: null,
-    options: [], rows: 2, rowConfigs: [], includeArmrests: true, accessories: {}
+    step: 1,
+    layout: Object.assign({ prefs: {} }, CFG.defaultRoom),
+    rangeId: null, material: null, colour: null, motor: null,
+    includeArmrests: true, accessories: {}
   };
 
-  // ── helpers ────────────────────────────────────────────────────────────────
   function $(id) { return document.getElementById(id); }
-  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
-  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-  function fmt(n, dp) { if (dp == null) dp = 2; return Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp }); }
-  function motorLabel(t) { return (CFG.motorLabels || {})[t] || t; }
-  function accLabel(t) { return (CFG.accLabels || {})[t] || cap(t); }
-  function assetUrl(p) { if (!p) return ''; return (/^https?:|^\.\.\//).test(p) ? p : '../' + p; }
-  function toast(m, kind) { try { if (global.SonorShell) return global.SonorShell.toast(m, { kind: kind || 'ok' }); } catch (e) {} }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function fmt(n) { return Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  function money(n) { return n == null ? 'POA' : '£' + fmt(n); }
+  function toast(m) { try { if (global.SonorShell) global.SonorShell.toast(m, { kind: 'ok' }); } catch (e) {} }
 
-  // ── boot ────────────────────────────────────────────────────────────────────
   async function boot() {
+    E = global.SonorSeating; R = global.SonorRecommend;
     try {
       var res = await E.load();
       var note = $('sourceNote');
-      if (note) {
-        var lbl = { supabase: 'Live catalogue', cache: 'Cached catalogue (offline)', seed: 'Bundled catalogue (offline)', inline: 'No catalogue data' }[E.source] || E.source;
-        note.textContent = lbl;
-        note.className = 'src-note src-' + E.source;
-      }
+      if (note) { note.textContent = { supabase: 'Live catalogue', cache: 'Offline (cached)', seed: 'Offline (bundled)', inline: 'No data' }[E.source] || E.source; note.className = 'src-note src-' + E.source; }
       renderStep();
       try { if (global.SonorShell && res.db) global.SonorShell.selfTest(res.db); } catch (e) {}
-    } catch (err) {
-      var grid = $('mfrGrid');
-      if (grid) grid.innerHTML = '<div class="loading-wrap" style="color:#c55">Failed to load catalogue: ' + esc(err && err.message) + '</div>';
-    }
+    } catch (err) { var m = $('stepBody'); if (m) m.innerHTML = '<div class="empty">Failed to load catalogue: ' + esc(err && err.message) + '</div>'; }
   }
 
-  // ── navigation ───────────────────────────────────────────────────────────────
-  function goNext() { if (cfg.step < STEP_LABELS.length) { cfg.step++; renderStep(); } }
+  // ── nav ─────────────────────────────────────────────────────────────────────
+  function goNext() { if (cfg.step < STEPS.length && !nextDisabled()) { cfg.step++; renderStep(); } }
   function goBack() { if (cfg.step > 1) { cfg.step--; renderStep(); } }
   function jumpTo(n) { if (n < cfg.step) { cfg.step = n; renderStep(); } }
-  function resetConfig() {
-    if (!global.confirm('Reset the configuration and start over?')) return;
-    cfg = { step: 1, manufacturer: null, range: null, material: null, colour: null, options: [], rows: 2, rowConfigs: [], includeArmrests: true, accessories: {} };
-    renderStep();
-  }
-
-  function stepNextDisabled() {
-    if (cfg.step === 1) return !cfg.manufacturer;
-    if (cfg.step === 2) return !cfg.range;
-    if (cfg.step === 3) return !cfg.material;
-    if (cfg.step === 4) return cfg.rowConfigs.reduce(function (s, rc) { return s + rc.seats; }, 0) === 0;
+  function restart() { cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {} }; renderStep(); }
+  function nextDisabled() {
+    if (cfg.step === 2) return !cfg.rangeId;
     return false;
   }
 
   function renderStep() {
-    document.querySelectorAll('.step-wrap').forEach(function (el, i) { el.classList.toggle('active', i + 1 === cfg.step); });
-
-    $('stepPills').innerHTML = STEP_LABELS.map(function (lbl, i) {
-      var n = i + 1, done = n < cfg.step, active = n === cfg.step;
-      var arr = i < STEP_LABELS.length - 1 ? '<span class="sp-arr">›</span>' : '';
-      return '<div class="step-pill ' + (done ? 'done' : '') + ' ' + (active ? 'active' : '') + '" ' + (done ? 'onclick="SeatingApp.jumpTo(' + n + ')"' : '') +
-        '><div class="sp-inner"><div class="sp-num">' + (done ? '✓' : n) + '</div>' + lbl + '</div></div>' + arr;
+    $('stepPills').innerHTML = STEPS.map(function (l, i) {
+      var n = i + 1, done = n < cfg.step, act = n === cfg.step;
+      return '<div class="pill ' + (done ? 'done' : '') + ' ' + (act ? 'active' : '') + '"' + (done ? ' onclick="SeatingApp.jumpTo(' + n + ')"' : '') + '><span class="pn">' + (done ? '✓' : n) + '</span>' + l + '</div>' + (i < STEPS.length - 1 ? '<span class="parr">›</span>' : '');
     }).join('');
-
-    // manufacturer context strip (logo surfaces once chosen)
-    var ctx = $('mfrContext');
-    if (ctx) {
-      if (cfg.manufacturer && cfg.step > 1) {
-        var m = E.manufacturer(cfg.manufacturer);
-        ctx.style.display = '';
-        ctx.innerHTML = '<img class="ctx-logo" src="' + esc(assetUrl(m && m.logo_url)) + '" alt="' + esc(m && m.name) + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\'">' +
-          '<span class="ctx-name" style="display:none">' + esc(m && m.name) + '</span>' +
-          (cfg.range ? '<span class="ctx-div"></span><span class="ctx-range">' + esc((E.range(cfg.range) || {}).name || '') + '</span>' : '');
-      } else { ctx.style.display = 'none'; ctx.innerHTML = ''; }
-    }
-
-    var back = $('btnBack'); back.style.display = cfg.step > 1 ? '' : 'none';
+    var back = $('btnBack'); back.style.visibility = cfg.step > 1 ? 'visible' : 'hidden';
     var next = $('btnNext');
-    if (cfg.step === STEP_LABELS.length) {
-      next.textContent = 'Start Over'; next.disabled = false; next.onclick = resetConfig;
-    } else {
-      next.textContent = 'Next →'; next.onclick = goNext; next.disabled = stepNextDisabled();
-    }
-
-    if (cfg.step === 1) renderManufacturerStep();
-    if (cfg.step === 2) renderRangeStep();
-    if (cfg.step === 3) renderMaterialStep();
-    if (cfg.step === 4) renderBuildStep();
-    if (cfg.step === 5) renderSummaryStep();
+    if (cfg.step === STEPS.length) { next.textContent = 'Start again'; next.onclick = restart; next.disabled = false; }
+    else { next.textContent = 'Continue →'; next.onclick = goNext; next.disabled = nextDisabled(); }
+    if (cfg.step === 1) renderLayout();
+    if (cfg.step === 2) renderRanges();
+    if (cfg.step === 3) renderConfigure();
+    if (cfg.step === 4) renderSummary();
     global.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // ── Step 1: Manufacturer ───────────────────────────────────────────────────
-  function renderManufacturerStep() {
-    var mfrs = E.manufacturers();
-    var grid = $('mfrGrid');
-    if (!mfrs.length) { grid.innerHTML = '<div class="loading-wrap">No manufacturers in the library yet.</div>'; return; }
-    grid.innerHTML = mfrs.map(function (m) {
-      var nRanges = E.ranges(m.id).length;
-      return '<div class="mfr-card ' + (cfg.manufacturer === m.id ? 'selected' : '') + '" onclick="SeatingApp.selectManufacturer(\'' + m.id + '\')">' +
-        '<div class="sel-check">✓</div>' +
-        '<div class="mfr-logo-wrap"><img class="mfr-logo" src="' + esc(assetUrl(m.logo_url)) + '" alt="' + esc(m.name) + '" onerror="this.style.display=\'none\';this.parentElement.querySelector(\'.mfr-logo-fallback\').style.display=\'flex\'">' +
-        '<div class="mfr-logo-fallback" style="display:none">' + esc(m.name) + '</div></div>' +
-        '<div class="mfr-body"><div class="mfr-name">' + esc(m.name) + '</div>' +
-        '<div class="mfr-blurb">' + esc(m.blurb || '') + '</div>' +
-        '<div class="mfr-meta">' + nRanges + ' range' + (nRanges !== 1 ? 's' : '') + '</div></div></div>';
+  // ── Step 1 · Layout ──────────────────────────────────────────────────────────
+  function renderLayout() {
+    var L = cfg.layout;
+    var prefBtns = (CFG.prefs || []).map(function (p) {
+      return '<button class="chip ' + (L.prefs[p.id] ? 'on' : '') + '" onclick="SeatingApp.togglePref(\'' + p.id + '\')" title="' + esc(p.hint) + '">' + esc(p.label) + '</button>';
     }).join('');
+    var rowP = CFG.rowOptions.map(function (n) { return '<button class="opt ' + (L.rows === n ? 'on' : '') + '" onclick="SeatingApp.setLayout(\'rows\',' + n + ')">' + n + '</button>'; }).join('');
+    var spr = CFG.seatsPerRowOptions.map(function (n) { return '<button class="opt ' + (L.seatsPerRow === n ? 'on' : '') + '" onclick="SeatingApp.setLayout(\'seatsPerRow\',' + n + ')">' + n + '</button>'; }).join('');
+    $('stepBody').innerHTML =
+      '<div class="lead"><h2>Design your room</h2><p>Start with the space and how many seats you want. We’ll then recommend ranges that fit.</p></div>' +
+      '<div class="layout-grid">' +
+        '<div class="panel"><div class="ptt">Room size</div>' +
+          '<label class="fld"><span>Width (m)</span><input type="number" step="0.1" min="1.5" value="' + (L.widthMm / 1000) + '" oninput="SeatingApp.setLayout(\'widthMm\', Math.round(this.value*1000))"></label>' +
+          '<label class="fld"><span>Length (m)</span><input type="number" step="0.1" min="2" value="' + (L.lengthMm / 1000) + '" oninput="SeatingApp.setLayout(\'lengthMm\', Math.round(this.value*1000))"></label>' +
+          '<div class="hint" id="fitHint"></div>' +
+        '</div>' +
+        '<div class="panel"><div class="ptt">Seating</div>' +
+          '<div class="lbl">Rows</div><div class="opts">' + rowP + '</div>' +
+          '<div class="lbl">Seats per row</div><div class="opts">' + spr + '</div>' +
+          '<div class="lbl">Total seats</div><div class="big" id="totalSeats"></div>' +
+        '</div>' +
+        '<div class="panel"><div class="ptt">Preferences <span class="opt-tag">optional</span></div>' +
+          '<div class="chips">' + prefBtns + '</div>' +
+          '<div class="hint">We’ll flag ranges that don’t offer what you pick (e.g. no daybed).</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="roomview" id="roomView"></div>';
+    updateLayoutDerived();
   }
-  function selectManufacturer(id) {
-    cfg.manufacturer = id; cfg.range = null; cfg.material = null; cfg.colour = null; cfg.options = []; cfg.rowConfigs = []; cfg.accessories = {};
-    renderStep();
+  function setLayout(k, v) { cfg.layout[k] = v; if (k === 'rows' || k === 'seatsPerRow') renderLayout(); else updateLayoutDerived(); }
+  function togglePref(id) { cfg.layout.prefs[id] = !cfg.layout.prefs[id]; renderLayout(); }
+  function updateLayoutDerived() {
+    var L = cfg.layout, total = L.rows * L.seatsPerRow;
+    if ($('totalSeats')) $('totalSeats').textContent = total;
+    var usable = L.widthMm - 300;
+    if ($('fitHint')) $('fitHint').innerHTML = 'Usable width ≈ <b>' + (usable / 1000).toFixed(1) + 'm</b> (allowing 150mm each side).';
+    if ($('roomView')) $('roomView').innerHTML = roomSVG(L);
   }
 
-  // ── Step 2: Range ───────────────────────────────────────────────────────────
-  function renderRangeStep() {
-    var rs = E.ranges(cfg.manufacturer);
-    var grid = $('rangeGrid');
-    $('rangeHeading').textContent = 'Select a ' + ((E.manufacturer(cfg.manufacturer) || {}).name || '') + ' Range';
-    if (!rs.length) { grid.innerHTML = '<div class="loading-wrap">No ranges for this manufacturer yet.</div>'; return; }
-    grid.innerHTML = rs.map(function (r) {
-      var from = E.rangeFromPrice(r.id, entryMaterial(r.id));
-      var fromStr = from != null ? 'From <strong>£' + fmt(from, 0) + '</strong> / seat (trade)' : '';
-      return '<div class="range-card ' + (cfg.range === r.id ? 'selected' : '') + '" onclick="SeatingApp.selectRange(\'' + r.id + '\')">' +
-        '<div class="sel-check">✓</div>' +
-        '<div class="rc-image" style="background-image:url(\'' + esc(assetUrl(r.thumb_img)) + '\')"></div>' +
-        '<div class="rc-body"><div class="rc-name">' + esc(r.name) + '</div>' +
-        '<div class="rc-tag">' + esc(r.tagline || '') + '</div>' +
-        '<div class="rc-desc">' + esc(r.description || '') + '</div>' +
-        (fromStr ? '<div class="rc-from">' + fromStr + '</div>' : '') + '</div></div>';
-    }).join('');
+  // ── Step 2 · Choose Range ────────────────────────────────────────────────────
+  function renderRanges() {
+    var ranked = R.rank(cfg.layout);
+    var fitCount = ranked.filter(function (x) { return x.fitsWidth; }).length;
+    $('stepBody').innerHTML =
+      '<div class="lead"><h2>Recommended ranges</h2><p>' + fitCount + ' of ' + ranked.length + ' ranges suit a ' + cfg.layout.seatsPerRow + '-across, ' + cfg.layout.rows + '-row layout in your ' + (cfg.layout.widthMm / 1000).toFixed(1) + 'm room. Ranked by fit.</p></div>' +
+      '<div class="range-grid">' + ranked.map(rangeCard).join('') + '</div>';
   }
-  // a sensible material for "from" pricing: first available material of the range
-  function entryMaterial(rangeId) { var m = E.materialsForRange(rangeId)[0]; return m ? m.id : null; }
-  function selectRange(id) {
-    cfg.range = id; cfg.material = null; cfg.colour = null;
-    var rc = E.rangeConfig(id);
-    cfg.rowConfigs = Array.from({ length: cfg.rows }, function () { return { seats: rc.default_seats_per_row, motorType: null }; });
-    cfg.accessories = {};
-    renderStep();
+  function rangeCard(x, i) {
+    var r = x.range, sel = cfg.rangeId === r.id;
+    var from = E.fromPrice(r);
+    var badge = i === 0 && x.fitsWidth ? '<span class="rec">Best fit</span>' : (x.fitsWidth ? '<span class="fit">Fits</span>' : '<span class="nofit">Tight fit</span>');
+    var flags = x.flags.map(function (f) { return '<span class="flag ' + f.kind + '">' + (f.kind === 'warn' ? '⚠ ' : '') + esc(f.text) + '</span>'; }).join('');
+    var plus = x.plus.slice(0, 3).map(function (p) { return '<span class="plus">✓ ' + esc(p) + '</span>'; }).join('');
+    var img = r.hero_img ? '<div class="rc-img" style="background-image:url(\'' + esc(r.hero_img) + '\')"></div>' : '<div class="rc-img rc-noimg">' + esc(r.manufacturer) + '</div>';
+    return '<div class="rcard ' + (sel ? 'sel' : '') + ' ' + (x.fitsWidth ? '' : 'dim') + '" onclick="SeatingApp.pickRange(\'' + r.id + '\')">' +
+      img +
+      '<div class="rc-b">' +
+        '<div class="rc-top"><div><div class="rc-mfr">' + esc(r.manufacturer) + '</div><div class="rc-name">' + esc(r.name) + '</div></div>' + badge + '</div>' +
+        (r.style ? '<div class="rc-style">' + esc(r.style) + '</div>' : '') +
+        '<div class="rc-price">' + (from != null ? 'From <b>' + money(from) + '</b> / seat' : '<b>MSRP on request</b>') + '</div>' +
+        (plus ? '<div class="rc-plus">' + plus + '</div>' : '') +
+        (flags ? '<div class="rc-flags">' + flags + '</div>' : '') +
+      '</div></div>';
+  }
+  function pickRange(id) {
+    cfg.rangeId = id; cfg.material = null; cfg.colour = null; cfg.motor = null; cfg.accessories = {};
+    var r = E.range(id); var mats = r.materials || [];
+    if (mats.length) { cfg.material = mats[0].id; if ((mats[0].colours || []).length) cfg.colour = mats[0].colours[0].name; }
+    var motors = E.motorOptions(r); cfg.motor = motors[0] || null;
+    renderStep(); if (cfg.step === 2) { document.querySelectorAll('.rcard').forEach(function (c) { c.classList.remove('sel'); }); goNext(); }
   }
 
-  // ── Step 3: Upholstery ──────────────────────────────────────────────────────
-  function renderMaterialStep() {
-    var mats = E.materialsForRange(cfg.range);
-    var groups = {};
-    mats.forEach(function (m) { (groups[m.group_id] = groups[m.group_id] || []).push(m); });
-    var rname = (E.range(cfg.range) || {}).name || '';
-    $('matSub').textContent = 'Choose the upholstery for the ' + rname + ' configuration. Only grades available for this range are shown.';
+  // ── Step 3 · Configure ───────────────────────────────────────────────────────
+  function renderConfigure() {
+    var r = E.range(cfg.rangeId); if (!r) { cfg.step = 2; return renderStep(); }
+    var mats = r.materials || [], fins = r.finishes || [], motors = E.motorOptions(r);
+    var matHtml = mats.length ? '<div class="panel"><div class="ptt">Upholstery</div><div class="swatches">' +
+      mats.map(function (m) { return '<button class="sw ' + (cfg.material === m.id ? 'on' : '') + '" style="--c:' + esc(m.swatch || '#888') + '" onclick="SeatingApp.setMaterial(\'' + m.id + '\')"><span></span>' + esc(m.name) + '</button>'; }).join('') + '</div>' + colourHtml(r) + '</div>'
+      : (r.metadata && r.metadata.needs_review ? '<div class="panel"><div class="ptt">Upholstery</div><div class="hint">Fabric &amp; leather options for this range are confirmed at quotation — ' + esc((r.materials || []).length ? '' : (fins.length ? '' : (catFinish(r) || 'various finishes'))) + '</div></div>' : '');
+    var motorHtml = motors.length > 1 ? '<div class="panel"><div class="ptt">Recline</div><div class="opts">' +
+      motors.map(function (mt) { return '<button class="opt ' + (cfg.motor === mt ? 'on' : '') + '" onclick="SeatingApp.setMotor(\'' + mt + '\')">' + esc((CFG.motorLabels || {})[mt] || mt) + '</button>'; }).join('') + '</div></div>' : '';
+    var accs = E.accessoryItems(cfg.rangeId);
+    var accHtml = accs.length ? '<div class="panel"><div class="ptt">Add-ons</div>' + accs.map(function (it) {
+      var q = cfg.accessories[it.id] || 0, s = E.itemSell(it);
+      return '<div class="acc"><div><div class="acc-n">' + esc(it.label) + '</div><div class="acc-p">' + (s != null ? money(s) + ' each' : 'POA') + '</div></div>' +
+        '<div class="qty"><button onclick="SeatingApp.acc(\'' + it.id + '\',-1)">−</button><span id="q_' + it.id + '">' + q + '</span><button onclick="SeatingApp.acc(\'' + it.id + '\',1)">+</button></div></div>';
+    }).join('') + '</div>' : '';
+    var arm = E.armrestItems(cfg.rangeId).length ? '<div class="panel"><div class="ptt">Armrests</div><label class="toggle"><input type="checkbox" ' + (cfg.includeArmrests ? 'checked' : '') + ' onchange="SeatingApp.toggleArm(this.checked)"> Include separate armrests (1 per seat + row ends)</label></div>' : '';
 
-    $('matSections').innerHTML = Object.keys(groups).map(function (grp) {
-      return '<div><div class="mat-sec-lbl">' + esc(cap(grp)) + '</div><div class="mat-grid">' +
-        groups[grp].map(function (m) {
-          var pr = seatPriceFor(m.id);
-          var priceStr = pr != null ? 'Seat from £' + fmt(pr, 0) + ' trade' : '';
-          var nCol = E.colours(m.id).length;
-          var note = (m.metadata && m.metadata.note) ? m.metadata.note : '';
-          return '<div class="mat-card ' + (cfg.material === m.id ? 'selected' : '') + '" onclick="SeatingApp.selectMaterial(\'' + m.id + '\')">' +
-            '<div class="mat-swatch" style="background:' + esc(m.swatch_hex || '#555') + '"></div><div>' +
-            '<div class="mat-name">' + esc(m.name) + '</div>' +
-            '<div class="mat-tier">' + esc(cap(grp)) + ' · Tier ' + (m.tier || 1) + '</div>' +
-            (note ? '<div class="mat-note">⚠ ' + esc(note) + '</div>' : '') +
-            (priceStr ? '<div class="mat-price">' + priceStr + '</div>' : '') +
-            '<div class="mat-price" style="opacity:.7">' + nCol + ' colourways</div></div></div>';
-        }).join('') + '</div></div>';
-    }).join('');
-    if (cfg.material) showColourSection(cfg.material);
-    else $('colourSection').style.display = 'none';
+    $('stepBody').innerHTML =
+      '<div class="lead"><h2>Configure your ' + esc(r.name) + '</h2><p>' + esc(r.manufacturer) + (r.style ? ' · ' + esc(r.style) : '') + '</p></div>' +
+      '<div class="cfg-grid"><div class="cfg-left">' +
+        '<div class="panel"><div class="ptt">Layout</div><div class="lbl">Seats per row</div><div class="opts">' +
+          CFG.seatsPerRowOptions.map(function (n) { return '<button class="opt ' + (cfg.layout.seatsPerRow === n ? 'on' : '') + '" onclick="SeatingApp.setLayout2(\'seatsPerRow\',' + n + ')">' + n + '</button>'; }).join('') +
+          '</div><div class="lbl">Rows</div><div class="opts">' +
+          CFG.rowOptions.map(function (n) { return '<button class="opt ' + (cfg.layout.rows === n ? 'on' : '') + '" onclick="SeatingApp.setLayout2(\'rows\',' + n + ')">' + n + '</button>'; }).join('') +
+          '</div></div>' + motorHtml + matHtml + arm + accHtml +
+        '</div>' +
+        '<div class="cfg-right"><div class="panel sticky"><div class="ptt">Your cinema</div><div id="planWrap"></div>' +
+          '<div id="liveTotal" class="live"></div></div></div>' +
+      '</div>';
+    updateLive();
   }
-  function seatPriceFor(materialId) {
-    var it = E.seatItem(cfg.range, E.motorTypes(cfg.range)[0]);
-    if (!it) return null; var pr = E.priceRow(it, materialId);
-    return pr ? Number(pr.price_trade_gbp) : null;
+  function colourHtml(r) {
+    var m = (r.materials || []).find(function (x) { return x.id === cfg.material; });
+    var cols = (m && m.colours) || [];
+    if (!cols.length) return '';
+    return '<div class="lbl" style="margin-top:12px">Colour</div><div class="cols">' + cols.map(function (c) {
+      return '<button class="col ' + (cfg.colour === c.name ? 'on' : '') + '" title="' + esc(c.name) + '" style="--c:' + esc(c.hex) + '" onclick="SeatingApp.setColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')"></button>';
+    }).join('') + '</div>';
   }
-  function selectMaterial(id) { cfg.material = id; cfg.colour = null; renderStep(); }
-  function showColourSection(materialId) {
-    var cols = E.colours(materialId), sec = $('colourSection'); sec.style.display = '';
-    var m = E.material(materialId) || {};
-    $('colourSecSub').textContent = (m.name || '') + ' is available in ' + cols.length + ' colourways. Select your preference — samples can be arranged.';
-    $('colourGrid').innerHTML = cols.map(function (c) {
-      return '<div class="colour-chip ' + (cfg.colour === c.name ? 'selected' : '') + '" onclick="SeatingApp.selectColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')">' +
-        '<div class="colour-chip-swatch" style="background:' + esc(c.hex) + '"></div><div class="colour-chip-name">' + esc(c.name) + '</div></div>';
-    }).join('');
-    var fins = E.finishOptions(cfg.manufacturer);
-    $('finishBlock').style.display = fins.length ? '' : 'none';
-    $('finishOpts').innerHTML = fins.map(function (f) {
-      return '<div class="finish-opt ' + (cfg.options.indexOf(f.id) >= 0 ? 'active' : '') + '" onclick="SeatingApp.toggleFinish(\'' + f.id + '\')">' +
-        '<div class="fo-toggle"></div><div class="fo-info"><div class="fo-label">' + esc(f.label) + '</div><div class="fo-note">' + esc(f.note || '') + '</div></div></div>';
-    }).join('');
+  function catFinish(r) { var it = E.seatItems(r.id)[0]; return it && it.finish; }
+  function setMaterial(id) { cfg.material = id; var r = E.range(cfg.rangeId); var m = (r.materials || []).find(function (x) { return x.id === id; }); cfg.colour = m && (m.colours || [])[0] ? m.colours[0].name : null; renderConfigure(); }
+  function setColour(n) { cfg.colour = n; renderConfigure(); }
+  function setMotor(mt) { cfg.motor = mt; updateLive(); document.querySelectorAll('.cfg-left .opt').forEach(function () {}); renderConfigure(); }
+  function setLayout2(k, v) { cfg.layout[k] = v; renderConfigure(); }
+  function toggleArm(v) { cfg.includeArmrests = v; updateLive(); }
+  function acc(id, d) { var m = itemById(id); var max = (CFG.accMax && CFG.accMax[accType(m)]) || (CFG.accMax && CFG.accMax._default) || 8; cfg.accessories[id] = Math.max(0, Math.min(max, (cfg.accessories[id] || 0) + d)); var el = $('q_' + id); if (el) el.textContent = cfg.accessories[id]; updateLive(); }
+  function accType(it) { var l = (it.label || '').toLowerCase(); return /chaise/.test(l) ? 'chaise' : '_default'; }
+
+  // ── quote build (MSRP) ──────────────────────────────────────────────────────
+  function primarySeat() {
+    var seats = E.seatItems(cfg.rangeId);
+    if (!seats.length) return null;
+    if (cfg.motor) { var m = seats.find(function (s) { var l = (s.label || '').toLowerCase(); return (cfg.motor === '2motor' && /2-?motor/.test(l)) || (cfg.motor === '1motor' && /1-?motor/.test(l)) || (cfg.motor === 'fixed' && /fixed|non-reclin/.test(l)); }); if (m) return m; }
+    // cheapest priced seat, else first
+    var priced = seats.filter(function (s) { return s.sell_price_gbp != null; }).sort(function (a, b) { return a.sell_price_gbp - b.sell_price_gbp; });
+    return priced[0] || seats[0];
   }
-  function selectColour(name) { cfg.colour = name; renderMaterialStep(); }
-  function toggleFinish(id) { var i = cfg.options.indexOf(id); if (i >= 0) cfg.options.splice(i, 1); else cfg.options.push(id); renderMaterialStep(); }
-
-  // ── Step 4: Build ────────────────────────────────────────────────────────────
-  function renderBuildStep() {
-    var motors = E.motorTypes(cfg.range), defMt = motors[0] || 'fixed';
-    var rc = E.rangeConfig(cfg.range);
-    if (!cfg.rowConfigs.length) cfg.rowConfigs = Array.from({ length: cfg.rows }, function () { return { seats: rc.default_seats_per_row, motorType: defMt }; });
-    cfg.rowConfigs.forEach(function (r) { if (!r.motorType || motors.indexOf(r.motorType) < 0) r.motorType = defMt; });
-
-    $('rowPills').innerHTML = ROW_OPTS.map(function (n) {
-      return '<button class="opt-pill ' + (cfg.rows === n ? 'active' : '') + '" onclick="SeatingApp.setRows(' + n + ')">' + n + ' Row' + (n !== 1 ? 's' : '') + '</button>';
-    }).join('');
-    renderRowCards();
-    $('armToggle').classList.toggle('on', cfg.includeArmrests);
-    updateArmInfo();
-
-    var accItems = E.accessoryItems(cfg.range);
-    $('accRows').innerHTML = accItems.length ? accItems.map(function (it) {
-      var pr = E.priceRow(it, cfg.material); var trade = pr ? Number(pr.price_trade_gbp) : null;
-      var qty = cfg.accessories[it.item_type] || 0;
-      return '<div class="acc-row"><div style="flex:1"><div class="acc-name">' + esc(accLabel(it.item_type)) + '</div>' +
-        (it.size_label ? '<div class="acc-note">' + esc(it.size_label) + '</div>' : '') +
-        (it.is_universal ? '<div class="acc-note">Universal pricing</div>' : '') + '</div>' +
-        '<div class="acc-price">' + (trade != null ? '<strong>£' + fmt(trade) + '</strong> trade' : '—') + '</div>' +
-        '<div class="qty-ctrl"><button class="qty-btn" onclick="SeatingApp.changeAcc(\'' + it.item_type + '\',-1)">−</button>' +
-        '<div class="qty-val" id="accQty_' + it.item_type + '">' + qty + '</div>' +
-        '<button class="qty-btn" onclick="SeatingApp.changeAcc(\'' + it.item_type + '\',1)">+</button></div></div>';
-    }).join('') : '<div style="color:var(--sc-muted);font-size:12px">No accessories available for this range.</div>';
-
-    updateBuildSummary();
+  function itemById(id) { return E.itemsOf(cfg.rangeId).find(function (i) { return i.id === id; }); }
+  function quoteLines() {
+    var lines = [], total = cfg.layout.rows * cfg.layout.seatsPerRow;
+    var seat = primarySeat();
+    if (seat) lines.push({ label: seat.label, qty: total, unit: E.itemSell(seat) });
+    var arms = E.armrestItems(cfg.rangeId);
+    if (cfg.includeArmrests && arms.length) { var a = arms[0]; lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: E.itemSell(a) }); }
+    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it) }); });
+    return lines;
   }
-  function renderRowCards() {
-    var motors = E.motorTypes(cfg.range), multi = motors.length > 1;
-    var rc = E.rangeConfig(cfg.range), minS = rc.min_seats, maxS = rc.max_seats;
-    $('rowConfigCards').innerHTML = cfg.rowConfigs.map(function (row, idx) {
-      var label = String.fromCharCode(65 + idx);
-      var pos = idx === 0 ? 'Front row · nearest screen' : (idx === cfg.rowConfigs.length - 1 && cfg.rowConfigs.length > 1 ? 'Back row' : '');
-      var pills = '';
-      for (var n = minS; n <= maxS; n++) pills += '<button class="opt-pill ' + (row.seats === n ? 'active' : '') + '" onclick="SeatingApp.setRowSeats(' + idx + ',' + n + ')">' + n + '</button>';
-      var motorHtml = '';
-      if (multi) {
-        motorHtml = '<div style="margin-top:12px"><div class="mini-lbl">Motor Type</div><div class="style-select">' +
-          motors.map(function (mt) {
-            var si = E.seatItem(cfg.range, mt); var pr = si && E.priceRow(si, cfg.material);
-            var ps = pr ? '£' + fmt(pr.price_trade_gbp, 0) + ' trade' : '';
-            return '<button class="style-btn ' + (row.motorType === mt ? 'active' : '') + '" onclick="SeatingApp.setRowMotorType(' + idx + ',\'' + mt + '\')">' + esc(motorLabel(mt)) + '<small>' + ps + '</small></button>';
-          }).join('') + '</div></div>';
+  function updateLive() {
+    var lines = quoteLines(), any = lines.some(function (l) { return l.unit != null; });
+    var total = lines.reduce(function (s, l) { return s + (l.unit || 0) * l.qty; }, 0);
+    var poa = lines.some(function (l) { return l.unit == null; });
+    $('planWrap').innerHTML = planSVG();
+    $('liveTotal').innerHTML = '<div class="lt-row"><span>Estimated MSRP</span><b>' + (any ? money(total) + (poa ? ' + POA items' : '') : 'On request') + '</b></div><div class="lt-sub">ex VAT · indicative — confirmed at quotation</div>';
+  }
+
+  // ── Step 4 · Summary ─────────────────────────────────────────────────────────
+  function renderSummary() {
+    var r = E.range(cfg.rangeId); if (!r) { cfg.step = 2; return renderStep(); }
+    var lines = quoteLines(), total = lines.reduce(function (s, l) { return s + (l.unit || 0) * l.qty; }, 0);
+    var mat = (r.materials || []).find(function (m) { return m.id === cfg.material; });
+    $('stepBody').innerHTML =
+      '<div class="summary">' +
+        '<div class="sm-head"><div><div class="sm-mfr">' + esc(r.manufacturer) + '</div><h2>' + esc(r.name) + '</h2></div><div class="sm-date">' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + '</div></div>' +
+        '<div class="strip">' +
+          cell('Room', (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm') +
+          cell('Layout', (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats', cfg.layout.rows + ' rows × ' + cfg.layout.seatsPerRow) +
+          cell('Upholstery', mat ? esc(mat.name) : (catFinish(r) || 'TBC'), cfg.colour ? esc(cfg.colour) : '') +
+          cell('Estimated MSRP', lines.some(function (l) { return l.unit != null; }) ? money(total) : 'On request', 'ex VAT') +
+        '</div>' +
+        '<div class="planbig">' + planSVG(true) + '</div>' +
+        '<table class="quote"><thead><tr><th>Item</th><th>Qty</th><th class="r">Unit MSRP</th><th class="r">Line MSRP</th></tr></thead><tbody>' +
+          lines.map(function (l) { return '<tr><td>' + esc(l.label) + '</td><td>' + l.qty + '</td><td class="r">' + money(l.unit) + '</td><td class="r">' + (l.unit != null ? money(l.unit * l.qty) : 'POA') + '</td></tr>'; }).join('') +
+          '<tr class="tot"><td colspan="3">Estimated total (ex VAT)</td><td class="r">' + money(total) + '</td></tr>' +
+        '</tbody></table>' +
+        '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button><button class="btn primary" onclick="SeatingApp.print()">🖨 Print / Save PDF</button></div>' +
+        '<div class="disc">Indicative MSRP from the Sonor library. Final pricing, fabric grades and lead times are confirmed on a formal quotation.</div>' +
+      '</div>';
+  }
+  function cell(l, v, n) { return '<div class="cellx"><div class="cl">' + l + '</div><div class="cv">' + v + '</div>' + (n ? '<div class="cn">' + n + '</div>' : '') + '</div>'; }
+
+  // ── plans (SVG) ──────────────────────────────────────────────────────────────
+  function roomSVG(L) {
+    var W = 420, scale = W / Math.max(L.widthMm, 3000), H = Math.max(120, Math.min(240, L.lengthMm * scale * 0.5));
+    var rw = L.widthMm * scale;
+    return '<svg viewBox="0 0 ' + (rw + 20) + ' ' + (H + 30) + '" width="100%" style="max-width:460px;display:block">' +
+      '<rect x="10" y="10" width="' + rw + '" height="' + H + '" rx="6" fill="rgba(255,255,255,.03)" stroke="rgba(201,168,92,.25)"/>' +
+      '<rect x="10" y="6" width="' + rw + '" height="6" fill="rgba(201,168,92,.5)"/><text x="' + (10 + rw / 2) + '" y="4" text-anchor="middle" fill="rgba(201,168,92,.7)" font-size="7" font-family="system-ui">SCREEN</text>' +
+      seatsSVG(L, 10, 22, rw, H - 12, scale) +
+      '<text x="' + (10 + rw / 2) + '" y="' + (H + 26) + '" text-anchor="middle" fill="rgba(122,112,96,.7)" font-size="9" font-family="system-ui">' + (L.widthMm / 1000).toFixed(1) + 'm wide · ' + (L.rows * L.seatsPerRow) + ' seats</text></svg>';
+  }
+  function seatsSVG(L, x0, y0, rw, rh, scale) {
+    var sw = (CFG.clearance.seatFallbackWidthMm) * scale;
+    if (cfg.rangeId && E) sw = E.seatWidthMm(E.range(cfg.rangeId)) * scale;
+    var out = '', rows = L.rows, per = L.seatsPerRow;
+    var gap = 6, seatH = Math.max(14, (rh - (rows + 1) * gap) / rows);
+    for (var r = 0; r < rows; r++) {
+      var totalW = per * sw + (per - 1) * 3;
+      var sx = x0 + (rw - totalW) / 2, sy = y0 + gap + r * (seatH + gap);
+      for (var s = 0; s < per; s++) {
+        out += '<rect x="' + (sx + s * (sw + 3)) + '" y="' + sy + '" width="' + (sw - 2) + '" height="' + seatH + '" rx="3" fill="rgba(128,88,161,.28)" stroke="rgba(128,88,161,.55)"/>';
       }
-      return '<div class="row-cfg-card"><div class="row-cfg-label"><span class="row-letter">' + label + '</span>' +
-        '<span class="row-desc">' + pos + '</span><span class="row-seat-count">' + row.seats + ' seat' + (row.seats !== 1 ? 's' : '') + '</span></div>' +
-        '<div class="option-pills">' + pills + '</div>' + motorHtml + '</div>';
-    }).join('');
-  }
-  function setRows(n) {
-    cfg.rows = n; var rc = E.rangeConfig(cfg.range), motors = E.motorTypes(cfg.range), defMt = motors[0] || 'fixed';
-    while (cfg.rowConfigs.length < n) cfg.rowConfigs.push({ seats: rc.default_seats_per_row, motorType: defMt });
-    cfg.rowConfigs = cfg.rowConfigs.slice(0, n);
-    renderBuildStep();
-  }
-  function setRowSeats(idx, n) { if (cfg.rowConfigs[idx]) { cfg.rowConfigs[idx].seats = n; renderRowCards(); updateArmInfo(); updateBuildSummary(); } }
-  function setRowMotorType(idx, mt) { if (cfg.rowConfigs[idx]) { cfg.rowConfigs[idx].motorType = mt; renderRowCards(); updateBuildSummary(); } }
-  function toggleArmrests() { cfg.includeArmrests = !cfg.includeArmrests; $('armToggle').classList.toggle('on', cfg.includeArmrests); updateArmInfo(); updateBuildSummary(); }
-  function updateArmInfo() {
-    if (cfg.includeArmrests) {
-      var total = cfg.rowConfigs.reduce(function (s, rc) { return s + rc.seats + 1; }, 0);
-      var detail = cfg.rowConfigs.map(function (rc, i) { return 'Row ' + String.fromCharCode(65 + i) + ': ' + (rc.seats + 1); }).join(' · ');
-      $('armCountInfo').textContent = total + ' armrests total  (' + detail + ')';
-    } else $('armCountInfo').textContent = '';
-  }
-  function changeAcc(type, delta) {
-    var max = (CFG.accMax && CFG.accMax[type]) || (CFG.accMax && CFG.accMax._default) || 6;
-    var cur = cfg.accessories[type] || 0; cfg.accessories[type] = Math.max(0, Math.min(max, cur + delta));
-    var el = $('accQty_' + type); if (el) el.textContent = cfg.accessories[type];
-    updateBuildSummary();
-  }
-  function updateBuildSummary() {
-    var totalSeats = cfg.rowConfigs.reduce(function (s, rc) { return s + rc.seats; }, 0);
-    var maxRow = cfg.rowConfigs.reduce(function (m, rc) { return Math.max(m, rc.seats); }, 0);
-    var rc = E.rangeConfig(cfg.range);
-    var widthM = (maxRow * rc.seat_width_mm / 1000).toFixed(2);
-    $('ssiTotal').textContent = totalSeats || '—';
-    $('ssiRows').textContent = cfg.rows || '—';
-    $('ssiWidth').textContent = totalSeats ? widthM + 'm' : '—';
-    updateLivePanel(E.entries(cfg));
-    $('btnNext').disabled = stepNextDisabled();
-  }
-  function updateLivePanel(entries) {
-    var lines = $('liveLines');
-    if (!entries.length) {
-      lines.innerHTML = '<div class="live-empty">No items yet</div>';
-      $('liveTotalRow').style.display = 'none';
-      $('buildPlanWrap').innerHTML = '<div class="plan-empty">Configure rows to see the floor plan</div>';
-      return;
     }
-    var tradeTot = 0, srpTot = 0;
-    lines.innerHTML = entries.map(function (e) {
-      tradeTot += e.tradeTot; srpTot += e.srpTot;
-      return '<div class="live-line"><span class="ll-name">' + e.qty + '× ' + esc(e.shortName) + '</span><span class="ll-price">£' + fmt(e.tradeTot, 0) + '</span></div>';
-    }).join('');
-    $('liveTradeTot').textContent = '£' + fmt(tradeTot);
-    $('liveSrpTot').textContent = '£' + fmt(srpTot);
-    $('liveTotalRow').style.display = '';
-    $('buildPlanWrap').innerHTML = buildSeatPlanSVG(entries, false);
+    return out;
   }
+  function planSVG(large) { return roomSVG(cfg.layout); }
 
-  // ── Step 5: Summary ──────────────────────────────────────────────────────────
-  function renderSummaryStep() {
-    var entries = E.entries(cfg);
-    var r = E.range(cfg.range) || {}, m = E.material(cfg.material) || {};
-    var tradeTot = 0, srpTot = 0; entries.forEach(function (e) { tradeTot += e.tradeTot; srpTot += e.srpTot; });
-    $('summaryDate').textContent = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-    var totalSeats = cfg.rowConfigs.reduce(function (s, rc) { return s + rc.seats; }, 0);
-    var motors = E.motorTypes(cfg.range), multi = motors.length > 1;
-    var optLabels = cfg.options.map(function (id) { var f = E.finishOptions(cfg.manufacturer).find(function (x) { return x.id === id; }); return f ? f.label : null; }).filter(Boolean);
-    var rowBreak = cfg.rowConfigs.map(function (rc, i) { return 'Row ' + String.fromCharCode(65 + i) + ': ' + rc.seats + ' seat' + (rc.seats !== 1 ? 's' : '') + (multi ? ' (' + motorLabel(rc.motorType) + ')' : ''); }).join(' · ');
-    var mfr = E.manufacturer(cfg.manufacturer) || {};
-
-    $('configStrip').innerHTML =
-      block('Manufacturer', esc(mfr.name || '')) +
-      block('Range', esc(r.name || ''), esc(r.tagline || '')) +
-      block('Upholstery', esc(m.name || cfg.material), esc(cfg.colour || 'Colour TBC')) +
-      block('Configuration', totalSeats + ' Seats', esc(rowBreak)) +
-      block('Finish', optLabels.length ? esc(optLabels.join(', ')) : 'Standard') +
-      block('Trade Total (ex VAT)', '£' + fmt(tradeTot), 'SRP ex VAT: £' + fmt(srpTot));
-
-    $('summaryPlanWrap').innerHTML = buildSeatPlanSVG(entries, true);
-
-    $('quoteBody').innerHTML = entries.map(function (e) {
-      return '<tr><td>' + esc(e.item.item_name) + (e.item.size_label ? ' <span style="color:var(--sc-muted);font-size:9.5px">(' + esc(e.item.size_label) + ')</span>' : '') + '</td>' +
-        '<td class="sku-cell">' + esc(e.sku || '—') + '</td><td class="price-cell">' + e.qty + '</td>' +
-        '<td class="price-cell">£' + fmt(e.trade) + '</td><td class="price-cell">£' + fmt(e.tradeTot) + '</td>' +
-        '<td class="price-cell" style="color:var(--sc-muted)">£' + fmt(e.srpTot) + '</td></tr>';
-    }).join('') + '<tr class="total-row"><td colspan="4">Total (ex VAT)</td><td class="price-cell">£' + fmt(tradeTot) + '</td><td class="price-cell" style="color:var(--sc-muted)">£' + fmt(srpTot) + '</td></tr>';
+  // ── export ───────────────────────────────────────────────────────────────────
+  function csv() {
+    var r = E.range(cfg.rangeId), lines = quoteLines();
+    var rows = [['Manufacturer', 'Range', 'Item', 'Qty', 'Unit MSRP', 'Line MSRP']];
+    lines.forEach(function (l) { rows.push([r.manufacturer, r.name, l.label, l.qty, l.unit != null ? l.unit.toFixed(2) : 'POA', l.unit != null ? (l.unit * l.qty).toFixed(2) : 'POA']); });
+    var csvs = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csvs], { type: 'text/csv' })); a.download = 'seating-msrp-' + cfg.rangeId + '.csv'; a.click(); toast('CSV exported');
   }
-  function block(lbl, val, note) { return '<div class="cs-block"><div class="cs-lbl">' + lbl + '</div><div class="cs-val">' + val + '</div>' + (note ? '<div class="cs-note">' + note + '</div>' : '') + '</div>'; }
-
-  // ── Seating-plan SVG (ported from Cineca; dims from range.config) ───────────
-  function buildSeatPlanSVG(entries, large) {
-    var dim = E.rangeConfig(cfg.range).plan_dims || { w: 72, d: 82, arm: 13, label: '' };
-    var ROW_GAP = 22, MX = large ? 54 : 44, MY = 32, OTT_W = 52, OTT_H = 36, OTT_GAP = 10, BB_W = 48, BB_H = 44, STL_W = 32, STL_H = 32, HDR_H = 18;
-    var CRN_W = Math.round(dim.w * 0.85), CRN_GAP = 12;
-    var counts = {}; entries.forEach(function (e) { counts[e.item.item_type] = (counts[e.item.item_type] || 0) + e.qty; });
-    var seatQty = counts.seat || 0, armQty = counts.armrest || 0, ottQty = counts.ottoman || 0, chaiseQty = counts.chaise || 0, cornerQty = counts.corner || 0, headrestQty = counts.headrest || 0, bbQty = counts.bean_bag || 0, stoolQty = counts.stool || 0;
-    if (!seatQty) return '<svg viewBox="0 0 320 70" width="320" height="70" style="display:block"><text x="160" y="38" text-anchor="middle" fill="#3a3028" font-size="11" font-family="system-ui">Configure rows to see the seating plan</text></svg>';
-
-    var hasArms = armQty > 0, hasCorner = cornerQty > 0;
-    var rowSeats = cfg.rowConfigs.length ? cfg.rowConfigs.map(function (rc) { return rc.seats; }) : [seatQty];
-    var rows = rowSeats.length, maxSeats = Math.max.apply(null, rowSeats);
-    var rowW = maxSeats * dim.w + (hasArms ? (maxSeats + 1) * dim.arm : 0);
-    var chaiseW = chaiseQty > 0 ? Math.round(dim.w * 1.45) + 14 : 0;
-    var cornerW = hasCorner ? CRN_W + CRN_GAP : 0;
-    var extraAccW = (bbQty * (BB_W + OTT_GAP) + stoolQty * (STL_W + OTT_GAP));
-    var innerW = Math.max(rowW + chaiseW + cornerW + 20, ottQty * (OTT_W + OTT_GAP) + MX, extraAccW + MX);
-    var totalW = innerW + MX * 2;
-    var ottH = ottQty > 0 ? OTT_H + 18 : 0;
-    var seatingH = rows * dim.d + (rows - 1) * ROW_GAP;
-    var extraH = (bbQty > 0 || stoolQty > 0) ? Math.max(BB_H, STL_H) + 18 : 0;
-    var totalH = MY + ottH + seatingH + extraH + MY + 16;
-    var els = [];
-    els.push('<rect x="0" y="0" width="' + totalW + '" height="' + totalH + '" rx="6" fill="#0e0c09" stroke="rgba(201,168,92,.18)" stroke-width="1.5"/>');
-    for (var gx = MX; gx < totalW - MX; gx += 36) els.push('<line x1="' + gx + '" y1="' + MY + '" x2="' + gx + '" y2="' + (totalH - MY) + '" stroke="rgba(255,255,255,.018)" stroke-width="1"/>');
-    for (var gy = MY; gy < totalH - MY; gy += 36) els.push('<line x1="' + MX + '" y1="' + gy + '" x2="' + (totalW - MX) + '" y2="' + gy + '" stroke="rgba(255,255,255,.018)" stroke-width="1"/>');
-    var sX = MX, sY = MY, sW = totalW - MX * 2;
-    els.push('<rect x="' + (sX - 8) + '" y="' + (sY - 8) + '" width="' + (sW + 16) + '" height="6" fill="rgba(201,168,92,.07)" stroke="rgba(201,168,92,.12)" stroke-width="1"/>');
-    var curY = sY;
-    if (ottQty > 0) {
-      var ottTW = ottQty * OTT_W + (ottQty - 1) * OTT_GAP, ottX0 = sX + (sW - ottTW) / 2;
-      for (var oi = 0; oi < ottQty; oi++) {
-        var ox = ottX0 + oi * (OTT_W + OTT_GAP);
-        els.push('<rect x="' + ox + '" y="' + curY + '" width="' + OTT_W + '" height="' + OTT_H + '" rx="7" fill="rgba(128,88,161,.18)" stroke="rgba(128,88,161,.45)" stroke-width="1"/>');
-        els.push('<text x="' + (ox + OTT_W / 2) + '" y="' + (curY + OTT_H + 11) + '" text-anchor="middle" fill="rgba(122,112,96,.5)" font-size="7" font-family="system-ui" letter-spacing="1">OTTOMAN</text>');
-      }
-      curY += OTT_H + 18;
-    }
-    var gsn = 1;
-    rowSeats.forEach(function (nSeats, rowIdx) {
-      var rowLabel = String.fromCharCode(65 + rowIdx);
-      var hasChaise = rowIdx === 0 && chaiseQty > 0;
-      var hasCornerRow = hasCorner && rowIdx < Math.min(cornerQty, rows);
-      var rW = nSeats * dim.w + (hasArms ? (nSeats + 1) * dim.arm : 0);
-      var thisChW = hasChaise ? Math.round(dim.w * 1.45) + 14 : 0;
-      var thisCrW = hasCornerRow ? CRN_W + CRN_GAP : 0;
-      var rowX = sX + (sW - rW - thisChW - thisCrW) / 2;
-      els.push('<text x="' + (rowX - 16) + '" y="' + (curY + dim.d / 2 + 4) + '" text-anchor="middle" fill="rgba(201,168,92,.45)" font-size="9" font-family="system-ui" font-weight="700">' + rowLabel + '</text>');
-      var cx = rowX;
-      for (var s = 0; s < nSeats; s++) {
-        var num = gsn++;
-        if (hasArms) { els.push('<rect x="' + cx + '" y="' + (curY + 10) + '" width="' + dim.arm + '" height="' + (dim.d - 20) + '" rx="2" fill="rgba(201,168,92,.22)" stroke="rgba(201,168,92,.15)" stroke-width="1"/>'); cx += dim.arm; }
-        var headH = Math.round(dim.d * 0.28), cushH = Math.round(dim.d * 0.48), restH = Math.round(dim.d * 0.24);
-        els.push('<rect x="' + cx + '" y="' + curY + '" width="' + dim.w + '" height="' + dim.d + '" rx="4" fill="rgba(128,88,161,.22)" stroke="rgba(128,88,161,.5)" stroke-width="1.2"/>');
-        els.push('<rect x="' + (cx + 3) + '" y="' + (curY + 3) + '" width="' + (dim.w - 6) + '" height="' + headH + '" rx="3" fill="rgba(128,88,161,.45)"/>');
-        if (headrestQty >= gsn - 1) els.push('<rect x="' + (cx + 3) + '" y="' + (curY + 3) + '" width="' + (dim.w - 6) + '" height="' + HDR_H + '" rx="2" fill="rgba(90,173,96,.35)" stroke="rgba(90,173,96,.4)" stroke-width="0.8"/>');
-        els.push('<rect x="' + (cx + 5) + '" y="' + (curY + headH + 6) + '" width="' + (dim.w - 10) + '" height="' + cushH + '" rx="2" fill="rgba(128,88,161,.18)"/>');
-        els.push('<text x="' + (cx + dim.w / 2) + '" y="' + (curY + dim.d - 7) + '" text-anchor="middle" fill="rgba(255,255,255,.45)" font-size="8" font-family="system-ui">' + num + '</text>');
-        cx += dim.w;
-      }
-      if (hasArms) { els.push('<rect x="' + cx + '" y="' + (curY + 10) + '" width="' + dim.arm + '" height="' + (dim.d - 20) + '" rx="2" fill="rgba(201,168,92,.22)" stroke="rgba(201,168,92,.15)" stroke-width="1"/>'); cx += dim.arm; }
-      if (hasChaise) {
-        var chW = Math.round(dim.w * 1.45), chX = cx + 14;
-        els.push('<rect x="' + chX + '" y="' + curY + '" width="' + chW + '" height="' + dim.d + '" rx="4" fill="rgba(128,88,161,.12)" stroke="rgba(128,88,161,.35)" stroke-width="1" stroke-dasharray="5,3"/>');
-        els.push('<text x="' + (chX + chW / 2) + '" y="' + (curY + dim.d / 2 + 2) + '" text-anchor="middle" fill="rgba(128,88,161,.6)" font-size="7.5" font-family="system-ui" letter-spacing="2">CHAISE</text>');
-        cx += chW + 14;
-      }
-      if (hasCornerRow) {
-        var crX = cx + CRN_GAP, crW = CRN_W, crH = dim.d, notchW = Math.round(crW * 0.45), notchH = Math.round(crH * 0.45);
-        els.push('<rect x="' + crX + '" y="' + curY + '" width="' + crW + '" height="' + crH + '" rx="4" fill="rgba(128,88,161,.15)" stroke="rgba(128,88,161,.4)" stroke-width="1"/>');
-        els.push('<rect x="' + crX + '" y="' + curY + '" width="' + notchW + '" height="' + notchH + '" rx="3" fill="rgba(13,11,9,.7)"/>');
-        els.push('<text x="' + (crX + crW / 2 + 4) + '" y="' + (curY + crH / 2 + 14) + '" text-anchor="middle" fill="rgba(128,88,161,.6)" font-size="7" font-family="system-ui" letter-spacing="1">CRN</text>');
-      }
-      els.push('<text x="' + (totalW - MX + 14) + '" y="' + (curY + dim.d / 2 + 4) + '" text-anchor="middle" fill="rgba(122,112,96,.4)" font-size="8.5" font-family="system-ui">' + nSeats + '</text>');
-      curY += dim.d + ROW_GAP;
-    });
-    if (bbQty > 0 || stoolQty > 0) {
-      var accItems = []; for (var b = 0; b < bbQty; b++) accItems.push('BB'); for (var st = 0; st < stoolQty; st++) accItems.push('STL');
-      var totalAccW = accItems.reduce(function (s, t) { return (t === 'BB' ? BB_W : STL_W) + OTT_GAP + s; }, 0) - OTT_GAP;
-      var ax = sX + (sW - totalAccW) / 2;
-      accItems.forEach(function (t) {
-        if (t === 'BB') {
-          var bx = ax + BB_W / 2, by = curY + BB_H / 2;
-          els.push('<ellipse cx="' + bx + '" cy="' + by + '" rx="' + (BB_W / 2) + '" ry="' + (BB_H / 2) + '" fill="rgba(212,136,58,.18)" stroke="rgba(212,136,58,.45)" stroke-width="1"/>');
-          els.push('<text x="' + bx + '" y="' + (curY + BB_H + 11) + '" text-anchor="middle" fill="rgba(122,112,96,.5)" font-size="7" font-family="system-ui" letter-spacing="1">BEAN BAG</text>');
-          ax += BB_W + OTT_GAP;
-        } else {
-          var sx2 = ax + STL_W / 2, sy = curY + STL_W / 2;
-          els.push('<circle cx="' + sx2 + '" cy="' + sy + '" r="' + (STL_W / 2) + '" fill="rgba(183,177,167,.14)" stroke="rgba(183,177,167,.4)" stroke-width="1"/>');
-          els.push('<text x="' + sx2 + '" y="' + (curY + STL_H + 11) + '" text-anchor="middle" fill="rgba(122,112,96,.5)" font-size="7" font-family="system-ui" letter-spacing="1">STOOL</text>');
-          ax += STL_W + OTT_GAP;
-        }
-      });
-      curY += Math.max(BB_H, STL_H) + 18;
-    }
-    els.push('<line x1="' + (MX - 12) + '" y1="' + (MY - 8) + '" x2="' + (MX - 12) + '" y2="' + (totalH - MY) + '" stroke="rgba(201,168,92,.1)" stroke-width="2"/>');
-    els.push('<line x1="' + (totalW - MX + 12) + '" y1="' + (MY - 8) + '" x2="' + (totalW - MX + 12) + '" y2="' + (totalH - MY) + '" stroke="rgba(201,168,92,.1)" stroke-width="2"/>');
-    var r = E.range(cfg.range) || {}, m = E.material(cfg.material) || {};
-    var totSeats = rowSeats.reduce(function (s, n) { return s + n; }, 0);
-    var annY = totalH - 6;
-    els.push('<text x="' + MX + '" y="' + annY + '" fill="rgba(122,112,96,.5)" font-size="7.5" font-family="system-ui">' + esc(r.name || '') + '</text>');
-    els.push('<text x="' + (totalW / 2) + '" y="' + annY + '" text-anchor="middle" fill="rgba(122,112,96,.5)" font-size="7.5" font-family="system-ui">' + esc(m.name || '') + (cfg.colour ? ' · ' + esc(cfg.colour) : '') + '</text>');
-    els.push('<text x="' + (totalW - MX) + '" y="' + annY + '" text-anchor="end" fill="rgba(122,112,96,.5)" font-size="7.5" font-family="system-ui">' + totSeats + ' seat' + (totSeats !== 1 ? 's' : '') + ' · ' + rows + ' row' + (rows !== 1 ? 's' : '') + '</text>');
-    els.push('<text x="' + (totalW / 2) + '" y="' + (totalH - 1) + '" text-anchor="middle" fill="rgba(122,112,96,.28)" font-size="6.5" font-family="system-ui" font-style="italic">illustrative plan — not to scale</text>');
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + totalW + ' ' + totalH + '" width="' + (large ? '100%' : totalW) + '" style="max-width:100%;display:block">' + els.join('') + '</svg>';
-  }
-
-  // ── Export ────────────────────────────────────────────────────────────────────
-  function copySkus() {
-    var lines = E.entries(cfg).map(function (e) { return e.sku + '\t' + e.qty + '\t' + e.item.item_name + '\t£' + fmt(e.trade) + '\t£' + fmt(e.tradeTot); });
-    navigator.clipboard.writeText(lines.join('\n')).then(function () { toast('SKU list copied'); });
-  }
-  function exportCsv() {
-    var m = E.material(cfg.material) || {};
-    var rows = [['SKU', 'Description', 'Manufacturer', 'Range', 'Material', 'Colour', 'Qty', 'Unit Trade', 'Trade Total', 'Unit SRP', 'SRP Total']];
-    var mfr = E.manufacturer(cfg.manufacturer) || {}, rng = E.range(cfg.range) || {};
-    E.entries(cfg).forEach(function (e) {
-      rows.push([e.sku, e.item.item_name, mfr.name || '', rng.name || '', m.name || cfg.material, cfg.colour || 'TBC', e.qty, e.trade.toFixed(2), e.tradeTot.toFixed(2), e.srp.toFixed(2), e.srpTot.toFixed(2)]);
-    });
-    var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
-    var url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    var a = document.createElement('a'); a.href = url; a.download = 'seating-quote-' + (cfg.manufacturer || 'x') + '-' + (cfg.range || 'x') + '-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
-    URL.revokeObjectURL(url); toast('CSV exported');
-  }
-  function printSummary() { global.print(); }
+  function print() { global.print(); }
 
   global.SeatingApp = {
-    boot: boot, jumpTo: jumpTo, goBack: goBack, resetConfig: resetConfig,
-    selectManufacturer: selectManufacturer, selectRange: selectRange,
-    selectMaterial: selectMaterial, selectColour: selectColour, toggleFinish: toggleFinish,
-    setRows: setRows, setRowSeats: setRowSeats, setRowMotorType: setRowMotorType,
-    toggleArmrests: toggleArmrests, changeAcc: changeAcc,
-    copySkus: copySkus, exportCsv: exportCsv, printSummary: printSummary
+    boot: boot, goBack: goBack, jumpTo: jumpTo, restart: restart,
+    setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
+    pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
+    toggleArm: toggleArm, acc: acc, csv: csv, print: print
   };
 })(typeof window !== 'undefined' ? window : this);

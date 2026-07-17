@@ -3,23 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Seating Configurator</title>
+  <title>Seating Configurator — Sonor</title>
   <link rel="icon" href="../data/favicon.svg" type="image/svg+xml">
-  <!-- Spine import order (§2) — DO NOT reorder -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=DM+Mono:wght@400&amp;family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=DM+Mono:wght@400&amp;family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&amp;display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../sonor-db.js"></script>
   <script src="../data/sonor-app.js"></script>
   <script src="../data/sonor-brand.js"></script>
   <script src="../data/sonor-header.js"></script>
-  <!-- SONOR SHELL (B-317 / Spine v1.3 §21) — palette BEFORE shell -->
   <script src="../data/sonor-palette.js"></script>
   <script src="../data/sonor-shell.js"></script>
-  <!-- App modules -->
   <script src="../data/seating-config.js"></script>
   <script src="../data/seating-catalogue.js"></script>
   <script src="../data/seating-engine.js"></script>
+  <script src="../data/seating-recommend.js"></script>
   <script src="../data/seating-app.js"></script>
   <script src="../data/backups/sonor-db-backup-latest.js"></script>
   <link rel="stylesheet" href="../data/brand.css">
@@ -28,356 +26,104 @@
   <link rel="stylesheet" href="../data/sonor-components.css">
   <link rel="stylesheet" href="../data/sonor-shell.css">
   <style>
-    /* App-local layout. Sonor slate chrome frames a scoped luxury configurator.
-       LUXURY PALETTE = documented Brand Override (see CLAUDE.md ## Brand Overrides):
-       raw hex is confined to the .seating-cfg block only — it never touches :root
-       (S-4.1 respected) and is intentional per the "keep the Cineca luxury look,
-       Sonor branding only" brief. */
-    body { background: var(--bg-0); color: var(--text-primary); font-family: 'DM Sans', system-ui, sans-serif; margin: 0; -webkit-font-smoothing: antialiased; }
-    main { max-width: none; margin: 0; padding: 0; }
+    /* LUXURY canvas = documented Brand Override (scoped to .sc; :root untouched, S-4.1). */
+    body { background:#0d0b09; color:#e8e0cc; margin:0; font-family:'DM Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+    #sonor-header.header { position:relative; z-index:5; }
+    .sc { --gold:#c9a85c; --gold2:#e8c97a; --cream:#e8e0cc; --muted:#8a8070; --dim:#3a3028;
+      --bg1:#141009; --bg2:#1c160f; --bg3:#241d14; --brd:rgba(201,168,92,.14); --brd2:rgba(255,255,255,.06); --cin:#8058a1;
+      min-height:calc(100vh - 52px); display:flex; flex-direction:column;
+      background:radial-gradient(1200px 500px at 50% -100px, rgba(201,168,92,.06), transparent), #0d0b09; }
+    .sc * { box-sizing:border-box; }
+    .sc a { color:var(--gold); }
 
-    /* ── Scoped luxury configurator surface ─────────────────────────── */
-    .seating-cfg {
-      --sc-bg:#0d0b09; --sc-bg2:#181410; --sc-bg3:#231e18; --sc-bg4:#2d2620;
-      --sc-gold:#c9a85c; --sc-gold2:#e8c97a; --sc-cream:#e8e0cc; --sc-dim:#3a3028;
-      --sc-muted:#7a7060; --sc-cin:#8058a1; --sc-good:#5aad60; --sc-warn:#d4883a;
-      --sc-brd:rgba(201,168,92,.12); --sc-brd2:rgba(255,255,255,.06); --sc-r:4px; --sc-r2:8px;
-      background:var(--sc-bg); color:var(--sc-cream); overflow:hidden;
-      min-height:calc(100vh - 56px); display:flex; flex-direction:column;
-    }
-    .seating-cfg *{ box-sizing:border-box; }
+    .topbar { display:flex; align-items:center; gap:16px; padding:14px 30px; border-bottom:1px solid var(--brd); flex-wrap:wrap; }
+    .brandline { font-family:'Cormorant Garamond',serif; font-size:22px; letter-spacing:.06em; color:var(--gold); }
+    .brandline i { font-style:italic; color:rgba(232,224,204,.4); font-size:15px; margin:0 6px; }
+    .src-note { margin-left:auto; font-size:10.5px; letter-spacing:.04em; color:var(--muted); border:1px solid var(--brd); border-radius:20px; padding:4px 12px; }
+    .src-supabase{ color:#5aad60; border-color:rgba(90,173,96,.3); } .src-cache,.src-seed{ color:#d4883a; border-color:rgba(212,136,58,.3); }
 
-    /* header strip inside the configurator (steps + manufacturer context + source) */
-    .cfg-top { display:flex; align-items:center; gap:16px; padding:12px 22px; border-bottom:1px solid var(--sc-brd); background:rgba(13,11,9,.7); flex-wrap:wrap; }
-    .cfg-title { font-family:'Cormorant Garamond',Georgia,serif; font-size:20px; letter-spacing:.06em; color:var(--sc-gold); }
-    .mfr-context { display:flex; align-items:center; gap:10px; }
-    .ctx-logo { height:20px; object-fit:contain; filter:brightness(1.05); }
-    .ctx-name { font-family:'Cormorant Garamond',serif; font-size:16px; color:var(--sc-gold); }
-    .ctx-div { width:1px; height:16px; background:var(--sc-brd); }
-    .ctx-range { font-size:12px; color:var(--sc-cream); letter-spacing:.04em; }
-    .src-note { margin-left:auto; font-size:10px; letter-spacing:.04em; color:var(--sc-muted); border:1px solid var(--sc-brd); border-radius:20px; padding:3px 10px; }
-    .src-supabase{ color:var(--sc-good); border-color:rgba(90,173,96,.3); }
-    .src-cache,.src-seed{ color:var(--sc-warn); border-color:rgba(212,136,58,.3); }
+    .steps { display:flex; align-items:center; justify-content:center; gap:2px; padding:14px; border-bottom:1px solid var(--brd); flex-wrap:wrap; }
+    .pill { display:flex; align-items:center; gap:8px; padding:6px 16px; border-radius:22px; font-size:12px; color:var(--muted); }
+    .pill.done { color:rgba(201,168,92,.7); cursor:pointer; } .pill.active { background:rgba(201,168,92,.1); color:var(--gold); border:1px solid rgba(201,168,92,.25); }
+    .pn { width:18px; height:18px; border-radius:50%; border:1.5px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; }
+    .pill.active .pn { background:var(--gold); color:#0d0b09; border-color:var(--gold); } .pill.done .pn { background:rgba(201,168,92,.5); color:#0d0b09; border-color:transparent; }
+    .parr { color:var(--dim); }
 
-    .cfg-steps { display:flex; align-items:center; justify-content:center; gap:0; padding:10px; border-bottom:1px solid var(--sc-brd); }
-    .step-pill { display:flex; align-items:center; }
-    .sp-inner { display:flex; align-items:center; gap:7px; padding:5px 14px; border-radius:20px; font-size:11px; font-weight:500; color:var(--sc-muted); letter-spacing:.03em; cursor:default; transition:all .2s; }
-    .step-pill.done .sp-inner { color:rgba(201,168,92,.6); cursor:pointer; }
-    .step-pill.done .sp-inner:hover { color:var(--sc-gold); }
-    .step-pill.active .sp-inner { background:rgba(201,168,92,.1); color:var(--sc-gold); border:1px solid rgba(201,168,92,.22); }
-    .sp-num { width:17px; height:17px; border-radius:50%; border:1.5px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; }
-    .step-pill.done .sp-num { background:rgba(201,168,92,.55); border-color:transparent; color:var(--sc-bg); }
-    .step-pill.active .sp-num { background:var(--sc-gold); border-color:var(--sc-gold); color:var(--sc-bg); }
-    .sp-arr { color:var(--sc-dim); font-size:10px; padding:0 2px; }
+    .body { flex:1; padding:34px clamp(20px,5vw,64px); max-width:1180px; margin:0 auto; width:100%; }
+    .lead { margin-bottom:26px; }
+    .lead h2 { font-family:'Cormorant Garamond',serif; font-weight:500; font-size:34px; letter-spacing:.02em; margin:0 0 6px; color:var(--cream); }
+    .lead p { color:var(--muted); font-size:14px; margin:0; max-width:640px; line-height:1.6; }
 
-    .step-wrap { display:none; }
-    .step-wrap.active { display:block; flex:1 1 auto; }
-    .step-heading { font-size:22px; font-weight:400; letter-spacing:.05em; color:var(--sc-cream); font-family:Georgia,serif; margin-bottom:5px; }
-    .step-sub { font-size:12.5px; color:var(--sc-muted); margin-bottom:24px; line-height:1.55; }
-    .loading-wrap { padding:50px; text-align:center; color:var(--sc-muted); }
-    .spinner { width:26px; height:26px; border:2px solid var(--sc-dim); border-top-color:var(--sc-gold); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 10px; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .sel-check { display:none; position:absolute; top:10px; right:10px; width:20px; height:20px; background:var(--sc-gold); color:var(--sc-bg); border-radius:50%; font-size:10px; font-weight:700; align-items:center; justify-content:center; z-index:2; }
-    .selected .sel-check { display:flex; }
+    .panel { background:var(--bg2); border:1px solid var(--brd2); border-radius:12px; padding:18px 20px; }
+    .ptt { font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .opt-tag { font-weight:500; color:var(--muted); letter-spacing:.04em; text-transform:none; }
+    .lbl { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:12px 0 8px; }
+    .fld { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .fld span { font-size:13px; color:var(--cream); }
+    .fld input { width:110px; background:var(--bg3); border:1px solid var(--brd); border-radius:6px; color:var(--cream); padding:9px 12px; font-size:14px; font-family:'DM Mono',monospace; }
+    .fld input:focus { outline:none; border-color:var(--gold); }
+    .hint { font-size:11.5px; color:var(--muted); line-height:1.5; margin-top:6px; }
+    .big { font-size:34px; font-family:'Cormorant Garamond',serif; color:var(--gold); }
+    .opts { display:flex; gap:8px; flex-wrap:wrap; }
+    .opt { min-width:42px; padding:9px 14px; border-radius:8px; border:1.5px solid var(--dim); background:none; color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; transition:.15s; }
+    .opt:hover { border-color:rgba(201,168,92,.4); color:var(--cream); } .opt.on { background:rgba(201,168,92,.12); border-color:var(--gold); color:var(--gold); }
+    .chips { display:flex; gap:8px; flex-wrap:wrap; } .chip { padding:8px 14px; border-radius:22px; border:1.5px solid var(--dim); background:none; color:var(--muted); font-size:12.5px; cursor:pointer; transition:.15s; }
+    .chip:hover { border-color:rgba(201,168,92,.4); color:var(--cream); } .chip.on { background:rgba(201,168,92,.12); border-color:var(--gold); color:var(--gold); }
 
-    /* Manufacturer + Range grids */
-    .grid-wrap { padding:32px 34px; }
-    .mfr-grid,.range-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; margin-top:8px; }
-    .mfr-card,.range-card { position:relative; background:var(--sc-bg2); border:2px solid transparent; border-radius:var(--sc-r2); overflow:hidden; cursor:pointer; transition:all .2s; }
-    .mfr-card:hover,.range-card:hover { background:var(--sc-bg3); }
-    .mfr-card.selected,.range-card.selected { border-color:var(--sc-gold); background:var(--sc-bg3); }
-    .mfr-logo-wrap { height:110px; display:flex; align-items:center; justify-content:center; background:linear-gradient(160deg,#1a1510,#0f0c09); border-bottom:1px solid var(--sc-brd); padding:18px; }
-    .mfr-logo { max-height:52px; max-width:78%; object-fit:contain; }
-    .mfr-logo-fallback { display:flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',serif; font-size:26px; color:var(--sc-gold); letter-spacing:.08em; }
-    .mfr-body { padding:14px 16px 18px; }
-    .mfr-name { font-family:Georgia,serif; font-size:18px; color:var(--sc-gold); letter-spacing:.04em; margin-bottom:4px; }
-    .mfr-blurb { font-size:11.5px; color:var(--sc-muted); line-height:1.5; margin-bottom:8px; }
-    .mfr-meta { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--sc-muted); }
-    .rc-image { width:100%; aspect-ratio:16/10; background:var(--sc-bg3) center/cover no-repeat; }
-    .rc-body { padding:14px 16px 18px; }
-    .rc-name { font-size:18px; font-family:Georgia,serif; color:var(--sc-gold); letter-spacing:.04em; margin-bottom:2px; }
-    .rc-tag { font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--sc-muted); margin-bottom:9px; }
-    .rc-desc { font-size:11.5px; color:var(--sc-muted); line-height:1.55; margin-bottom:10px; }
-    .rc-from { font-size:11px; color:var(--sc-muted); border-top:1px solid var(--sc-brd2); padding-top:9px; }
-    .rc-from strong { color:var(--sc-cream); font-size:13px; }
+    .layout-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    @media(max-width:820px){ .layout-grid{ grid-template-columns:1fr; } }
+    .roomview { margin-top:22px; display:flex; justify-content:center; padding:20px; background:var(--bg1); border:1px solid var(--brd2); border-radius:12px; }
 
-    /* Material */
-    .mat-step-wrap,.build-step-wrap,.summary-step-wrap { padding:30px 34px; }
-    .mat-sections { display:flex; flex-direction:column; gap:26px; }
-    .mat-sec-lbl { font-size:9.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--sc-gold); margin-bottom:12px; display:flex; align-items:center; gap:12px; }
-    .mat-sec-lbl::after { content:''; flex:1; height:1px; background:var(--sc-brd); }
-    .mat-grid { display:flex; flex-wrap:wrap; gap:10px; }
-    .mat-card { background:var(--sc-bg2); border:1.5px solid var(--sc-brd2); border-radius:var(--sc-r2); padding:13px 16px; cursor:pointer; transition:all .18s; min-width:160px; display:flex; gap:12px; }
-    .mat-card:hover { border-color:rgba(201,168,92,.3); background:var(--sc-bg3); }
-    .mat-card.selected { border-color:var(--sc-gold); background:var(--sc-bg3); }
-    .mat-swatch { width:26px; height:26px; border-radius:50%; flex-shrink:0; border:1.5px solid rgba(255,255,255,.1); margin-top:2px; }
-    .mat-name { font-size:13px; font-weight:500; color:var(--sc-cream); margin-bottom:2px; }
-    .mat-tier { font-size:10px; color:var(--sc-muted); margin-bottom:4px; }
-    .mat-note { font-size:9.5px; color:var(--sc-warn); }
-    .mat-price { font-size:10.5px; color:var(--sc-muted); margin-top:3px; }
-    .colour-section,.finish-section { margin-top:22px; padding:20px 24px; background:var(--sc-bg2); border:1px solid var(--sc-brd); border-radius:var(--sc-r2); }
-    .colour-sec-ttl,.finish-sec-ttl { font-size:9.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--sc-gold); margin-bottom:12px; display:flex; gap:12px; align-items:center; }
-    .colour-sec-ttl::after,.finish-sec-ttl::after { content:''; flex:1; height:1px; background:var(--sc-brd); }
-    .colour-sec-sub { font-size:11px; color:var(--sc-muted); margin-bottom:14px; }
-    .colour-grid { display:flex; flex-wrap:wrap; gap:8px; }
-    .colour-chip { display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer; }
-    .colour-chip-swatch { width:34px; height:34px; border-radius:50%; border:2px solid rgba(255,255,255,.08); transition:all .15s; }
-    .colour-chip:hover .colour-chip-swatch { border-color:rgba(201,168,92,.4); transform:scale(1.08); }
-    .colour-chip.selected .colour-chip-swatch { border-color:var(--sc-gold); box-shadow:0 0 0 2px rgba(201,168,92,.25); transform:scale(1.1); }
-    .colour-chip-name { font-size:8.5px; color:var(--sc-muted); text-align:center; max-width:48px; line-height:1.2; }
-    .colour-chip.selected .colour-chip-name { color:var(--sc-gold); }
-    .finish-opts { display:flex; flex-direction:column; gap:8px; }
-    .finish-opt { display:flex; align-items:center; gap:14px; padding:11px 14px; background:var(--sc-bg3); border:1px solid var(--sc-brd2); border-radius:var(--sc-r); cursor:pointer; transition:all .15s; }
-    .finish-opt.active { border-color:rgba(201,168,92,.45); background:rgba(201,168,92,.04); }
-    .fo-toggle { width:32px; height:18px; border-radius:9px; background:var(--sc-dim); position:relative; flex-shrink:0; transition:background .15s; }
-    .fo-toggle::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--sc-muted); transition:all .15s; }
-    .finish-opt.active .fo-toggle { background:rgba(201,168,92,.3); }
-    .finish-opt.active .fo-toggle::after { left:16px; background:var(--sc-gold); }
-    .fo-label { font-size:12.5px; color:var(--sc-cream); font-weight:500; }
-    .fo-note { font-size:10px; color:var(--sc-muted); }
+    .range-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+    .rcard { background:var(--bg2); border:1.5px solid var(--brd2); border-radius:14px; overflow:hidden; cursor:pointer; transition:.18s; display:flex; flex-direction:column; }
+    .rcard:hover { border-color:rgba(201,168,92,.4); transform:translateY(-2px); } .rcard.sel { border-color:var(--gold); box-shadow:0 0 0 2px rgba(201,168,92,.2); }
+    .rcard.dim { opacity:.72; } .rcard.dim:hover { opacity:1; }
+    .rc-img { aspect-ratio:16/10; background:#0a0806 center/cover no-repeat; } .rc-noimg { display:flex; align-items:center; justify-content:center; font-family:'Cormorant Garamond',serif; font-size:22px; color:rgba(201,168,92,.4); letter-spacing:.06em; }
+    .rc-b { padding:15px 17px 17px; display:flex; flex-direction:column; gap:8px; flex:1; }
+    .rc-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .rc-mfr { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); } .rc-name { font-family:'Cormorant Garamond',serif; font-size:22px; color:var(--gold); line-height:1.1; }
+    .rec,.fit,.nofit { font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+    .rec { background:var(--gold); color:#0d0b09; } .fit { background:rgba(90,173,96,.15); color:#7cc884; border:1px solid rgba(90,173,96,.3); } .nofit { background:rgba(212,136,58,.12); color:#e0a05a; border:1px solid rgba(212,136,58,.3); }
+    .rc-style { font-size:11.5px; color:var(--muted); } .rc-price { font-size:13px; color:var(--cream); } .rc-price b { color:var(--gold); font-size:15px; }
+    .rc-plus { display:flex; flex-wrap:wrap; gap:5px; } .plus { font-size:10px; color:#7cc884; }
+    .rc-flags { display:flex; flex-direction:column; gap:4px; margin-top:2px; } .flag { font-size:10.5px; } .flag.warn { color:#e0a05a; } .flag.info { color:var(--muted); }
 
-    /* Build */
-    .build-layout { display:grid; grid-template-columns:1fr 360px; gap:22px; align-items:start; }
-    @media(max-width:900px){ .build-layout{ grid-template-columns:1fr; } }
-    .cfg-panel { background:var(--sc-bg2); border:1px solid var(--sc-brd2); border-radius:var(--sc-r2); padding:18px 20px; }
-    .cfg-panel + .cfg-panel { margin-top:14px; }
-    .cfg-panel-ttl,.panel-ttl { font-size:9.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--sc-gold); margin-bottom:14px; display:flex; align-items:center; gap:10px; }
-    .cfg-panel-ttl::after { content:''; flex:1; height:1px; background:var(--sc-brd); }
-    .mini-lbl { font-size:9.5px; color:var(--sc-muted); letter-spacing:.06em; text-transform:uppercase; margin-bottom:7px; }
-    .option-pills { display:flex; gap:8px; flex-wrap:wrap; }
-    .opt-pill { padding:7px 16px; border-radius:20px; border:1.5px solid var(--sc-dim); background:none; font-size:12px; font-weight:500; color:var(--sc-muted); cursor:pointer; transition:all .15s; }
-    .opt-pill:hover { border-color:rgba(201,168,92,.3); color:var(--sc-cream); }
-    .opt-pill.active { background:rgba(201,168,92,.1); border-color:var(--sc-gold); color:var(--sc-gold); }
-    .style-select { display:flex; gap:8px; flex-wrap:wrap; }
-    .style-btn { flex:1; min-width:100px; padding:10px 12px; border-radius:var(--sc-r); border:1.5px solid var(--sc-dim); background:none; font-size:11.5px; font-weight:500; color:var(--sc-muted); cursor:pointer; transition:all .15s; text-align:center; }
-    .style-btn.active { background:rgba(201,168,92,.08); border-color:var(--sc-gold); color:var(--sc-gold); }
-    .style-btn small { display:block; font-size:9px; color:var(--sc-muted); margin-top:2px; }
-    .row-cfg-card { background:var(--sc-bg3); border:1px solid var(--sc-brd2); border-radius:var(--sc-r); padding:12px 14px; margin-bottom:10px; }
-    .row-cfg-label { display:flex; align-items:center; gap:9px; margin-bottom:10px; }
-    .row-letter { width:22px; height:22px; border-radius:50%; background:rgba(201,168,92,.15); border:1px solid rgba(201,168,92,.32); display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:var(--sc-gold); }
-    .row-desc { font-size:10px; color:var(--sc-muted); flex:1; font-style:italic; }
-    .row-seat-count { font-size:11px; color:var(--sc-cream); font-weight:600; }
-    .row-cfg-card .opt-pill { padding:5px 12px; font-size:11.5px; }
-    .acc-row { display:flex; align-items:center; padding:10px 0; border-bottom:1px solid var(--sc-brd2); gap:12px; }
-    .acc-row:last-child { border-bottom:none; }
-    .acc-name { font-size:12.5px; font-weight:500; color:var(--sc-cream); }
-    .acc-note { font-size:10px; color:var(--sc-muted); margin-top:2px; }
-    .acc-price { font-size:11px; color:var(--sc-muted); min-width:90px; text-align:right; }
-    .acc-price strong { color:var(--sc-cream); }
-    .qty-ctrl { display:flex; align-items:center; gap:8px; }
-    .qty-btn { width:26px; height:26px; border-radius:50%; border:1.5px solid var(--sc-dim); background:none; cursor:pointer; font-size:14px; color:var(--sc-muted); display:flex; align-items:center; justify-content:center; transition:all .15s; }
-    .qty-btn:hover { border-color:var(--sc-gold); color:var(--sc-gold); }
-    .qty-val { width:28px; text-align:center; font-size:14px; font-weight:600; color:var(--sc-cream); }
-    .arm-toggle-wrap { display:flex; align-items:center; gap:12px; }
-    .arm-toggle-label { flex:1; }
-    .toggle-switch { width:40px; height:22px; border-radius:11px; background:var(--sc-dim); position:relative; cursor:pointer; border:none; }
-    .toggle-switch::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:var(--sc-muted); transition:all .15s; }
-    .toggle-switch.on { background:rgba(201,168,92,.28); }
-    .toggle-switch.on::after { left:21px; background:var(--sc-gold); }
-    .seat-summary-info { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
-    .ssi-block { background:var(--sc-bg3); border:1px solid var(--sc-brd2); border-radius:var(--sc-r); padding:10px 14px; flex:1; min-width:80px; }
-    .ssi-val { font-size:20px; font-weight:700; color:var(--sc-gold); font-family:Georgia,serif; }
-    .ssi-lbl { font-size:9.5px; color:var(--sc-muted); margin-top:3px; }
-    .build-right { position:sticky; top:14px; display:flex; flex-direction:column; gap:14px; }
-    .plan-panel,.total-panel { background:var(--sc-bg2); border:1px solid var(--sc-brd); border-radius:var(--sc-r2); padding:16px; overflow:hidden; }
-    .plan-empty { font-size:11.5px; color:var(--sc-dim); text-align:center; padding:28px 0; font-style:italic; }
-    .live-line { display:flex; justify-content:space-between; font-size:11px; padding:3.5px 0; border-bottom:1px dotted var(--sc-brd2); gap:8px; }
-    .ll-name { flex:1; color:var(--sc-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .ll-price { color:var(--sc-cream); font-weight:500; }
-    .live-empty { font-size:11px; color:var(--sc-dim); text-align:center; padding:16px 0; font-style:italic; }
-    .live-total-row { display:flex; justify-content:space-between; margin-top:12px; font-size:13px; font-weight:700; color:var(--sc-cream); }
-    .live-srp { font-size:10.5px; color:var(--sc-muted); display:flex; justify-content:space-between; margin-top:4px; }
+    .cfg-grid { display:grid; grid-template-columns:1fr 340px; gap:18px; align-items:start; } @media(max-width:860px){ .cfg-grid{ grid-template-columns:1fr; } }
+    .cfg-left { display:flex; flex-direction:column; gap:14px; } .sticky { position:sticky; top:14px; }
+    .swatches { display:flex; flex-wrap:wrap; gap:8px; } .sw { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:8px; border:1.5px solid var(--brd2); background:var(--bg3); color:var(--cream); font-size:12px; cursor:pointer; } .sw span { width:16px; height:16px; border-radius:50%; background:var(--c); border:1px solid rgba(255,255,255,.15); } .sw.on { border-color:var(--gold); }
+    .cols { display:flex; flex-wrap:wrap; gap:6px; } .col { width:26px; height:26px; border-radius:50%; background:var(--c); border:2px solid rgba(255,255,255,.1); cursor:pointer; } .col.on { border-color:var(--gold); box-shadow:0 0 0 2px rgba(201,168,92,.25); }
+    .acc { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--brd2); } .acc:last-child{ border:none; } .acc-n { font-size:13px; color:var(--cream); } .acc-p { font-size:11px; color:var(--muted); }
+    .qty { display:flex; align-items:center; gap:10px; } .qty button { width:28px; height:28px; border-radius:50%; border:1.5px solid var(--dim); background:none; color:var(--muted); font-size:15px; cursor:pointer; } .qty button:hover { border-color:var(--gold); color:var(--gold); } .qty span { min-width:18px; text-align:center; color:var(--cream); font-weight:600; }
+    .toggle { display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--cream); cursor:pointer; } .toggle input { accent-color:var(--gold); width:16px; height:16px; }
+    .live { margin-top:14px; padding-top:14px; border-top:1px solid var(--brd); } .lt-row { display:flex; justify-content:space-between; align-items:baseline; } .lt-row b { font-size:22px; color:var(--gold); font-family:'Cormorant Garamond',serif; } .lt-sub { font-size:10px; color:var(--muted); margin-top:4px; }
 
-    /* Summary */
-    .summary-masthead { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px; padding-bottom:18px; border-bottom:1px solid var(--sc-brd); }
-    .sm-title { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--sc-gold); letter-spacing:.05em; }
-    .sm-sub { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--sc-muted); }
-    .sm-date { font-size:11px; color:var(--sc-dim); }
-    .config-strip { display:flex; gap:0; background:var(--sc-bg2); border:1px solid var(--sc-brd); border-radius:var(--sc-r2); overflow:hidden; margin-bottom:22px; flex-wrap:wrap; }
-    .cs-block { flex:1; min-width:130px; padding:14px 18px; border-right:1px solid var(--sc-brd); }
-    .cs-block:last-child { border-right:none; }
-    .cs-lbl { font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--sc-muted); margin-bottom:5px; }
-    .cs-val { font-size:15px; font-weight:600; color:var(--sc-cream); font-family:Georgia,serif; }
-    .cs-note { font-size:9.5px; color:var(--sc-muted); margin-top:2px; line-height:1.5; }
-    .plan-section { background:var(--sc-bg2); border:1px solid var(--sc-brd); border-radius:var(--sc-r2); padding:22px; margin-bottom:22px; }
-    .plan-sec-ttl { font-size:9.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--sc-gold); margin-bottom:16px; display:flex; gap:10px; align-items:center; }
-    .plan-sec-ttl::after { content:''; flex:1; height:1px; background:var(--sc-brd); }
-    .quote-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:20px; }
-    .quote-table th { text-align:left; padding:7px 12px; font-size:8.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--sc-muted); border-bottom:1px solid var(--sc-brd); }
-    .quote-table td { padding:10px 12px; border-bottom:1px solid var(--sc-brd2); color:var(--sc-cream); }
-    .sku-cell { font-family:'DM Mono',monospace; font-size:9.5px; color:var(--sc-muted); }
-    .price-cell { text-align:right; }
-    .total-row td { font-weight:700; font-size:13.5px; border-top:1px solid var(--sc-brd); padding-top:14px; color:var(--sc-gold); }
-    .export-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .summary { max-width:860px; margin:0 auto; } .sm-head { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid var(--brd); padding-bottom:16px; margin-bottom:20px; } .sm-mfr { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); } .sm-head h2 { font-family:'Cormorant Garamond',serif; font-weight:500; font-size:32px; margin:2px 0 0; color:var(--gold); } .sm-date { font-size:12px; color:var(--muted); }
+    .strip { display:flex; flex-wrap:wrap; background:var(--bg2); border:1px solid var(--brd); border-radius:12px; overflow:hidden; margin-bottom:20px; } .cellx { flex:1; min-width:150px; padding:14px 18px; border-right:1px solid var(--brd); } .cellx:last-child{ border:none; } .cl { font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); } .cv { font-family:'Cormorant Garamond',serif; font-size:18px; color:var(--cream); margin-top:3px; } .cn { font-size:10px; color:var(--muted); margin-top:2px; }
+    .planbig { background:var(--bg1); border:1px solid var(--brd2); border-radius:12px; padding:22px; display:flex; justify-content:center; margin-bottom:20px; }
+    .quote { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:18px; } .quote th { text-align:left; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--brd); } .quote td { padding:11px 10px; border-bottom:1px solid var(--brd2); color:var(--cream); } .quote .r { text-align:right; } .quote .tot td { font-weight:700; color:var(--gold); border-top:1px solid var(--brd); }
+    .actions { display:flex; gap:10px; } .disc { font-size:11px; color:var(--muted); margin-top:16px; line-height:1.5; }
+    .empty { padding:60px; text-align:center; color:var(--muted); }
 
-    /* Buttons + footer */
-    .cfg-footer { display:flex; justify-content:space-between; align-items:center; padding:14px 22px; border-top:1px solid var(--sc-brd); background:rgba(13,11,9,.7); position:sticky; bottom:0; }
-    .nav-info { font-size:12px; color:var(--sc-muted); }
-    .nav-btns { display:flex; gap:10px; }
-    .btn { padding:9px 22px; border-radius:var(--sc-r); border:none; cursor:pointer; font-size:12px; font-weight:600; letter-spacing:.04em; transition:all .18s; }
-    .btn-secondary { background:var(--sc-bg3); color:var(--sc-muted); border:1px solid var(--sc-dim); }
-    .btn-secondary:hover { color:var(--sc-cream); border-color:var(--sc-muted); }
-    .btn-primary { background:var(--sc-gold); color:var(--sc-bg); }
-    .btn-primary:hover { background:var(--sc-gold2); }
-    .btn-primary:disabled { opacity:.4; cursor:not-allowed; }
-    .btn-ghost { background:none; color:var(--sc-gold); border:1px solid rgba(201,168,92,.3); }
-    .btn-ghost:hover { background:rgba(201,168,92,.08); border-color:var(--sc-gold); }
+    .footer { display:flex; justify-content:space-between; align-items:center; padding:16px 30px; border-top:1px solid var(--brd); background:rgba(13,11,9,.7); position:sticky; bottom:0; }
+    .btn { padding:11px 26px; border-radius:8px; border:none; font-size:13px; font-weight:600; cursor:pointer; transition:.18s; } .btn.primary { background:var(--gold); color:#0d0b09; } .btn.primary:hover { background:var(--gold2); } .btn.primary:disabled { opacity:.4; cursor:not-allowed; } .btn.ghost { background:none; color:var(--gold); border:1px solid rgba(201,168,92,.35); } .btn.ghost:hover { background:rgba(201,168,92,.08); } .btn.sec { background:var(--bg3); color:var(--muted); border:1px solid var(--dim); }
 
-    @media print {
-      .header,.cfg-top,.cfg-steps,.cfg-footer,.export-actions { display:none !important; }
-      body,.seating-cfg { background:#fff; color:#111; box-shadow:none; border:none; }
-      .cs-val,.quote-table td { color:#111; }
-    }
+    @media print { #sonor-header,.topbar,.steps,.footer,.actions { display:none!important; } body,.sc { background:#fff; color:#111; } .cv,.quote td,.sm-head h2 { color:#111; } }
   </style>
 </head>
 <body>
   <header class="header" id="sonor-header"></header>
-
-  <main>
-    <div class="seating-cfg">
-      <div class="cfg-top">
-        <span class="cfg-title">Seating Configurator</span>
-        <div class="mfr-context" id="mfrContext" style="display:none"></div>
-        <span class="src-note" id="sourceNote">Loading…</span>
-      </div>
-      <div class="cfg-steps" id="stepPills"></div>
-
-      <!-- Step 1: Manufacturer -->
-      <div class="step-wrap active" id="sw1">
-        <div class="grid-wrap">
-          <div class="step-heading">Select Manufacturer</div>
-          <div class="step-sub">Choose the seating manufacturer. Ranges, upholstery, motor packages and accessories all adapt to the manufacturer you pick.</div>
-          <div class="mfr-grid" id="mfrGrid"><div class="loading-wrap"><div class="spinner"></div>Loading catalogue…</div></div>
-        </div>
-      </div>
-
-      <!-- Step 2: Range -->
-      <div class="step-wrap" id="sw2">
-        <div class="grid-wrap">
-          <div class="step-heading" id="rangeHeading">Select a Range</div>
-          <div class="step-sub">Each range brings its own seat sizes, motor options and accessories.</div>
-          <div class="range-grid" id="rangeGrid"></div>
-        </div>
-      </div>
-
-      <!-- Step 3: Upholstery -->
-      <div class="step-wrap" id="sw3">
-        <div class="mat-step-wrap">
-          <div class="step-heading">Select Upholstery</div>
-          <div class="step-sub" id="matSub"></div>
-          <div class="mat-sections" id="matSections"></div>
-          <div id="colourSection" style="display:none">
-            <div class="colour-section">
-              <div class="colour-sec-ttl">Colour Selection</div>
-              <div class="colour-sec-sub" id="colourSecSub"></div>
-              <div class="colour-grid" id="colourGrid"></div>
-            </div>
-            <div class="finish-section" id="finishBlock">
-              <div class="finish-sec-ttl">Finish Options</div>
-              <div class="finish-opts" id="finishOpts"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 4: Build -->
-      <div class="step-wrap" id="sw4">
-        <div class="build-step-wrap">
-          <div class="step-heading">Build Configuration</div>
-          <div class="step-sub">Select rows, seats per row, motor type and accessories.</div>
-          <div class="build-layout">
-            <div>
-              <div class="cfg-panel">
-                <div class="cfg-panel-ttl">Row Layout</div>
-                <div class="mini-lbl">Number of Rows</div>
-                <div class="option-pills" id="rowPills"></div>
-                <div id="rowConfigCards" style="margin-top:14px"></div>
-                <div class="seat-summary-info">
-                  <div class="ssi-block"><div class="ssi-val" id="ssiTotal">—</div><div class="ssi-lbl">Total Seats</div></div>
-                  <div class="ssi-block"><div class="ssi-val" id="ssiRows">—</div><div class="ssi-lbl">Rows</div></div>
-                  <div class="ssi-block"><div class="ssi-val" id="ssiWidth">—</div><div class="ssi-lbl">Row Width</div></div>
-                </div>
-              </div>
-              <div class="cfg-panel">
-                <div class="cfg-panel-ttl">Armrests</div>
-                <div class="arm-toggle-wrap">
-                  <div class="arm-toggle-label">
-                    <div style="font-size:12.5px;color:var(--sc-cream);font-weight:500;margin-bottom:2px">Include Separate Armrests</div>
-                    <div style="font-size:10.5px;color:var(--sc-muted)">Auto-calculated: 1 per seat + 1 per row end</div>
-                  </div>
-                  <button class="toggle-switch on" id="armToggle" onclick="SeatingApp.toggleArmrests()"></button>
-                </div>
-                <div id="armCountInfo" style="margin-top:12px;font-size:11px;color:var(--sc-muted)"></div>
-              </div>
-              <div class="cfg-panel">
-                <div class="cfg-panel-ttl">Accessories</div>
-                <div id="accRows"></div>
-              </div>
-            </div>
-            <div class="build-right">
-              <div class="plan-panel">
-                <div class="panel-ttl">Seating Plan</div>
-                <div id="buildPlanWrap"><div class="plan-empty">Configure rows to see the floor plan</div></div>
-              </div>
-              <div class="total-panel">
-                <div class="panel-ttl">Running Total</div>
-                <div id="liveLines"><div class="live-empty">No items yet</div></div>
-                <div id="liveTotalRow" style="display:none">
-                  <div class="live-total-row"><span>Trade Total</span><span id="liveTradeTot">£0</span></div>
-                  <div class="live-srp"><span>SRP (ex VAT)</span><span id="liveSrpTot">£0</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 5: Summary -->
-      <div class="step-wrap" id="sw5">
-        <div class="summary-step-wrap">
-          <div class="summary-masthead">
-            <div>
-              <div class="sm-title">Seating Configuration</div>
-              <div class="sm-sub">Confidential Trade Pricing</div>
-            </div>
-            <div class="sm-date" id="summaryDate"></div>
-          </div>
-          <div class="config-strip" id="configStrip"></div>
-          <div class="plan-section">
-            <div class="plan-sec-ttl">Seating Plan</div>
-            <div id="summaryPlanWrap"></div>
-          </div>
-          <table class="quote-table" id="quoteTable">
-            <thead><tr><th>Description</th><th>SKU</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Trade</th><th style="text-align:right">Trade Total</th><th style="text-align:right">SRP Total</th></tr></thead>
-            <tbody id="quoteBody"></tbody>
-          </table>
-          <div class="export-actions">
-            <button class="btn btn-ghost" onclick="SeatingApp.copySkus()">📋 Copy SKUs</button>
-            <button class="btn btn-ghost" onclick="SeatingApp.exportCsv()">⬇ Export CSV</button>
-            <button class="btn btn-primary" onclick="SeatingApp.printSummary()">🖨 Print / Save PDF</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="cfg-footer">
-        <div class="nav-info" id="navInfo"></div>
-        <div class="nav-btns">
-          <button class="btn btn-secondary" id="btnBack" onclick="SeatingApp.goBack()" style="display:none">← Back</button>
-          <button class="btn btn-primary" id="btnNext" disabled>Next →</button>
-        </div>
-      </div>
+  <div class="sc">
+    <div class="topbar"><span class="brandline">Seating Configurator</span><span class="src-note" id="sourceNote">Loading…</span></div>
+    <div class="steps" id="stepPills"></div>
+    <div class="body" id="stepBody"><div class="empty">Loading…</div></div>
+    <div class="footer">
+      <button class="btn sec" id="btnBack" onclick="SeatingApp.goBack()" style="visibility:hidden">← Back</button>
+      <button class="btn primary" id="btnNext" disabled>Continue →</button>
     </div>
-  </main>
-
+  </div>
   <script>
-    const APP_VERSION = '0.1.0';
-    // Sonor chrome via SonorShell (supabase:false — the app owns its SonorSeating data engine)
-    SonorShell.mount({
-      appKey: 'seating', appName: 'Seating Configurator', repo: 'sonor-seating',
-      version: APP_VERSION, faviconHref: '../data/favicon.svg', assetBase: '../data/',
-      supabase: false,
-      palette: { self: 'seating' }
-    });
+    const APP_VERSION = '0.2.0';
+    SonorShell.mount({ appKey:'seating', appName:'Seating Configurator', repo:'sonor-seating', version:APP_VERSION, faviconHref:'../data/favicon.svg', assetBase:'../data/', supabase:false, palette:{ self:'seating' } });
     SeatingApp.boot();
   </script>
 </body>
