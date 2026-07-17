@@ -99,7 +99,7 @@
   // ── Step 2 · Choose Range ────────────────────────────────────────────────────
   function renderRanges() {
     var ranked = R.rank(cfg.layout);
-    var fitCount = ranked.filter(function (x) { return x.fitsWidth; }).length;
+    var fitCount = ranked.filter(function (x) { return x.fits; }).length;
     $('stepBody').innerHTML =
       '<div class="lead"><h2>Recommended ranges</h2><p>' + fitCount + ' of ' + ranked.length + ' ranges suit a ' + cfg.layout.seatsPerRow + '-across, ' + cfg.layout.rows + '-row layout in your ' + (cfg.layout.widthMm / 1000).toFixed(1) + 'm room. Ranked by fit.</p></div>' +
       '<div class="range-grid">' + ranked.map(rangeCard).join('') + '</div>';
@@ -107,11 +107,11 @@
   function rangeCard(x, i) {
     var r = x.range, sel = cfg.rangeId === r.id;
     var from = E.fromPrice(r);
-    var badge = i === 0 && x.fitsWidth ? '<span class="rec">Best fit</span>' : (x.fitsWidth ? '<span class="fit">Fits</span>' : '<span class="nofit">Tight fit</span>');
+    var badge = i === 0 && x.fits ? '<span class="rec">Best fit</span>' : (x.fits ? '<span class="fit">Fits</span>' : '<span class="nofit">Tight fit</span>');
     var flags = x.flags.map(function (f) { return '<span class="flag ' + f.kind + '">' + (f.kind === 'warn' ? '⚠ ' : '') + esc(f.text) + '</span>'; }).join('');
     var plus = x.plus.slice(0, 3).map(function (p) { return '<span class="plus">✓ ' + esc(p) + '</span>'; }).join('');
     var img = r.hero_img ? '<div class="rc-img" style="background-image:url(\'' + esc(r.hero_img) + '\')"></div>' : '<div class="rc-img rc-noimg">' + esc(r.manufacturer) + '</div>';
-    return '<div class="rcard ' + (sel ? 'sel' : '') + ' ' + (x.fitsWidth ? '' : 'dim') + '" onclick="SeatingApp.pickRange(\'' + r.id + '\')">' +
+    return '<div class="rcard ' + (sel ? 'sel' : '') + ' ' + (x.fits ? '' : 'dim') + '" onclick="SeatingApp.pickRange(\'' + r.id + '\')">' +
       img +
       '<div class="rc-b">' +
         '<div class="rc-top"><div><div class="rc-mfr">' + esc(r.manufacturer) + '</div><div class="rc-name">' + esc(r.name) + '</div></div>' + badge + '</div>' +
@@ -135,7 +135,11 @@
     var mats = r.materials || [], fins = r.finishes || [], motors = E.motorOptions(r);
     var matHtml = mats.length ? '<div class="panel"><div class="ptt">Upholstery</div><div class="swatches">' +
       mats.map(function (m) { return '<button class="sw ' + (cfg.material === m.id ? 'on' : '') + '" style="--c:' + esc(m.swatch || '#888') + '" onclick="SeatingApp.setMaterial(\'' + m.id + '\')"><span></span>' + esc(m.name) + '</button>'; }).join('') + '</div>' + colourHtml(r) + '</div>'
-      : (r.metadata && r.metadata.needs_review ? '<div class="panel"><div class="ptt">Upholstery</div><div class="hint">Fabric &amp; leather options for this range are confirmed at quotation — ' + esc((r.materials || []).length ? '' : (fins.length ? '' : (catFinish(r) || 'various finishes'))) + '</div></div>' : '');
+      : (function () {
+          var f = catFinish(r);
+          if (!f && !(r.metadata && r.metadata.needs_review) && !fins.length) return '';
+          return '<div class="panel"><div class="ptt">Upholstery</div><div class="hint">Fabric &amp; leather grades for this range are confirmed at quotation' + (f ? ' — ' + esc(f) : '') + '.</div></div>';
+        })();
     var motorHtml = motors.length > 1 ? '<div class="panel"><div class="ptt">Recline</div><div class="opts">' +
       motors.map(function (mt) { return '<button class="opt ' + (cfg.motor === mt ? 'on' : '') + '" onclick="SeatingApp.setMotor(\'' + mt + '\')">' + esc((CFG.motorLabels || {})[mt] || mt) + '</button>'; }).join('') + '</div></div>' : '';
     var accs = E.accessoryItems(cfg.rangeId);
@@ -230,10 +234,10 @@
   function cell(l, v, n) { return '<div class="cellx"><div class="cl">' + l + '</div><div class="cv">' + v + '</div>' + (n ? '<div class="cn">' + n + '</div>' : '') + '</div>'; }
 
   // ── plans (SVG) ──────────────────────────────────────────────────────────────
-  function roomSVG(L) {
-    var W = 420, scale = W / Math.max(L.widthMm, 3000), H = Math.max(120, Math.min(240, L.lengthMm * scale * 0.5));
+  function roomSVG(L, big) {
+    var W = big ? 640 : 420, scale = W / Math.max(L.widthMm, 3000), H = Math.max(140, Math.min(big ? 340 : 240, L.lengthMm * scale * 0.5));
     var rw = L.widthMm * scale;
-    return '<svg viewBox="0 0 ' + (rw + 20) + ' ' + (H + 30) + '" width="100%" style="max-width:460px;display:block">' +
+    return '<svg viewBox="0 0 ' + (rw + 20) + ' ' + (H + 30) + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' +
       '<rect x="10" y="10" width="' + rw + '" height="' + H + '" rx="6" fill="rgba(255,255,255,.03)" stroke="rgba(201,168,92,.25)"/>' +
       '<rect x="10" y="6" width="' + rw + '" height="6" fill="rgba(201,168,92,.5)"/><text x="' + (10 + rw / 2) + '" y="4" text-anchor="middle" fill="rgba(201,168,92,.7)" font-size="7" font-family="system-ui">SCREEN</text>' +
       seatsSVG(L, 10, 22, rw, H - 12, scale) +
@@ -253,7 +257,7 @@
     }
     return out;
   }
-  function planSVG(large) { return roomSVG(cfg.layout); }
+  function planSVG(large) { return roomSVG(cfg.layout, large); }
 
   // ── export ───────────────────────────────────────────────────────────────────
   function csv() {

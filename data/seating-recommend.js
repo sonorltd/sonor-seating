@@ -20,10 +20,21 @@
       var flags = [], plus = [], score = 0;
 
       // width fit — the dominant factor
-      if (fitsWidth) { score += 50; }
+      if (fitsWidth) { score += 40; }
       else {
         var maxAcross = Math.floor(usableWidth / seatW);
         flags.push({ kind: 'warn', text: layout.seatsPerRow + ' across won’t fit this room — max ~' + Math.max(1, maxAcross) + ' of this seat (≈' + Math.round(seatW) + 'mm) per row' });
+      }
+
+      // depth fit (§7.4) — room length must hold the rows + gaps + reclined depth
+      var seatD = E.seatDepthMm(r);
+      var wallClear = ((r.capability || {}).wall_clearance_mm) || 400;   // walkway front + rear
+      var requiredDepth = layout.rows * seatD + (layout.rows - 1) * (CL.rowGapMm || 600) + wallClear;
+      var fitsDepth = requiredDepth <= layout.lengthMm;
+      if (fitsDepth) { score += 12; }
+      else {
+        var maxRows = Math.max(1, Math.floor((layout.lengthMm - wallClear + (CL.rowGapMm || 600)) / (seatD + (CL.rowGapMm || 600))));
+        flags.push({ kind: 'warn', text: layout.rows + ' rows won’t fit the ' + (layout.lengthMm / 1000).toFixed(1) + 'm length (needs ≈' + (requiredDepth / 1000).toFixed(1) + 'm) — max ~' + maxRows + ' row' + (maxRows !== 1 ? 's' : '') + ' of this seat' });
       }
 
       // preference matches / constraints
@@ -52,11 +63,11 @@
       // gentle brand nudge: fully-modelled ranges first
       if ((r.metadata || {}).is_cineca) score += 4;
 
-      return { range: r, score: score, fitsWidth: fitsWidth, flags: flags, plus: plus, rowWidthMm: rowWidth, seatWidthMm: seatW };
+      return { range: r, score: score, fitsWidth: fitsWidth, fitsDepth: fitsDepth, fits: fitsWidth && fitsDepth, flags: flags, plus: plus, rowWidthMm: rowWidth, seatWidthMm: seatW };
     });
 
     scored.sort(function (a, b) {
-      if (a.fitsWidth !== b.fitsWidth) return a.fitsWidth ? -1 : 1;   // fitting ranges first
+      if (a.fits !== b.fits) return a.fits ? -1 : 1;   // ranges that fit width AND depth first
       if (b.score !== a.score) return b.score - a.score;
       var pa = E.fromPrice(a.range), pb = E.fromPrice(b.range);
       if (pa != null && pb != null) return pa - pb;                    // cheaper first

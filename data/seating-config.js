@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.2.0',
+    version: '0.2.1',
     buildDate: '2026-07-17',
     steps: ['Layout', 'Choose Range', 'Configure', 'Summary'],
     // Step 1 generic setup — standard defaults per the brief

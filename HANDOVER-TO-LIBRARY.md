@@ -1,3 +1,9 @@
+> ⚠ **SUPERSEDED — 2026-07-17.** This handover described consuming `furniture_ranges` +
+> `furniture_catalogue`, which conflicts with the `seating_*` SSOT recorded in DECISIONS.md
+> (2026-07-16). The binding cross-session contract is now **`/SEATING-SSOT-CONTRACT.md` (v2)**
+> — read and update THAT file. Its §3 adopts this doc's capability vocabulary; everything
+> else here is history. Do not build against this doc.
+
 # Seating Configurator ↔ Library — SSOT Handover
 
 **From:** APP - Seating Configurator (`sonor-seating`)

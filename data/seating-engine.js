@@ -81,10 +81,16 @@
     return set;
   }
 
-  // seat width used for layout math (mm)
+  // seat width used for layout math (mm). Conservative: prefer the single/typical
+  // width, then MAX (not min — min is optimistic, §7.5), then min, then fallback.
   function seatWidthMm(r) {
     var c = r.capability || {};
-    return c.seat_width_min_mm || c.seat_width_mm || (CFG.clearance && CFG.clearance.seatFallbackWidthMm) || 650;
+    return c.seat_width_mm || c.seat_width_max_mm || c.seat_width_min_mm || (CFG.clearance && CFG.clearance.seatFallbackWidthMm) || 650;
+  }
+  // reclined/plan depth of a seat row (mm) — for length-fit checks (§7.4)
+  function seatDepthMm(r) {
+    var c = r.capability || {};
+    return c.reclined_depth_mm || c.seat_depth_mm || (r.metadata && r.metadata.reclined_depth_mm) || 1000;
   }
 
   // MSRP for an item (sell). qty pricing
@@ -94,7 +100,7 @@
     load: load, get source() { return source; },
     seatingRanges: seatingRanges, range: range, itemsOf: itemsOf,
     seatItems: seatItems, armrestItems: armrestItems, accessoryItems: accessoryItems,
-    motorOptions: motorOptions, seatWidthMm: seatWidthMm, feature: feature,
+    motorOptions: motorOptions, seatWidthMm: seatWidthMm, seatDepthMm: seatDepthMm, feature: feature,
     priced: priced, fromPrice: fromPrice, itemSell: itemSell
   };
 })(typeof window !== 'undefined' ? window : this);
