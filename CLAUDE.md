@@ -1,5 +1,14 @@
 # Seating Configurator — Claude Code Context (v0.10.1)
 
+> ══════════════════════════════════════════════════════════════════════════════
+> ## 🔗 SEATING SSOT BRIDGE — read `/SEATING-SSOT-CONTRACT.md` BEFORE touching seating data
+> Two sessions work this domain (Library + Seating Configurator). To stop drift:
+> - **SSOT = the `seating_*` Supabase tables** (`seating_manufacturers/ranges/items/materials/material_colours/range_materials/prices`), read via the **`v_seating_catalogue`** view. **The Library WRITES; the Configurator READS.** Never author catalogue data in an app file or re-scrape what's already in the tables.
+> - **Assets (images + spec PDFs) → Supabase Storage bucket `seating-assets`** (public). `seating_ranges.hero_img` / `metadata.tech_sheets[]` carry the URLs. `range-images.js` is a transitional cache to retire.
+> - Before adding/scraping anything seating, CHECK the tables + the contract. After any change, update `/SEATING-SSOT-CONTRACT.md` so the other session sees it.
+> ══════════════════════════════════════════════════════════════════════════════
+
+
 > **v0.10.1 —** terms now lead with "Indicative proposal for the seating package only — refer
 > to the main cinema design plans for the final room specification" (also on the drawing notes);
 > "SPECIFICATION" label removed under the model name (p2); content-page footer relaid: email LHS ·
