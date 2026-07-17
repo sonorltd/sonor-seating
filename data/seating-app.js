@@ -493,12 +493,21 @@
       client: (cfg.client.name || '').trim(), project: (cfg.client.project || '').trim(),
       heroImage: CFG.heroImage || null,
       rangeImage: r.hero_img || null,
+      // PDF embedding needs CORS-readable bytes. The seating-assets bucket serves ACAO:* —
+      // prefer it (SSOT URLs already point there for Fortress/Cinema Deco; for other ranges
+      // try the bucket copy by convention, then the display URL).
+      rangeImagePdf: (function () {
+        var h = r.hero_img || '';
+        if (/seating-assets|^\.\.\//.test(h)) return h;             // bucket or app-hosted → safe
+        return 'https://ysmvklstkzodlocttspy.supabase.co/storage/v1/object/public/seating-assets/' + r.id + '.jpg';
+      })(),
       spec: {
         seatWidthMm: cap.seat_width_mm || seatW, seatDepthMm: cap.seat_depth_mm || null,
         reclinedDepthMm: cap.reclined_depth_mm || null, wallClearanceMm: cap.wall_clearance_mm || null,
         planSeatWidthMm: seatW, planSeatDepthMm: seatD,
         rowGapMm: (CFG.clearance && CFG.clearance.rowGapMm) || 600,
         sideWallMm: (CFG.clearance && CFG.clearance.sideWallMm) || 150,
+        dimsReal: !!(cap.seat_width_mm || cap.seat_depth_mm || cap.reclined_depth_mm),
         style: r.style || meta.range_style || null
       },
       roomWidthMm: cfg.layout.widthMm, roomLengthMm: cfg.layout.lengthMm,

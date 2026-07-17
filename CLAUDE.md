@@ -1,12 +1,34 @@
-# Seating Configurator — Claude Code Context (v0.10.1)
+# Seating Configurator — Claude Code Context (v0.12.0)
 
-> ══════════════════════════════════════════════════════════════════════════════
-> ## 🔗 SEATING SSOT BRIDGE — read `/SEATING-SSOT-CONTRACT.md` BEFORE touching seating data
-> Two sessions work this domain (Library + Seating Configurator). To stop drift:
-> - **SSOT = the `seating_*` Supabase tables** (`seating_manufacturers/ranges/items/materials/material_colours/range_materials/prices`), read via the **`v_seating_catalogue`** view. **The Library WRITES; the Configurator READS.** Never author catalogue data in an app file or re-scrape what's already in the tables.
-> - **Assets (images + spec PDFs) → Supabase Storage bucket `seating-assets`** (public). `seating_ranges.hero_img` / `metadata.tech_sheets[]` carry the URLs. `range-images.js` is a transitional cache to retire.
-> - Before adding/scraping anything seating, CHECK the tables + the contract. After any change, update `/SEATING-SSOT-CONTRACT.md` so the other session sees it.
-> ══════════════════════════════════════════════════════════════════════════════
+> **v0.12.0 — bridge reciprocals executed; Library seating role MERGED INTO THIS SESSION.**
+> **Assets hosted:** all 60 images (range-assets + cineca-assets + intro hero) uploaded to the
+> public **`seating-assets` storage bucket** (anon write via temporary RLS policy, since removed;
+> read policy `seating_assets_anon_select` remains). SSOT `hero_img` for Fortress (41) + Cinema
+> Deco (7) swapped to bucket URLs (CORS-open → PDFs embed reliably); Moovia/Cinelux/FrontRow keep
+> original CDN shots with a bucket-copy fallback for PDF embedding (`rangeImagePdf`).
+> **`range-images.js` RETIRED** (script tag removed — imagery is pure SSOT now; engine map lookup
+> guarded). **Accessories:** engine honours the Library's `item_metadata.kind='accessory'` flag
+> (heuristic fallback for unflagged rows) — FrontRow's 166 modules/configs stay seats, its 6
+> accessories split correctly. Seed regenerated (360 items incl. `item_metadata`, bucket URLs,
+> FrontRow re-model). **This session now owns BOTH sides (Library writes + Configurator)** —
+> read `/SEATING-SSOT-CONTRACT.md` + `/SEATING-HANDOVER-2026-07-17.md`; remaining backlog lives
+> in the handover (Moovia 5 heroes, FrontRow Modern/Contour, swatches, accessories from brands,
+> tech sheets, Fortress pricing).
+
+
+> **v0.11.0 — SSOT imagery + drawing corrections + p2 fixes (user review round).**
+> **Images now live in the LIBRARY:** absolute `hero_img` URLs written into `seating_ranges`
+> for all 66 imaged ranges (user-directed write, §8) — Pages-hosted for the curated
+> Fortress/Cinema Deco sets, original CDN shots for Moovia/Cinelux/FrontRow, Cineca's own
+> assets. Engine now prefers SSOT hero_img; app map (`range-images.js`) demoted to fallback.
+> **PDF embedding vs CORS:** `__RANGE_IMAGES_LOCAL__` app-hosted copies preferred for pdf-lib
+> embedding (remote CDNs block byte reads); remote attempted second; model photo now reliably
+> on p2. **Drawing (p3):** seats face the screen (backrest at the REAR); solid = upright
+> footprint, **lighter ghost ahead = reclined envelope**; run centred with **side-space dims**
+> either side; dim chains moved OUTSIDE the room (reclined · row gap · upright · rear
+> clearance); distance-to-screen dim removed; notes state whether dims are **manufacturer
+> data or standard allowances** (`spec.dimsReal`). **P2:** Armrests spec row removed; spec row
+> spacing loosened. Seed regenerated (library now 360 items).
 
 
 > **v0.10.1 —** terms now lead with "Indicative proposal for the seating package only — refer

@@ -17,7 +17,7 @@
   function unslim(a) {
     return (a || []).map(function (r) {
       return {
-        item_id: r.ii, item_type: r.it, item_name: r.nm, size_label: r.sz, motor_type: r.mo, item_sort: r.is,
+        item_id: r.ii, item_type: r.it, item_name: r.nm, size_label: r.sz, motor_type: r.mo, item_sort: r.is, item_metadata: r.im || null,
         manufacturer_name: r.mf, manufacturer_slug: r.ms, range_id: r.rid, range_name: r.rn, range_tagline: r.rt,
         hero_img: r.hi, thumb_img: r.ti, seat_width_cm: r.sw, reclined_depth_cm: r.rd, seat_depth_cm: r.sd,
         wall_clearance_mm: r.wc, range_enabled: r.re, range_sort: r.rs, range_config: r.rc, range_metadata: r.rmeta,
@@ -56,8 +56,9 @@
         rmap[rid] = {
           id: rid, manufacturer: row.manufacturer_name, name: row.range_name,
           style: row.range_tagline || meta.range_style || '',
-          // App-hosted imagery wins (SSOT hero_img paths are relative to other apps / absent — contract §6 ask)
-          hero_img: (global.__RANGE_IMAGES__ || {})[rid] || (/^https?:/.test(row.hero_img || '') ? row.hero_img : null),
+          // Library is SSOT for imagery: absolute hero_img from the view wins;
+          // the app-side map remains only as a fallback for unfiled ranges.
+          hero_img: (/^https?:/.test(row.hero_img || '') ? row.hero_img : null) || (global.__RANGE_IMAGES__ || {})[rid] || null,
           thumb_img: row.thumb_img || null,
           sort_order: row.range_sort || 0, enabled: row.range_enabled !== false,
           pricing_from: { sell: null },
@@ -78,7 +79,7 @@
       var ft = (type === 'seat' || isArm) ? 'Seating' : (row.item_type || 'accessory');
       var label = row.item_name || row.size_label || 'Item';
       if (isArm && !/armrest/i.test(label)) label += ' Armrest';
-      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
+      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
     });
     var rs = [], cat = [];
     order.forEach(function (rid) {
@@ -151,13 +152,17 @@
   function priced(r) { return (r.pricing_from || {}).sell != null; }
   function fromPrice(r) { var p = (r.pricing_from || {}).sell; return p != null ? Number(p) : null; }
 
-  // primary seat items of a range (Seating type, not armrest)
+  // primary seat items of a range (Seating type, not armrest, not kind=accessory)
   function seatItems(rangeId) {
-    return itemsOf(rangeId).filter(function (i) { return i.furniture_type === 'Seating' && !/armrest/i.test(i.label || ''); });
+    return itemsOf(rangeId).filter(function (i) { return i.kind !== 'accessory' && i.furniture_type === 'Seating' && !/armrest/i.test(i.label || ''); });
   }
-  function armrestItems(rangeId) { return itemsOf(rangeId).filter(function (i) { return /armrest/i.test(i.label || ''); }); }
+  function armrestItems(rangeId) { return itemsOf(rangeId).filter(function (i) { return i.kind !== 'accessory' && /armrest/i.test(i.label || ''); }); }
+  // accessories: the Library's metadata.kind='accessory' flag is authoritative;
+  // type/label heuristics remain as fallback for unflagged rows.
   function accessoryItems(rangeId) {
     return itemsOf(rangeId).filter(function (i) {
+      if (i.kind === 'accessory') return true;
+      if (i.kind) return false;                                   // flagged as module/config/seat etc.
       var t = (i.furniture_type || '').toLowerCase();
       return t !== 'seating' || /ottoman|footrest|table|console/i.test(i.label || '');
     });

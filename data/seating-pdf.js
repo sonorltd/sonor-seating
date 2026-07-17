@@ -228,7 +228,6 @@
       ['Recline', m.reclineText],
       ['Finish options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
       ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null],
-      ['Armrests', m.includeArmrests ? 'Included (1 per seat + row ends)' : null],
       ['Lead time', m.leadText || 'On request']
     ].filter(function (r) { return r[1]; });
     var sy = top;
@@ -242,9 +241,9 @@
         tx = M + 15;
       }
       var lines = wrap(String(r[1]), F.b, 11.5, colW - (tx - M));
-      lines.forEach(function (ln, li) { P.text(ln, tx, sy + 10 + li * 13, 11.5, F.b, INK); });
-      sy += 10 + lines.length * 13 + 9;
-      P.hline(M, M + colW, sy - 6, LINE, 0.5, 0.7);
+      lines.forEach(function (ln, li) { P.text(ln, tx, sy + 11 + li * 13.5, 11.5, F.b, INK); });
+      sy += 11 + lines.length * 13.5 + 11;
+      P.hline(M, M + colW, sy - 7, LINE, 0.5, 0.7);
     });
     // photo of the actual swatch — when the Library files material.swatch_img
     if (swatchImg) {
@@ -354,18 +353,21 @@
     P.right('All dimensions in mm', A4.w - M, 108, 9, F.r, MUT);
 
     var S = m.spec || {};
-    var seatW = S.planSeatWidthMm || 650, seatD = S.planSeatDepthMm || 1000;
-    var rowGap = S.rowGapMm || 600, sideWall = S.sideWallMm || 150, wallClear = S.wallClearanceMm || 400;
+    var seatW = S.planSeatWidthMm || 650;
+    var uprD = S.seatDepthMm || 1050;                                   // upright footprint
+    var reclD = S.reclinedDepthMm || Math.round(uprD * 1.5);            // reclined envelope
+    if (reclD < uprD) reclD = uprD;
+    var rowGap = S.rowGapMm || 600, wallClear = S.wallClearanceMm || 400;
     var roomW = m.roomWidthMm || 4000, roomL = m.roomLengthMm || 6000;
     var rows = m.rows || 2, per = m.seatsPerRow || 3;
 
-    // fit room into plan box (leave generous margins for dimension strings)
-    var bx = M + 46, bTop = 168, bw = A4.w - M * 2 - 92, bh = 470;
+    // fit room into plan box (generous margins so dimension strings never crowd)
+    var bx = M + 58, bTop = 172, bw = A4.w - M * 2 - 116, bh = 452;
     var sc = Math.min(bw / roomW, bh / roomL);
     var rw = roomW * sc, rl = roomL * sc;
     var rx = bx + (bw - rw) / 2, rTop = bTop + (bh - rl) / 2;
 
-    var DIM = [110, 100, 88], CADL = [90, 84, 72];
+    var DIM = [110, 100, 88], CADL = [90, 84, 72], GHOST = [150, 142, 126];
     // room outline (double line, architectural)
     P.rectB(rx - 3, rTop - 3, rw + 6, rl + 6, CADL, 1.4, 0.9);
     P.rectB(rx, rTop, rw, rl, CADL, 0.7, 0.8);
@@ -373,55 +375,68 @@
     P.rect(rx + rw * 0.14, rTop + 8, rw * 0.72, 5, GOLD, 0.85);
     P.center('S C R E E N', rx + rw / 2, rTop + 18, 6, F.r, [140, 120, 88], 2);
 
-    // seats — anchored to the REAR wall (opposite the screen), wall clearance behind
+    // seats — CENTRED across the room, anchored to the REAR wall (backs to the rear).
+    // Solid = upright footprint; lighter ghost ahead = reclined envelope (footrest extends
+    // toward the screen).
     var seatGapMm = 40;
     var totalRowW = per * seatW + (per - 1) * seatGapMm;
+    var sideSpace = Math.round((roomW - totalRowW) / 2);
     var sx0 = rx + (rw - totalRowW * sc) / 2;
-    var seatPX = seatW * sc, seatPD = seatD * sc, gapPX = seatGapMm * sc, rowGapPX = rowGap * sc;
-    var lastRowBottom = rTop + rl - wallClear * sc;
-    var firstRowTop = lastRowBottom - (rows * seatPD + (rows - 1) * rowGapPX);
+    var seatPX = seatW * sc, uprPX = uprD * sc, reclPX = reclD * sc, gapPX = seatGapMm * sc, rowGapPX = rowGap * sc;
+    var rearY = rTop + rl - wallClear * sc;                             // back of rearmost row
+    var pitchPX = reclPX + rowGapPX;
+    var frontRowRear = rearY - (rows - 1) * pitchPX;                    // back of front row
     for (var r = 0; r < rows; r++) {
-      var ry = firstRowTop + r * (seatPD + rowGapPX);
+      var rRear = rearY - (rows - 1 - r) * pitchPX;                     // r=0 front … r=rows-1 rear
+      var ryU = rRear - uprPX;                                          // upright top (front edge)
+      var ryR = rRear - reclPX;                                         // reclined top
       for (var s = 0; s < per; s++) {
         var cx = sx0 + s * (seatPX + gapPX);
-        var aw = seatPX * 0.15;                                        // armrest width
-        P.rrect(cx, ry, seatPX, seatPD, 4, INK2, 1, 0.9);              // seat outline
-        P.rrect(cx + 1.2, ry + 1.2, aw, seatPD - 2.4, 2.5, INK2, 0.6, 0.55);              // left arm
-        P.rrect(cx + seatPX - aw - 1.2, ry + 1.2, aw, seatPD - 2.4, 2.5, INK2, 0.6, 0.55); // right arm
-        P.rrect(cx + aw + 2.5, ry + seatPD * 0.06, seatPX - 2 * aw - 5, seatPD * 0.26, 3, INK2, 0.7, 0.75); // backrest
-        P.rrect(cx + aw + 2.5, ry + seatPD * 0.38, seatPX - 2 * aw - 5, seatPD * 0.54, 3, INK2, 0.7, 0.75); // cushion
+        var aw = seatPX * 0.15;
+        // reclined envelope — lighter, ahead of the seat
+        if (reclPX > uprPX + 2) P.rrect(cx + 1.5, ryR, seatPX - 3, reclPX - uprPX + 3, 3, GHOST, 0.7, 0.55);
+        // upright footprint — solid, backrest at the REAR (bottom, facing the screen)
+        P.rrect(cx, ryU, seatPX, uprPX, 4, INK2, 1, 0.9);
+        P.rrect(cx + 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);               // left arm
+        P.rrect(cx + seatPX - aw - 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);  // right arm
+        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.08, seatPX - 2 * aw - 5, uprPX * 0.52, 3, INK2, 0.7, 0.75); // cushion (front)
+        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.66, seatPX - 2 * aw - 5, uprPX * 0.26, 3, INK2, 0.9, 0.9);  // backrest (rear)
       }
     }
 
     // ── dimension helpers ──
     function dimH(x1, x2, top, label, above) {
       P.hline(x1, x2, top, DIM, 0.7); P.vline(x1, top - 4, top + 4, DIM, 0.7); P.vline(x2, top - 4, top + 4, DIM, 0.7);
-      P.center(label, (x1 + x2) / 2, above ? top - 13 : top + 6, 7.5, F.b, DIM);
+      P.center(label, (x1 + x2) / 2, above ? top - 14 : top + 7, 7.5, F.b, DIM);
     }
     function dimV(x, t1, t2, label, leftSide) {
       P.vline(x, t1, t2, DIM, 0.7); P.hline(x - 4, x + 4, t1, DIM, 0.7); P.hline(x - 4, x + 4, t2, DIM, 0.7);
-      P.center(label, x + (leftSide ? -18 : 16), (t1 + t2) / 2 - 4, 7.5, F.b, DIM);
+      P.center(label, x + (leftSide ? -20 : 18), (t1 + t2) / 2 - 4, 7.5, F.b, DIM);
     }
-    // room width (top, above room)
-    dimH(rx, rx + rw, rTop - 16, roomW + '', true);
-    // total seating run (below plan, outside the room)
-    dimH(sx0, sx0 + totalRowW * sc, rTop + rl + 14, Math.round(totalRowW) + '', false);
-    // seat width (above the first row, first seat)
-    dimH(sx0, sx0 + seatPX, firstRowTop - 10, Math.round(seatW) + '', true);
-    // room length (left, outside)
-    dimV(rx - 18, rTop, rTop + rl, roomL + '', true);
-    // right-hand chain: viewing distance → seat depth → row gap → rear clearance
-    var rgx = sx0 + totalRowW * sc + 16;
-    dimV(rgx, rTop, firstRowTop, Math.round((firstRowTop - rTop) / sc) + '');
-    dimV(rgx, firstRowTop, firstRowTop + seatPD, Math.round(seatD) + '');
-    if (rows > 1) dimV(rgx, firstRowTop + seatPD, firstRowTop + seatPD + rowGapPX, Math.round(rowGap) + '');
-    dimV(rgx, lastRowBottom, rTop + rl, Math.round(wallClear) + '');
+    // room width (top) + room length (left) — outside the room
+    dimH(rx, rx + rw, rTop - 18, roomW + '', true);
+    dimV(rx - 20, rTop, rTop + rl, roomL + '', true);
+    // seat width (above the front row's reclined envelope, clear of the room lines)
+    dimH(sx0, sx0 + seatPX, frontRowRear - reclPX - 12, Math.round(seatW) + '', true);
+    // side space either side of the run — at the rear row, inside the room
+    var sideYc = rearY - uprPX / 2;
+    dimH(rx, sx0, sideYc, sideSpace + '', true);
+    dimH(sx0 + totalRowW * sc, rx + rw, sideYc, sideSpace + '', true);
+    // total seating run (below plan, outside)
+    dimH(sx0, sx0 + totalRowW * sc, rTop + rl + 16, Math.round(totalRowW) + '', false);
+    // right-hand chain OUTSIDE the room: reclined depth · upright depth · row gap · rear clearance
+    var rgx = rx + rw + 18;
+    dimV(rgx, frontRowRear - reclPX, frontRowRear, Math.round(reclD) + '');
+    if (rows > 1) dimV(rgx, frontRowRear, frontRowRear + rowGapPX, Math.round(rowGap) + '');
+    dimV(rgx, rearY - uprPX, rearY, Math.round(uprD) + '');
+    dimV(rgx, rearY, rTop + rl, Math.round(wallClear) + '');
 
-    // notes
-    var ny = bTop + bh + 26;
-    P.hline(M, A4.w - M, ny - 12, LINE, 0.7);
-    var notes = 'Seat width ' + Math.round(seatW) + 'mm' + (S.reclinedDepthMm ? ' · reclined depth ' + Math.round(S.reclinedDepthMm) + 'mm' : ' · plan depth ' + Math.round(seatD) + 'mm') + ' · row spacing ' + rowGap + 'mm · side clearance ' + sideWall + 'mm each side' + (wallClear ? ' · wall clearance ' + wallClear + 'mm' : '') + '. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
-    wrap(notes, F.r, 8.5, A4.w - M * 2).forEach(function (ln, li) { P.text(ln, M, ny + li * 11, 8.5, F.r, MUT); });
+    // notes — with the data source made explicit
+    var ny = bTop + bh + 34;
+    P.hline(M, A4.w - M, ny - 14, LINE, 0.7);
+    var src = S.dimsReal ? 'Seat dimensions from manufacturer data' : 'Seat dimensions are standard allowances (manufacturer data pending)';
+    var notes = src + ': width ' + Math.round(seatW) + 'mm · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter). Row spacing ' + rowGap + 'mm · ' + sideSpace + 'mm free each side · rear clearance ' + wallClear + 'mm. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
+    wrap(notes, F.r, 8.5, A4.w - M * 2).forEach(function (ln, li) { P.text(ln, M, ny + li * 11.5, 8.5, F.r, MUT); });
     pageFoot(P, F, m);
   }
 
@@ -507,7 +522,10 @@
 
     var hero = null, rangeImg = null;
     try { if (m.heroImage) hero = await loadImage(doc, m.heroImage); } catch (e) {}
-    try { if (m.rangeImage) rangeImg = await loadImage(doc, m.rangeImage); } catch (e) {}
+    try { if (m.rangeImagePdf || m.rangeImage) rangeImg = await loadImage(doc, m.rangeImagePdf || m.rangeImage); } catch (e) {}
+    if (!rangeImg && m.rangeImage && m.rangeImagePdf && m.rangeImage !== m.rangeImagePdf) {
+      try { rangeImg = await loadImage(doc, m.rangeImage); } catch (e2) {}
+    }
     if (!hero && rangeImg) hero = rangeImg;
     try { m._cedia = await doc.embedPng(await fetchBytes(BASE + 'cedia-member-wide.png')); } catch (e) { m._cedia = null; }
 
