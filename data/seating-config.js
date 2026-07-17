@@ -4,10 +4,19 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.4.0',
+    version: '0.6.0',
     buildDate: '2026-07-17',
     // Client-facing landing hero. One-line swap: drop a new file at the app root and repoint.
     heroImage: '../venice-double-seats.png',
+    // VAT (UK) applied at the summary to show gross totals. Library prices are ex-VAT.
+    vatRate: 0.20,
+    // Generic finish upgrades (from the Cineca finish set) — offered on every range.
+    finishOptions: [
+      { id: 'contrast_stitch', label: 'Contrast Stitching', note: 'Contrasting thread on all seams — colour to discuss with supplier' },
+      { id: 'decorative_piping', label: 'Decorative Piping', note: 'Adds definition to seat cushion and back edges' },
+      { id: 'headrest_monogram', label: 'Headrest Monogram / Embroidery', note: 'Initials or logo embroidered on each headrest panel' },
+      { id: 'medialink_armrest', label: 'MediaLink Armrests', note: 'USB-A & USB-C charging ports integrated into armrest cap' }
+    ],
     // ── Commercial terms per manufacturer (Sonor-set: delivery £ + lead time). ──
     //   NOT catalogue data — these are Sonor's own delivery pricing & typical lead times.
     //   Transitional home: migrate to SSOT seating_manufacturers when the Library exposes
@@ -15,15 +24,10 @@
     //   delivery.type: 'flat' (gbp per order) · 'perSeat' (gbp × seats) · 'band' (bands[] by order £).
     //   leadWeeks: [min, max]. Any null / missing manufacturer → "confirmed at quotation".
     deliveryLabel: 'Delivery',
+    // Interim assumption until accurate per-manufacturer figures: £50 per seat, 8–12 weeks
+    // (standard stock items ship sooner). Add manufacturer keys here to override the default.
     manufacturerTerms: {
-      _default:            null,
-      'Cineca':            { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
-      'Cineak':            { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
-      'Cinelux Seating':   { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
-      'Fortress Seating':  { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
-      'FrontRow Seating':  { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
-      'Moovia':            { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
-      'Palliser':          { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' }
+      _default: { delivery: { type: 'perSeat', gbp: 50 }, leadWeeks: [8, 12], note: 'Standard stock items (e.g. black leather) ship sooner; bespoke finishes 8–12 weeks.' }
     },
     steps: ['Layout', 'Choose Range', 'Configure', 'Summary'],
     // Step 1 generic setup — standard defaults per the brief
@@ -46,6 +50,6 @@
       headrest: 'Motorised Headrest', bean_bag: 'Bean Bag', stool: 'Bar Stool', accessory: 'Accessory'
     },
     accMax: { chaise: 2, _default: 8 },
-    cacheKey: 'sonor_seating_ssot_v2'
+    cacheKey: 'sonor_seating_ssot_v3'
   };
 })();

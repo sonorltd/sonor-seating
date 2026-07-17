@@ -59,66 +59,77 @@
       rect: function (x, top, w, h, c, o) { page.drawRectangle({ x: x, y: A4.h - top - h, width: w, height: h, color: col(c), opacity: o == null ? 1 : o }); },
       rectB: function (x, top, w, h, c, bw, o) { page.drawRectangle({ x: x, y: A4.h - top - h, width: w, height: h, borderColor: col(c), borderWidth: bw, opacity: 0, borderOpacity: o == null ? 1 : o }); },
       hline: function (x1, x2, top, c, t, o) { page.drawLine({ start: { x: x1, y: A4.h - top }, end: { x: x2, y: A4.h - top }, thickness: t || 0.6, color: col(c), opacity: o == null ? 1 : o }); },
-      logo: function (x, top, h, c) { var sc = h / 95; page.drawSvgPath(HOUSE, { x: x, y: A4.h - top, scale: sc, color: col(c || GOLD) }); }
+      logo: function (x, top, h, c) { var sc = h / 95; page.drawSvgPath(HOUSE, { x: x, y: A4.h - top, scale: sc, color: col(c || GOLD) }); },
+      image: function (img, x, top, w, h, o) { page.drawImage(img, { x: x, y: A4.h - top - h, width: w, height: h, opacity: o == null ? 1 : o }); }
     };
   }
 
   function money(n) { return n == null ? 'POA' : '£' + Number(n).toLocaleString('en-GB', { maximumFractionDigits: 0 }); }
 
   // ── COVER (dark) ─────────────────────────────────────────────────────────────
-  function cover(P, F, m) {
+  function cover(P, F, m, hero) {
     P.rect(0, 0, A4.w, A4.h, DARK);
-    // faint purple + gold ambience bands
-    P.rect(0, 0, A4.w, 250, PUR, 0.05);
-    P.rect(0, A4.h - 150, A4.w, 150, GOLD, 0.045);
+    // hero photograph (cover-fit) with dark scrim for legibility
+    if (hero) {
+      var iw = hero.width, ih = hero.height, s = Math.max(A4.w / iw, A4.h / ih);
+      var dw = iw * s, dh = ih * s;
+      P.image(hero, (A4.w - dw) / 2, (A4.h - dh) / 2, dw, dh, 1);
+      P.rect(0, 0, A4.w, A4.h, DARK, 0.5);                 // overall scrim
+      P.rect(0, 0, A4.w, 250, DARK, 0.35);                 // top (lockup)
+      P.rect(0, A4.h - 320, A4.w, 320, DARK, 0.5);         // lower (title/chips/footer)
+    }
+    // purple + gold cinema ambience (gels with the app)
+    P.rect(0, 0, A4.w, 300, PUR, 0.10);
+    P.rect(0, A4.h - 260, A4.w, 260, PUR, 0.10);
+    P.rect(0, A4.h - 180, A4.w, 180, GOLD, 0.05);
     // inset frame
-    P.rectB(M * 0.66, M * 0.66, A4.w - M * 1.32, A4.h - M * 1.32, GOLD, 0.7, 0.28);
+    P.rectB(M * 0.66, M * 0.66, A4.w - M * 1.32, A4.h - M * 1.32, GOLD, 0.7, 0.32);
 
     // brand lockup
     P.logo(M, 70, 30, GOLD);
-    var wx = P.tracked('SONOR', M + 40, 48, 13, F.b, CREAM, 3.4);
-    P.tracked('SMART HOMES', M + 40, 66, 6.5, F.r, GOLDL, 2.6);
+    P.tracked('SONOR', M + 40, 48, 13, F.b, CREAM, 3.4);
+    P.tracked('CINEMA SEATING', M + 40, 66, 6.5, F.r, [190, 156, 222], 2.4);
 
     // eyebrow
-    P.hline(M, M + 26, 300, GOLD, 1, 0.9);
-    P.tracked('LUXURY HOME CINEMA SEATING', M + 36, 296, 8.5, F.r, GOLDL, 3.2);
+    P.hline(M, M + 26, 452, GOLD, 1, 0.9);
+    P.tracked('LUXURY HOME CINEMA SEATING', M + 36, 448, 8.5, F.r, GOLDL, 3.2);
 
     // title
-    P.text('Cinema Seating', M - 1, 322, 52, F.b, CREAM);
-    P.text('Proposal', M - 1, 384, 52, F.l, GOLDL);
+    P.text('Cinema Seating', M - 1, 474, 50, F.b, CREAM);
+    P.text('Proposal', M - 1, 534, 50, F.l, GOLDL);
 
-    // range subtitle
-    P.hline(M, M + 46, 470, GOLD, 1.2, 0.9);
-    P.text('Featuring the ' + (m.range || '') + ' range', M, 490, 15, F.r, [210, 202, 186]);
-    if (m.manufacturer) P.text('by ' + m.manufacturer, M, 512, 15, F.l, GOLDL);
+    // range subtitle — gold + purple accent rule
+    P.rect(M, 616, 34, 2.5, GOLD);
+    P.rect(M + 40, 616, 20, 2.5, PUR);
+    P.text('Featuring the ' + (m.range || '') + ' range' + (m.manufacturer ? ' by ' + m.manufacturer : ''), M, 636, 14, F.r, [222, 216, 202]);
 
-    // summary chips
+    // proposal info chips — NO price on the cover (details on following pages)
     var chips = [
+      ['PREPARED', m.dateText || '—'],
       ['ROOM', m.roomText || '—'],
       ['LAYOUT', m.layoutText || '—'],
-      ['LEAD TIME', m.leadText || 'On request'],
-      ['ESTIMATED MSRP', m.totalText || 'On request']
+      ['LEAD TIME', m.leadText || 'On request']
     ];
-    var cy = 600, cw = (A4.w - M * 2) / 4;
-    P.hline(M, A4.w - M, cy - 14, GOLD, 0.5, 0.3);
+    var cy = 690, cw = (A4.w - M * 2) / 4;
+    P.hline(M, A4.w - M, cy - 14, GOLD, 0.5, 0.4);
     chips.forEach(function (c, i) {
       var x = M + i * cw;
-      P.tracked(c[0], x, cy, 7, F.r, MUT2(), 1.8);
-      P.text(c[1], x, cy + 14, 14, F.b, CREAM);
+      P.tracked(c[0], x, cy, 7, F.r, [170, 158, 138], 1.6);
+      P.text(c[1], x, cy + 14, 12.5, F.b, CREAM);
     });
-    P.hline(M, A4.w - M, cy + 44, GOLD, 0.5, 0.3);
+    P.hline(M, A4.w - M, cy + 42, GOLD, 0.5, 0.4);
 
     // footer
-    P.hline(M, A4.w - M, A4.h - 74, GOLD, 0.6, 0.5);
+    P.hline(M, A4.w - M, A4.h - 74, GOLD, 0.6, 0.55);
     P.tracked('PROJECTS@SONOR.CO.UK   ·   SONOR.CO.UK', M, A4.h - 62, 7.5, F.r, GOLDL, 1.6);
-    P.trackedRight('DESIGNED & INSTALLED SINCE 2003   ·   CEDIA MEMBER', A4.w - M, A4.h - 62, 7.5, F.r, MUT2(), 1.4);
+    P.trackedRight('DESIGNED & INSTALLED SINCE 2003   ·   CEDIA MEMBER', A4.w - M, A4.h - 62, 7.5, F.r, [170, 158, 138], 1.4);
   }
-  function MUT2() { return [150, 140, 120]; }
 
   // ── SPECIFICATION + QUOTE (cream) ────────────────────────────────────────────
   function quote(P, F, m) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
     P.rect(0, 0, A4.w, 4, GOLD);
+    P.rect(A4.w - 130, 0, 130, 4, PUR);
 
     // header
     P.logo(M, 62, 24, GOLD);
@@ -175,25 +186,32 @@
       y += 26;
     });
 
-    // subtotal + delivery + total
+    // subtotal + delivery + VAT + total
     y += 4;
     P.text('Products subtotal', cItem, y - 10, 10.5, F.r, MUT);
-    P.right(money(m.productTotal), cLine, y - 10, 10.5, F.r, INK2); y += 22;
+    P.right(money(m.productTotal), cLine, y - 10, 10.5, F.r, INK2); y += 19;
     P.text(m.deliveryLabel || 'Delivery', cItem, y - 10, 10.5, F.r, MUT);
-    P.right(m.deliveryCost != null ? money(m.deliveryCost) : 'On request', cLine, y - 10, 10.5, F.r, INK2); y += 20;
-    P.hline(cQty, A4.w - M, y, INK, 0.8, 0.6); y += 20;
-    P.text('Estimated total', cItem, y - 12, 13, F.b, INK);
-    P.tracked('EX VAT', cItem + F.b.widthOfTextAtSize('Estimated total', 13) + 10, y - 6, 7, F.r, MUT, 1.4);
-    P.right(m.totalText || 'On request', cLine, y - 14, 17, F.b, [140, 116, 60]); y += 30;
+    P.right(m.deliveryCost != null ? money(m.deliveryCost) : 'On request', cLine, y - 10, 10.5, F.r, INK2); y += 19;
+    P.text('Subtotal (ex VAT)', cItem, y - 10, 10.5, F.r, MUT);
+    P.right(money(Math.round(m.exVat)), cLine, y - 10, 10.5, F.r, INK2); y += 19;
+    P.text('VAT @ ' + Math.round((m.vatRate || 0) * 100) + '%', cItem, y - 10, 10.5, F.r, MUT);
+    P.right(money(Math.round(m.vat)), cLine, y - 10, 10.5, F.r, INK2); y += 16;
+    P.hline(cQty, A4.w - M, y, INK, 0.8, 0.6); y += 22;
+    P.text('Total', cItem, y - 12, 13, F.b, INK);
+    P.tracked('INC VAT', cItem + F.b.widthOfTextAtSize('Total', 13) + 10, y - 6, 7, F.r, MUT, 1.4);
+    P.right(m.grossText || 'On request', cLine, y - 14, 18, F.b, [140, 116, 60]); y += 26;
+    if (m.finishes && m.finishes.length) {
+      P.text('Finish upgrades: ' + m.finishes.join(', ') + ' — confirmed & priced with the supplier.', cItem, y - 6, 9, F.r, MUT, { maxWidth: A4.w - M * 2 }); y += 16;
+    }
 
     // terms
-    var terms = 'Indicative MSRP from the Sonor library' + (m.deliveryCost != null ? ', including ' + (m.deliveryLabel || 'delivery').toLowerCase() : '') + (m.leadText ? ' and a typical ' + m.leadText + ' lead time for ' + m.manufacturer : '') + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation. Prices exclude VAT.';
+    var terms = 'Indicative MSRP from the Sonor library' + (m.deliveryCost != null ? ', including ' + (m.deliveryLabel || 'delivery').toLowerCase() : '') + (m.leadText ? ' and a typical ' + m.leadText + ' lead time for ' + m.manufacturer : '') + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation. VAT at ' + Math.round((m.vatRate || 0) * 100) + '%.';
     P.hline(M, A4.w - M, y, LINE, 0.6); y += 16;
     wrapText(P, terms, M, y, A4.w - M * 2, 8.5, F.r, MUT, 12);
 
     // footer
     P.hline(M, A4.w - M, A4.h - 52, LINE, 0.8);
-    P.tracked('SONOR SMART HOMES', M, A4.h - 42, 7, F.b, INK, 1.6);
+    P.tracked('SONOR', M, A4.h - 42, 7, F.b, INK, 1.6);
     P.trackedRight('PROJECTS@SONOR.CO.UK  ·  CHESHIRE · WIRRAL · WALES', A4.w - M, A4.h - 42, 7, F.r, MUT, 1.2);
   }
 
@@ -260,7 +278,15 @@
     doc.setTitle('Sonor — ' + (m.range || 'Cinema Seating') + ' Proposal');
     doc.setAuthor('Sonor Smart Homes'); doc.setCreator('Sonor Seating Configurator');
     doc.setSubject('Cinema seating proposal'); doc.setKeywords(['Sonor', 'cinema seating', 'CEDIA']);
-    cover(mk(doc.addPage([A4.w, A4.h])), F, m);
+    var hero = null;
+    if (m.heroImage) {
+      try {
+        var url = (typeof document !== 'undefined') ? new URL(m.heroImage, document.baseURI).href : m.heroImage;
+        var hb = await fetchBytes(url);
+        hero = /\.jpe?g(\?|$)/i.test(m.heroImage) ? await doc.embedJpg(hb) : await doc.embedPng(hb);
+      } catch (e) { hero = null; }
+    }
+    cover(mk(doc.addPage([A4.w, A4.h])), F, m, hero);
     quote(mk(doc.addPage([A4.w, A4.h])), F, m);
     var bytes = await doc.save();
     download(bytes, m.filename || 'sonor-cinema-seating-proposal.pdf');

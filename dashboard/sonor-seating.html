@@ -141,6 +141,22 @@
     .cfg-left { display:flex; flex-direction:column; gap:14px; } .sticky { position:sticky; top:14px; }
     .swatches { display:flex; flex-wrap:wrap; gap:9px; } .sw { display:flex; align-items:center; gap:8px; padding:8px 13px; border-radius:9px; border:1.5px solid var(--brd2); background:var(--bg3); color:var(--cream); font-size:12px; cursor:pointer; transition:.15s; } .sw span { width:16px; height:16px; border-radius:50%; background:var(--c); border:1px solid rgba(255,255,255,.18); } .sw:hover { border-color:var(--brdP); } .sw.on { border-color:var(--gold); box-shadow:0 0 0 2px rgba(173,153,120,.18); }
     .cols { display:flex; flex-wrap:wrap; gap:7px; } .col { width:27px; height:27px; border-radius:50%; background:var(--c); border:2px solid rgba(255,255,255,.12); cursor:pointer; transition:.15s; } .col:hover { transform:scale(1.1); } .col.on { border-color:var(--gold); box-shadow:0 0 0 2px rgba(173,153,120,.3); }
+    /* Cineca-style upholstery cards */
+    .mgrp { margin-bottom:16px; } .mgrp:last-of-type { margin-bottom:6px; }
+    .mat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+    .mcard { text-align:left; background:var(--bg3); border:1.5px solid var(--brd2); border-radius:11px; padding:13px 14px; cursor:pointer; transition:.16s; display:flex; flex-direction:column; gap:5px; color:var(--cream); }
+    .mcard:hover { border-color:var(--brdP); box-shadow:0 0 18px -8px rgba(128,88,161,.6); }
+    .mcard.on { border-color:var(--gold); background:linear-gradient(180deg, rgba(173,153,120,.14), rgba(128,88,161,.08)); box-shadow:0 0 0 1px rgba(173,153,120,.4); }
+    .mcard.off { opacity:.5; cursor:not-allowed; } .mcard.off:hover { box-shadow:none; border-color:var(--brd2); }
+    .mc-top { display:flex; align-items:center; gap:9px; } .mc-sw { width:18px; height:18px; border-radius:50%; background:var(--c); border:1px solid rgba(255,255,255,.2); flex-shrink:0; }
+    .mc-name { font-size:13px; font-weight:600; color:var(--cream); } .mc-meta { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+    .mc-price { font-size:11.5px; color:var(--muted); } .mc-price b { color:var(--gold2); font-weight:700; }
+    .mc-up { font-size:10.5px; color:#e0a05a; } .mc-col { font-size:10.5px; color:var(--pur2); opacity:.85; } .mc-un { font-size:11px; color:#e0a05a; }
+    .colsel { margin-top:14px; padding-top:12px; border-top:1px solid var(--brd2); }
+    /* finish option toggles */
+    .fin { display:flex; align-items:flex-start; gap:12px; padding:11px 0; border-bottom:1px solid var(--brd2); cursor:pointer; } .fin:last-of-type { border:none; }
+    .fin input { margin-top:2px; width:17px; height:17px; accent-color:var(--pur); flex-shrink:0; cursor:pointer; }
+    .fin-b { display:flex; flex-direction:column; gap:2px; } .fin-n { font-size:13px; color:var(--cream); font-weight:600; } .fin-d { font-size:11px; color:var(--muted); line-height:1.5; }
     .acc { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--brd2); } .acc:last-child{ border:none; } .acc-n { font-size:13px; color:var(--cream); } .acc-p { font-size:11px; color:var(--muted); }
     .qty { display:flex; align-items:center; gap:11px; } .qty button { width:29px; height:29px; border-radius:50%; border:1.5px solid var(--dim); background:none; color:var(--muted); font-size:15px; cursor:pointer; transition:.15s; } .qty button:hover { border-color:var(--gold); color:var(--gold); box-shadow:0 0 16px -5px rgba(173,153,120,.7); } .qty span { min-width:18px; text-align:center; color:var(--cream); font-weight:600; }
     .toggle { display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--cream); cursor:pointer; } .toggle input { accent-color:var(--pur); width:16px; height:16px; }
@@ -224,6 +240,11 @@
     .cta-lg.gold:hover { background:var(--w-gold); color:var(--w-cta); border-color:var(--w-gold); }
     .cta-lg.ghost { color:var(--w-txt2); background:transparent; border:1px solid var(--w-brd2); font-weight:400; }
     .cta-lg.ghost:hover { border-color:var(--w-gold); color:var(--w-gold); }
+    /* prominent primary action for the tool (obvious button) */
+    .cta-lg.solid { color:#151310; background:linear-gradient(135deg,var(--w-gold-l),var(--w-gold)); border:1px solid transparent;
+      box-shadow:0 14px 34px -14px rgba(173,153,120,.7), inset 0 1px 0 rgba(255,255,255,.25); }
+    .cta-lg.solid:hover { filter:brightness(1.05); transform:translateY(-1px); }
+    .start-row { margin-top:2.6rem; }
     .hero-tags { display:flex; flex-wrap:wrap; gap:.6rem 1.8rem; margin-top:2.4rem; padding-top:1.6rem; border-top:1px solid rgba(173,153,120,.1);
       font-size:.62rem; letter-spacing:.09em; text-transform:uppercase; font-weight:600; color:var(--w-muted); }
     .hero-tags span { display:inline-flex; align-items:center; gap:.55rem; }
@@ -287,16 +308,14 @@
 
   <!-- ── CLIENT-FACING SITE HEADER (aligned to sonor.co.uk) ── -->
   <header class="site-hdr">
-    <a class="wm" href="https://sonor.co.uk" target="_blank" rel="noopener" aria-label="Sonor Smart Homes">
+    <a class="wm" href="https://sonor.co.uk" target="_blank" rel="noopener" aria-label="Sonor">
       <svg class="wm-mark" viewBox="0 0 93 95" fill="currentColor" aria-hidden="true"><path d="M92.02,38.41v51.4c0,2.63-2.13,4.75-4.75,4.75h-3.34c-2.62,0-4.75-2.12-4.75-4.75v-45.34c0-2.45-1.11-4.77-3.01-6.31l-25.23-20.41c-2.8-2.27-6.76-2.42-9.73-.36l-23.15,16.05.45,1.55c22.38,9.5,40.47,30.05,47.71,53.39.95,3.06-1.32,6.18-4.53,6.18h-5.36c-2.08,0-3.9-1.37-4.54-3.35-6.96-21.83-24.83-38.23-46.17-46.13-1.31-.49-2.31-1.5-2.79-2.75-.2-.51-.31-1.06-.32-1.64l-.12-9.11c-.02-1.58.75-3.06,2.05-3.96L28.74,10.74,42.11,1.45c.16-.11.32-.22.49-.31,2.35-1.4,5.22-1.5,7.64-.34.57.26,1.12.61,1.63,1.03l37.16,30.29c1.89,1.54,2.99,3.85,2.99,6.29Z"/><path d="M34.59,94.55h-5.25c-1.6,0-3.09-.81-3.97-2.15-5.47-8.37-11.98-15.35-20.72-20.32-1.5-.85-2.45-2.42-2.45-4.15v-5.58c0-3.52,3.68-5.79,6.85-4.26,12.79,6.15,23.95,16.91,29.85,29.73,1.45,3.14-.86,6.73-4.32,6.73h0Z"/><path d="M4.26,83.39c7.65-1.71,9.39,9.06,4.03,10.83-8.9,2.94-11.25-9.22-4.03-10.83Z"/></svg>
-      <span class="wm-txt"><b>Sonor</b><i>Smart Homes</i></span>
+      <span class="wm-txt"><b>Sonor</b></span>
     </a>
-    <span class="tag">Luxury Cinema Seating</span>
+    <span class="tag">Cinema Seating</span>
     <nav>
-      <a class="lnk" href="#why">Why seating</a>
-      <a class="lnk" href="#tiers">Ranges</a>
       <a class="lnk" href="#how">How it works</a>
-      <a class="hdr-cta" href="mailto:projects@sonor.co.uk?subject=Home%20Cinema%20Seating%20Enquiry">Book a consultation</a>
+      <button class="hdr-cta" onclick="SeatingApp.enter()">Design your cinema →</button>
     </nav>
   </header>
 
@@ -305,73 +324,33 @@
     <section class="hero">
       <div class="hero-bg" id="heroBg"></div>
       <div class="hero-inner"><div class="hero-copy">
-        <div class="eyebrow">Luxury Home Cinema Seating</div>
-        <h1>Every seat,<br>the <span class="lt">best seat</span><br>in the house.</h1>
-        <p class="hero-sub">Bespoke cinema seating from the finest European makers — recliners, sofas, daybeds and loungers, configured to fit your room to the millimetre. Tell us your space and we'll recommend the ranges that suit it, then build your layout live.</p>
+        <div class="eyebrow">Sonor · Cinema Seating</div>
+        <h1>Design your <span class="lt">cinema seating</span>.</h1>
+        <p class="hero-sub">Tell us your room, we'll match the ranges that fit, and you'll build your layout and quote — all in a few minutes.</p>
         <div class="hero-ctas">
-          <button class="cta-lg gold" onclick="SeatingApp.enter()">Design your cinema →</button>
-          <a class="cta-lg ghost" href="mailto:projects@sonor.co.uk?subject=Home%20Cinema%20Seating%20Enquiry">Book a consultation</a>
+          <button class="cta-lg solid" onclick="SeatingApp.enter()">Start — design your cinema →</button>
+          <a class="cta-lg ghost" href="#how">See how it works</a>
         </div>
-        <div class="hero-tags"><span>Multiple manufacturers</span><span>Made to measure</span><span>Designed &amp; installed since 2003</span></div>
+        <div class="hero-tags"><span>68 ranges · 6 makers</span><span>Made to measure</span><span>Live layout &amp; pricing</span></div>
       </div></div>
     </section>
 
-    <section class="strip2" id="why"><div class="wrap">
-      <div class="sl"><span></span>Why dedicated seating</div>
-      <h2 class="sec-h">A cinema is only as good as <span class="lt">the seat you watch it from</span>.</h2>
-      <p class="sec-p">The screen and sound get the attention, but the seating decides whether a room gets used every night or admired once a month. The right range fits your dimensions, seats everyone with proper sightlines, and reclines without touching the wall behind. We size it around your room first — then show only what genuinely fits.</p>
-    </div></section>
-
-    <section id="tiers"><div class="wrap">
-      <div class="sl"><span></span>The ranges</div>
-      <h2 class="sec-h">From refined to <span class="lt">fully bespoke</span>.</h2>
-      <p class="sec-p">Our library spans multiple manufacturers and styles, grouped by how far you want to take it. The configurator recommends across all of them based on your room.</p>
-      <div class="tier-grid">
-        <div class="tier">
-          <div class="tn">Entry</div><div class="tt">Considered comfort</div>
-          <p class="td">Beautifully made powered recliners in leather or fabric — the essentials done properly, ready for most rooms.</p>
-          <ul class="tl"><li>Powered recline</li><li>Leather &amp; fabric options</li><li>Single &amp; double seats</li></ul>
-        </div>
-        <div class="tier feat">
-          <span class="badge">Most chosen</span>
-          <div class="tn">Premium</div><div class="tt">The Sonor standard</div>
-          <p class="td">Wider seat geometry, motorised headrests and lumbar, and finish choices that let the room feel designed rather than furnished.</p>
-          <ul class="tl"><li>Motorised headrest &amp; lumbar</li><li>Wide upholstery range</li><li>Armrests, ottomans &amp; accessories</li></ul>
-        </div>
-        <div class="tier">
-          <div class="tn">Bespoke</div><div class="tt">Made to your room</div>
-          <p class="td">Daybeds, loungers, corner units and made-to-measure configurations — for rooms that deserve something built entirely around them.</p>
-          <ul class="tl"><li>Daybeds &amp; loungers</li><li>Corner &amp; chaise units</li><li>Custom layouts &amp; materials</li></ul>
-        </div>
-      </div>
-    </div></section>
-
     <section class="strip2" id="how"><div class="wrap">
       <div class="sl"><span></span>How it works</div>
-      <h2 class="sec-h">Your layout, <span class="lt">then your quote</span>.</h2>
-      <p class="sec-p">Four steps, a few minutes. You'll leave with an indicative MSRP and a plan we can turn into a formal quotation.</p>
+      <h2 class="sec-h">Four steps to <span class="lt">your quote</span>.</h2>
+      <p class="sec-p">A few minutes from your room dimensions to an itemised layout, price, delivery and lead time.</p>
       <div class="steps3">
-        <div class="st"><h4>Your room</h4><p>Enter width, length and how many seats you'd like. We show what will realistically fit.</p></div>
-        <div class="st"><h4>Choose a range</h4><p>We recommend ranges that suit your space and flag anything that won't — like no daybed in a range.</p></div>
-        <div class="st"><h4>Configure</h4><p>Upholstery, colour, recline and add-ons, with a live layout plan and running MSRP.</p></div>
-        <div class="st"><h4>Your quote</h4><p>An itemised MSRP summary to export or print — the starting point for your formal quotation.</p></div>
+        <div class="st"><h4>Your room</h4><p>Enter width, length and how many seats. We show what realistically fits.</p></div>
+        <div class="st"><h4>Choose a range</h4><p>We rank the ranges that suit your space and flag anything that won't.</p></div>
+        <div class="st"><h4>Configure</h4><p>Upholstery, recline and add-ons, with a live layout plan and running price.</p></div>
+        <div class="st"><h4>Your quote</h4><p>An itemised summary with delivery &amp; lead time — export, print or PDF.</p></div>
       </div>
-    </div></section>
-
-    <section class="band"><div class="wrap">
-      <div class="sl" style="justify-content:center"><span></span>Ready when you are</div>
-      <h2 class="sec-h">Design your cinema seating <span class="lt">in minutes</span>.</h2>
-      <p class="sec-p">No obligation — build a layout, see indicative pricing, and we'll take it from there.</p>
-      <div class="hero-ctas">
-        <button class="cta-lg gold" onclick="SeatingApp.enter()">Design your cinema →</button>
-        <a class="cta-lg ghost" href="mailto:projects@sonor.co.uk?subject=Home%20Cinema%20Seating%20Enquiry">Book a consultation</a>
-      </div>
+      <div class="start-row"><button class="cta-lg solid" onclick="SeatingApp.enter()">Start now →</button></div>
     </div></section>
 
     <footer class="foot">
       <span class="wm2">Sonor</span>
-      <span>Home cinema &amp; smart home — Cheshire · Wirral · Wales · since 2003</span>
-      <span class="sp"><a href="mailto:projects@sonor.co.uk">projects@sonor.co.uk</a></span>
+      <span class="sp">Home cinema · Cheshire · Wirral · Wales</span>
     </footer>
   </main>
 
@@ -391,7 +370,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.4.0';
+    const APP_VERSION = '0.6.0';
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();

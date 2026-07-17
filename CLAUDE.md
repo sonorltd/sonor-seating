@@ -1,4 +1,36 @@
-# Seating Configurator — Claude Code Context (v0.4.0)
+# Seating Configurator — Claude Code Context (v0.6.0)
+
+> **v0.6.0 — fully-featured Material step + VAT + hero PDF cover.**
+> **Materials (Cineca parity):** adapter keeps `available` / `upcharge` / `tier` and attaches
+> **colourways** (from `seating_material_colours`, bundled in the seed `colours` map + fetched
+> live). Configure groups **Leather / Fabric** cards with tier, "Not available for {range}",
+> upcharge %, colourway counts + a colour picker. **Finish options** = 4 generic toggles
+> (`CFG.finishOptions`, from the Cineca set) → recorded on summary/CSV/PDF (priced with supplier).
+> **VAT:** `CFG.vatRate` (0.20) → summary shows Subtotal ex VAT → VAT → **Total inc VAT**; strip
+> headline + CSV + PDF all carry gross. **Delivery/lead defaults:** `manufacturerTerms._default`
+> = perSeat **£50** + **8–12 wks** (standard items sooner) until real figures. Material upcharge
+> multiplies seat/armrest unit price. **PDF cover** now uses the **hero image** full-bleed with
+> a scrim, **no price** (name + Prepared/Room/Layout/Lead-time chips only); page 2 has VAT rows +
+> finishes. **Known gap:** per-material base pricing still flat (§7.2) and the +7% Avalon-type
+> upcharge lives in `seating_range_materials` (not the view) so shows 0 — wire later.
+> **Open:** per-row seat/finish overrides; curating the scraped manufacturer images (zips in
+> ~/Downloads/images*.zip) → wire `hero_img` per range.
+
+
+> **v0.5.0 — SSOT repoint + tool intro + gelled branding.**
+> **Engine repoint (§7.1 done):** Tier-1 now reads the SSOT view **`v_seating_catalogue`**
+> (anon SELECT ok) via `adaptSSOT()` (maps view rows → the engine's native range/item shape;
+> materials from the `materials` jsonb, MSRP from `price_srp_from`, features inferred from
+> style/labels). Legacy `furniture_*` kept as a fallback tier. Seed regenerated from the view
+> (`data/seating-catalogue.js` → `__SEATING_SEED__.ssot_slim`, 214 rows). cacheKey bumped v2→v3.
+> **Now surfaces all 68 ranges / 6 manufacturers** (was 26): adds Cinema Deco (priced) + full
+> Fortress (POA) + Moovia/Cinelux/FrontRow. **Images:** only Cineca has them in the SSOT — the
+> rest use the wordmark-fallback card until the Library files image URLs (contract §6).
+> **Intro = tool, not website:** dropped the marketing sections + all "Book a consultation" CTAs;
+> now a hero + numbered 4-step "how it works" with prominent **solid gold** CTAs (`.cta-lg.solid`)
+> that flow into the wizard. Logo is **"Sonor"** only (dropped "Smart Homes"). **PDF cover** gained
+> the purple ambience + gold/purple divider to gel with the app; "Smart Homes" removed there too.
+
 
 > **v0.4.0 — luxury PDF proposal.** `data/seating-pdf.js` (`SeatingPdf.generate(model)`)
 > builds a crisp **vector** A4 PDF with **pdf-lib** + embedded Gilroy (`@pdf-lib/fontkit`),

@@ -11,7 +11,7 @@
     step: 1,
     layout: Object.assign({ prefs: {} }, CFG.defaultRoom),
     rangeId: null, material: null, colour: null, motor: null,
-    includeArmrests: true, accessories: {}
+    includeArmrests: true, accessories: {}, finishes: {}
   };
 
   function $(id) { return document.getElementById(id); }
@@ -50,7 +50,7 @@
   function goNext() { if (cfg.step < STEPS.length && !nextDisabled()) { cfg.step++; renderStep(); } }
   function goBack() { if (cfg.step > 1) { cfg.step--; renderStep(); } }
   function jumpTo(n) { if (n < cfg.step) { cfg.step = n; renderStep(); } }
-  function restart() { cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {} }; renderStep(); }
+  function restart() { cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {} }; renderStep(); }
   function nextDisabled() {
     if (cfg.step === 2) return !cfg.rangeId;
     return false;
@@ -163,14 +163,9 @@
   // ── Step 3 · Configure ───────────────────────────────────────────────────────
   function renderConfigure() {
     var r = E.range(cfg.rangeId); if (!r) { cfg.step = 2; return renderStep(); }
-    var mats = r.materials || [], fins = r.finishes || [], motors = E.motorOptions(r);
-    var matHtml = mats.length ? '<div class="panel"><div class="ptt">Upholstery</div><div class="swatches">' +
-      mats.map(function (m) { return '<button class="sw ' + (cfg.material === m.id ? 'on' : '') + '" style="--c:' + esc(m.swatch || '#888') + '" onclick="SeatingApp.setMaterial(\'' + m.id + '\')"><span></span>' + esc(m.name) + '</button>'; }).join('') + '</div>' + colourHtml(r) + '</div>'
-      : (function () {
-          var f = catFinish(r);
-          if (!f && !(r.metadata && r.metadata.needs_review) && !fins.length) return '';
-          return '<div class="panel"><div class="ptt">Upholstery</div><div class="hint">Fabric &amp; leather grades for this range are confirmed at quotation' + (f ? ' — ' + esc(f) : '') + '.</div></div>';
-        })();
+    var motors = E.motorOptions(r);
+    var matHtml = materialsHtml(r);
+    var finHtml = finishesHtml();
     var motorHtml = motors.length > 1 ? '<div class="panel"><div class="ptt">Recline</div><div class="opts">' +
       motors.map(function (mt) { return '<button class="opt ' + (cfg.motor === mt ? 'on' : '') + '" onclick="SeatingApp.setMotor(\'' + mt + '\')">' + esc((CFG.motorLabels || {})[mt] || mt) + '</button>'; }).join('') + '</div></div>' : '';
     var accs = E.accessoryItems(cfg.rangeId);
@@ -188,24 +183,64 @@
           CFG.seatsPerRowOptions.map(function (n) { return '<button class="opt ' + (cfg.layout.seatsPerRow === n ? 'on' : '') + '" onclick="SeatingApp.setLayout2(\'seatsPerRow\',' + n + ')">' + n + '</button>'; }).join('') +
           '</div><div class="lbl">Rows</div><div class="opts">' +
           CFG.rowOptions.map(function (n) { return '<button class="opt ' + (cfg.layout.rows === n ? 'on' : '') + '" onclick="SeatingApp.setLayout2(\'rows\',' + n + ')">' + n + '</button>'; }).join('') +
-          '</div></div>' + motorHtml + matHtml + arm + accHtml +
+          '</div></div>' + motorHtml + matHtml + finHtml + arm + accHtml +
         '</div>' +
         '<div class="cfg-right"><div class="panel sticky"><div class="ptt">Your cinema</div><div id="planWrap"></div>' +
           '<div id="liveTotal" class="live"></div></div></div>' +
       '</div>';
     updateLive();
   }
+  // ── Cineca-style upholstery: grouped leather/fabric with tier, availability, upcharge ──
+  var GROUP_ORDER = ['leather', 'fabric', 'velvet', 'alcantara'];
+  function groupLabel(k) { return { leather: 'Leather', fabric: 'Fabric', velvet: 'Velvet', alcantara: 'Alcantara' }[k] || (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Fabric'); }
+  function materialsHtml(r) {
+    var mats = r.materials || [];
+    if (!mats.length) {
+      return '<div class="panel"><div class="ptt">Upholstery</div><div class="hint">Fabric &amp; leather grades for this range are confirmed at quotation.</div></div>';
+    }
+    var from = E.fromPrice(r);
+    var groups = {}, order = [];
+    mats.forEach(function (m) { var g = m.groupKey || 'fabric'; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(m); });
+    order.sort(function (a, b) { var ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    var secs = order.map(function (g) {
+      var cards = groups[g].map(function (m) {
+        var sel = cfg.material === m.id, avail = m.available !== false;
+        var price = (from != null && avail) ? from * (1 + (m.upcharge || 0) / 100) : null;
+        var meta = groupLabel(g) + (m.tierLabel ? ' · ' + m.tierLabel : '');
+        var body = !avail
+          ? '<div class="mc-un">Not available for ' + esc(r.name) + '</div>'
+          : (price != null ? '<div class="mc-price">Seat from <b>' + money(Math.round(price)) + '</b></div>' : '<div class="mc-price">MSRP on request</div>') +
+            (m.upcharge > 0 ? '<div class="mc-up">⚠ +' + m.upcharge + '% upgrade</div>' : '') +
+            (m.colours && m.colours.length ? '<div class="mc-col">' + m.colours.length + ' colourways</div>' : '');
+        return '<button class="mcard ' + (sel ? 'on' : '') + (avail ? '' : ' off') + '"' + (avail ? ' onclick="SeatingApp.setMaterial(\'' + m.id + '\')"' : ' disabled') + '>' +
+          '<div class="mc-top"><span class="mc-sw" style="--c:' + esc(m.swatch || '#888') + '"></span><div class="mc-name">' + esc(m.name) + '</div></div>' +
+          '<div class="mc-meta">' + esc(meta) + '</div>' + body + '</button>';
+      }).join('');
+      return '<div class="mgrp"><div class="lbl">' + groupLabel(g) + '</div><div class="mat-grid">' + cards + '</div></div>';
+    }).join('');
+    return '<div class="panel"><div class="ptt">Upholstery</div>' + secs + colourHtml(r) + '</div>';
+  }
   function colourHtml(r) {
     var m = (r.materials || []).find(function (x) { return x.id === cfg.material; });
     var cols = (m && m.colours) || [];
     if (!cols.length) return '';
-    return '<div class="lbl" style="margin-top:12px">Colour</div><div class="cols">' + cols.map(function (c) {
+    return '<div class="colsel"><div class="lbl">Colour — ' + esc(m.name) + ' <span class="opt-tag">' + cols.length + ' colourways</span></div><div class="cols">' + cols.map(function (c) {
       return '<button class="col ' + (cfg.colour === c.name ? 'on' : '') + '" title="' + esc(c.name) + '" style="--c:' + esc(c.hex) + '" onclick="SeatingApp.setColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')"></button>';
-    }).join('') + '</div>';
+    }).join('') + '</div><div class="hint">Samples can be arranged on request.</div></div>';
+  }
+  function finishesHtml() {
+    var fins = CFG.finishOptions || []; if (!fins.length) return '';
+    return '<div class="panel"><div class="ptt">Finish options <span class="opt-tag">optional</span></div>' + fins.map(function (f) {
+      var on = !!cfg.finishes[f.id];
+      return '<label class="fin"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="SeatingApp.toggleFinish(\'' + f.id + '\',this.checked)"><span class="fin-b"><span class="fin-n">' + esc(f.label) + '</span><span class="fin-d">' + esc(f.note) + '</span></span></label>';
+    }).join('') + '<div class="hint">Finish upgrades are confirmed and priced with the supplier at quotation.</div></div>';
   }
   function catFinish(r) { var it = E.seatItems(r.id)[0]; return it && it.finish; }
+  function materialUpcharge() { var r = E.range(cfg.rangeId); var m = ((r && r.materials) || []).find(function (x) { return x.id === cfg.material; }); return m ? (m.upcharge || 0) : 0; }
   function setMaterial(id) { cfg.material = id; var r = E.range(cfg.rangeId); var m = (r.materials || []).find(function (x) { return x.id === id; }); cfg.colour = m && (m.colours || [])[0] ? m.colours[0].name : null; renderConfigure(); }
   function setColour(n) { cfg.colour = n; renderConfigure(); }
+  function toggleFinish(id, v) { cfg.finishes[id] = v; updateLive(); }
+  function selectedFinishes() { return (CFG.finishOptions || []).filter(function (f) { return cfg.finishes[f.id]; }); }
   function setMotor(mt) { cfg.motor = mt; updateLive(); document.querySelectorAll('.cfg-left .opt').forEach(function () {}); renderConfigure(); }
   function setLayout2(k, v) { cfg.layout[k] = v; renderConfigure(); }
   function toggleArm(v) { cfg.includeArmrests = v; updateLive(); }
@@ -224,13 +259,17 @@
   function itemById(id) { return E.itemsOf(cfg.rangeId).find(function (i) { return i.id === id; }); }
   function quoteLines() {
     var lines = [], total = cfg.layout.rows * cfg.layout.seatsPerRow;
+    var up = 1 + materialUpcharge() / 100;
     var seat = primarySeat();
-    if (seat) lines.push({ label: seat.label, qty: total, unit: E.itemSell(seat) });
+    if (seat) { var su = E.itemSell(seat); lines.push({ label: seat.label, qty: total, unit: su != null ? Math.round(su * up) : null }); }
     var arms = E.armrestItems(cfg.rangeId);
-    if (cfg.includeArmrests && arms.length) { var a = arms[0]; lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: E.itemSell(a) }); }
+    if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a); lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * up) : null }); }
     Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it) }); });
     return lines;
   }
+  // ── VAT ──
+  function vatRate() { return CFG.vatRate || 0; }
+  function vatBreakdown(net) { var v = net * vatRate(); return { net: net, vat: v, gross: net + v }; }
   // ── delivery + lead time (per manufacturer) ──────────────────────────────────
   function productTotal(lines) { return lines.reduce(function (s, l) { return s + (l.unit || 0) * l.qty; }, 0); }
   function deliveryInfo() {
@@ -249,7 +288,8 @@
     var extra = di.cost != null
       ? '<div class="lt-sub">Incl. ' + esc((CFG.deliveryLabel || 'Delivery').toLowerCase()) + ' ' + money(di.cost) + (leadText(di.lead) ? ' · lead time ' + leadText(di.lead) : '') + '</div>'
       : (leadText(di.lead) ? '<div class="lt-sub">Lead time ' + leadText(di.lead) + '</div>' : '<div class="lt-sub">Delivery &amp; lead time confirmed at quotation</div>');
-    $('liveTotal').innerHTML = '<div class="lt-row"><span>Estimated MSRP</span><b>' + (any ? money(total) + (poa ? ' + POA items' : '') : 'On request') + '</b></div><div class="lt-sub">ex VAT · indicative — confirmed at quotation</div>' + extra;
+    var vb = vatBreakdown(total);
+    $('liveTotal').innerHTML = '<div class="lt-row"><span>Estimated MSRP</span><b>' + (any ? money(total) + (poa ? ' + POA' : '') : 'On request') + '</b></div><div class="lt-sub">ex VAT' + (any ? ' · inc VAT ' + money(Math.round(vb.gross)) : '') + ' — indicative</div>' + extra;
   }
 
   // ── Step 4 · Summary ─────────────────────────────────────────────────────────
@@ -261,6 +301,9 @@
     var lt = leadText(di.lead);
     var delLbl = CFG.deliveryLabel || 'Delivery';
     var mat = (r.materials || []).find(function (m) { return m.id === cfg.material; });
+    var vb = vatBreakdown(total);
+    var fins = selectedFinishes();
+    var finNote = fins.length ? '<div class="disc">Selected finish upgrades: <b style="color:var(--gold2)">' + fins.map(function (f) { return esc(f.label); }).join(', ') + '</b> — confirmed and priced with the supplier at quotation.</div>' : '';
     var deliveryRow = di.cost != null
       ? '<tr><td>' + esc(delLbl) + '</td><td>1</td><td class="r">' + money(di.cost) + '</td><td class="r">' + money(di.cost) + '</td></tr>'
       : '<tr><td>' + esc(delLbl) + '</td><td>1</td><td class="r">—</td><td class="r">On request</td></tr>';
@@ -272,17 +315,20 @@
           cell('Layout', (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats', cfg.layout.rows + ' rows × ' + cfg.layout.seatsPerRow) +
           cell('Upholstery', mat ? esc(mat.name) : (catFinish(r) || 'TBC'), cfg.colour ? esc(cfg.colour) : '') +
           cell('Lead time', lt || 'On request', 'from order') +
-          cell('Estimated MSRP', anyPriced ? money(total) : 'On request', 'inc. delivery · ex VAT') +
+          cell('Total inc VAT', anyPriced ? money(Math.round(vb.gross)) : 'On request', 'inc. delivery & VAT') +
         '</div>' +
         '<div class="planbig">' + planSVG(true) + '</div>' +
         '<table class="quote"><thead><tr><th>Item</th><th>Qty</th><th class="r">Unit MSRP</th><th class="r">Line MSRP</th></tr></thead><tbody>' +
           lines.map(function (l) { return '<tr><td>' + esc(l.label) + '</td><td>' + l.qty + '</td><td class="r">' + money(l.unit) + '</td><td class="r">' + (l.unit != null ? money(l.unit * l.qty) : 'POA') + '</td></tr>'; }).join('') +
           '<tr class="sub2"><td colspan="3">Products subtotal</td><td class="r">' + money(prod) + '</td></tr>' +
           deliveryRow +
-          '<tr class="tot"><td colspan="3">Estimated total (ex VAT)</td><td class="r">' + money(total) + '</td></tr>' +
+          '<tr class="sub2"><td colspan="3">Subtotal (ex VAT)</td><td class="r">' + money(total) + '</td></tr>' +
+          '<tr class="sub2"><td colspan="3">VAT @ ' + Math.round(vatRate() * 100) + '%</td><td class="r">' + money(Math.round(vb.vat)) + '</td></tr>' +
+          '<tr class="tot"><td colspan="3">Total (inc VAT)</td><td class="r">' + money(Math.round(vb.gross)) + '</td></tr>' +
         '</tbody></table>' +
+        finNote +
         '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button><button class="btn primary" onclick="SeatingApp.savePdf()">⬇ Download PDF proposal</button></div>' +
-        '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation.</div>' +
+        '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation. VAT at ' + Math.round(vatRate() * 100) + '%.</div>' +
       '</div>';
   }
   function cell(l, v, n) { return '<div class="cellx"><div class="cl">' + l + '</div><div class="cv">' + v + '</div>' + (n ? '<div class="cn">' + n + '</div>' : '') + '</div>'; }
@@ -331,17 +377,23 @@
     var uph = mat ? mat.name : (catFinish(r) || 'Confirmed at quotation');
     if (mat && cfg.colour) uph += ' · ' + cfg.colour;
     var recline = cfg.motor ? ((CFG.motorLabels || {})[cfg.motor] || cfg.motor) : null;
+    var vb = vatBreakdown(total);
     var slug = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
     return {
       range: r.name, manufacturer: r.manufacturer,
+      heroImage: CFG.heroImage || null,
       roomText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm',
       roomWidthText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm wide',
       layoutText: (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats · ' + cfg.layout.rows + ' × ' + cfg.layout.seatsPerRow,
       rows: cfg.layout.rows, seatsPerRow: cfg.layout.seatsPerRow,
       upholsteryText: uph, reclineText: recline,
+      finishes: selectedFinishes().map(function (f) { return f.label; }),
       leadText: leadText(di.lead),
       lines: lines, productTotal: prod, deliveryCost: di.cost, deliveryLabel: CFG.deliveryLabel || 'Delivery',
+      exVat: total, vatRate: vatRate(), vat: vb.vat, gross: vb.gross,
       totalText: anyPriced ? money(total) : 'On request',
+      grossText: anyPriced ? money(Math.round(vb.gross)) : 'On request',
+      priced: anyPriced,
       dateText: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
       filename: 'sonor-' + slug(r.manufacturer) + '-' + slug(r.name) + '-proposal.pdf'
     };
@@ -366,8 +418,14 @@
     lines.forEach(function (l) { rows.push([r.manufacturer, r.name, l.label, l.qty, l.unit != null ? l.unit.toFixed(2) : 'POA', l.unit != null ? (l.unit * l.qty).toFixed(2) : 'POA']); });
     rows.push([r.manufacturer, r.name, 'Products subtotal', '', '', prod.toFixed(2)]);
     rows.push([r.manufacturer, r.name, delLbl, 1, di.cost != null ? di.cost.toFixed(2) : 'On request', di.cost != null ? di.cost.toFixed(2) : 'On request']);
-    rows.push([r.manufacturer, r.name, 'Estimated total (ex VAT)', '', '', total.toFixed(2)]);
+    rows.push([r.manufacturer, r.name, 'Subtotal (ex VAT)', '', '', total.toFixed(2)]);
+    var vb = vatBreakdown(total);
+    rows.push([r.manufacturer, r.name, 'VAT @ ' + Math.round(vatRate() * 100) + '%', '', '', vb.vat.toFixed(2)]);
+    rows.push([r.manufacturer, r.name, 'Total (inc VAT)', '', '', vb.gross.toFixed(2)]);
     rows.push([r.manufacturer, r.name, 'Lead time', '', '', lt || 'On request']);
+    var upSel = (r.materials || []).find(function (m) { return m.id === cfg.material; });
+    if (upSel) rows.push([r.manufacturer, r.name, 'Upholstery', '', '', upSel.name + (cfg.colour ? ' / ' + cfg.colour : '')]);
+    selectedFinishes().forEach(function (f) { rows.push([r.manufacturer, r.name, 'Finish', '', '', f.label]); });
     var csvs = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csvs], { type: 'text/csv' })); a.download = 'seating-msrp-' + cfg.rangeId + '.csv'; a.click(); toast('CSV exported');
   }
@@ -377,6 +435,6 @@
     boot: boot, enter: enter, backToIntro: backToIntro, goBack: goBack, jumpTo: jumpTo, restart: restart,
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
-    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf
+    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish
   };
 })(typeof window !== 'undefined' ? window : this);
