@@ -221,7 +221,7 @@
       padding:0 clamp(18px,5vw,48px); background:rgba(9,8,7,.97); backdrop-filter:blur(18px);
       border-bottom:1px solid var(--w-brd); }
     .site-hdr .wm { display:flex; align-items:center; gap:11px; text-decoration:none; }
-    .site-hdr .wm .wm-mark { height:30px; width:auto; display:block; color:var(--w-gold-l); flex-shrink:0; }
+    .site-hdr .wm .wm-mark { height:30px; width:auto; display:block; color:var(--w-txt); flex-shrink:0; }   /* website nav: mark inherits wordmark colour */
     .site-hdr .wm .wm-txt { display:flex; align-items:baseline; gap:8px; }
     .site-hdr .wm b { font-weight:800; font-size:15px; letter-spacing:.22em; text-transform:uppercase; color:var(--w-txt); line-height:1; }
     .site-hdr .wm i { font-style:normal; font-size:9px; letter-spacing:.24em; text-transform:uppercase; color:var(--w-txt2); }
@@ -390,7 +390,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.9.0';
+    const APP_VERSION = '0.9.1';
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();

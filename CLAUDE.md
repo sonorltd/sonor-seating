@@ -1,4 +1,14 @@
-# Seating Configurator — Claude Code Context (v0.9.0)
+# Seating Configurator — Claude Code Context (v0.9.1)
+
+> **v0.9.1 — PDF brand polish (user review round).** Cover: fade is now a **canvas-rendered
+> alpha-gradient PNG** (zero banding, starts lower ~52%); top lockup removed — **Sonor lockup
+> bottom-left** (website style: mark + SONOR in the same cream, Gilroy 800 tracked, no
+> "Cinema Seating") with only the **CEDIA logo** beside it. Content pages: logo appears **once
+> per page** — a **golden footer lockup** (mark + SONOR + SMART HOMES ultralight); contact is
+> email + **07933 684 000 with the WhatsApp glyph** (official path, same as website); location
+> line removed. Header labels de-duplicated ("Specification & Estimate" on p2). App header mark
+> recoloured cream to match the website nav (mark inherits wordmark colour).
+
 
 > **v0.9.0 — per-row config + datasheets + original imagery + PDF polish.**
 > **Per-row editor (Summary):** `cfg.rowOverrides` — each row can take a different seat model,

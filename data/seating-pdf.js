@@ -19,6 +19,21 @@
   var HOUSE = 'M92.02,38.41v51.4c0,2.63-2.13,4.75-4.75,4.75h-3.34c-2.62,0-4.75-2.12-4.75-4.75v-45.34c0-2.45-1.11-4.77-3.01-6.31l-25.23-20.41c-2.8-2.27-6.76-2.42-9.73-.36l-23.15,16.05.45,1.55c22.38,9.5,40.47,30.05,47.71,53.39.95,3.06-1.32,6.18-4.53,6.18h-5.36c-2.08,0-3.9-1.37-4.54-3.35-6.96-21.83-24.83-38.23-46.17-46.13-1.31-.49-2.31-1.5-2.79-2.75-.2-.51-.31-1.06-.32-1.64l-.12-9.11c-.02-1.58.75-3.06,2.05-3.96L28.74,10.74,42.11,1.45c.16-.11.32-.22.49-.31,2.35-1.4,5.22-1.5,7.64-.34.57.26,1.12.61,1.63,1.03l37.16,30.29c1.89,1.54,2.99,3.85,2.99,6.29Z ' +
     'M34.59,94.55h-5.25c-1.6,0-3.09-.81-3.97-2.15-5.47-8.37-11.98-15.35-20.72-20.32-1.5-.85-2.45-2.42-2.45-4.15v-5.58c0-3.52,3.68-5.79,6.85-4.26,12.79,6.15,23.95,16.91,29.85,29.73,1.45,3.14-.86,6.73-4.32,6.73h0Z ' +
     'M4.26,83.39c7.65-1.71,9.39,9.06,4.03,10.83-8.9,2.94-11.25-9.22-4.03-10.83Z';
+  // WhatsApp glyph (official path, viewBox 24 — same asset as the website)
+  var WA = 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z';
+  // smooth alpha fade (canvas-rendered PNG — no banding); cached per session
+  var _fadePng = null;
+  function fadePngDataUrl() {
+    if (_fadePng) return _fadePng;
+    try {
+      var cv = document.createElement('canvas'); cv.width = 16; cv.height = 1024;
+      var g = cv.getContext('2d'); var gr = g.createLinearGradient(0, 0, 0, 1024);
+      gr.addColorStop(0, 'rgba(9,8,7,0)'); gr.addColorStop(0.45, 'rgba(9,8,7,0.55)'); gr.addColorStop(1, 'rgba(9,8,7,1)');
+      g.fillStyle = gr; g.fillRect(0, 0, 16, 1024);
+      _fadePng = cv.toDataURL('image/png');
+    } catch (e) { _fadePng = null; }
+    return _fadePng;
+  }
 
   function col(a) { return global.PDFLib.rgb(a[0] / 255, a[1] / 255, a[2] / 255); }
   function selfDir() {
@@ -108,39 +123,44 @@
   // shared page furniture (content pages)
   function pageHead(P, F, m, label) {
     P.rect(0, 0, A4.w, 4, GOLD); P.rect(A4.w - 130, 0, 130, 4, PUR);
-    P.logo(M, 34, 21, GOLD);                        // mark spans 34–55; wordmark centred beside it
-    P.tracked('SONOR', M + 29, 39, 11.5, F.b, INK, 3);
+    P.tracked('LUXURY SEATING PROPOSAL', M, 42, 8, F.r, [150, 138, 116], 2.4);
     P.trackedRight(label, A4.w - M, 42, 8, F.r, MUT, 2.4);
     P.hline(M, A4.w - M, 68, LINE, 0.8);
   }
   function pageFoot(P, F, m, pageNo, total) {
-    P.hline(M, A4.w - M, A4.h - 52, LINE, 0.8);
-    P.tracked('SONOR', M, A4.h - 42, 7, F.b, INK, 1.6);
-    P.trackedRight('PROJECTS@SONOR.CO.UK  ·  CHESHIRE · WIRRAL · WALES', A4.w - M - 34, A4.h - 42, 7, F.r, MUT, 1.2);
-    P.right(pageNo + ' / ' + total, A4.w - M, A4.h - 42.5, 8, F.r, MUT);
+    var GDEEP = [140, 116, 60];
+    P.hline(M, A4.w - M, A4.h - 56, LINE, 0.8);
+    // golden lockup — once per page, here only
+    P.logo(M, A4.h - 47, 15, GOLD);
+    var wx = M + 21;
+    wx += P.tracked('SONOR', wx, A4.h - 44, 9.5, F.b, GDEEP, 2.6) + 8;
+    P.tracked('SMART HOMES', wx, A4.h - 42.4, 6.8, F.l, GOLD, 2.8);
+    // contact: email · WhatsApp number — page number far right
+    P.right(pageNo + ' / ' + total, A4.w - M, A4.h - 44.5, 8, F.r, MUT);
+    var phone = '07933 684 000', ps = 8;
+    var phW = 0; for (var i = 0; i < phone.length; i++) phW += F.r.widthOfTextAtSize(phone[i], ps) + 1.2;
+    var phX = A4.w - M - 34 - phW;
+    P.tracked(phone, phX, A4.h - 44.4, ps, F.r, INK2, 1.2);
+    // WhatsApp glyph before the number (pdf-lib y = distance from bottom; glyph draws downward)
+    P.page.drawSvgPath(WA, { x: phX - 14, y: 45.6, scale: 9.5 / 24, color: col([37, 165, 88]) });
+    P.trackedRight('PROJECTS@SONOR.CO.UK', phX - 26, A4.h - 44.2, 7.2, F.r, MUT, 1.4);
   }
 
   // ── PAGE 1 · COVER ───────────────────────────────────────────────────────────
-  function cover(P, F, m, hero) {
+  function cover(P, F, m, hero, fadeImg) {
     P.rect(0, 0, A4.w, A4.h, DARK);
     if (hero) {
       var iw = hero.width, ih = hero.height, s = Math.max(A4.w / iw, A4.h / ih);
       var dw = iw * s, dh = ih * s;
       P.image(hero, (A4.w - dw) / 2, 0, dw, dh, 1);
-      // gentle top scrim for the lockup (dark → transparent going down)
-      var steps = 14;
-      for (var ti = 0; ti < steps; ti++) { var tt = 1 - ti / steps; P.rect(0, (130 / steps) * ti, A4.w, 130 / steps + 0.5, DARK, 0.5 * tt * tt); }
-      // long fade to brand dark at the bottom (transparent → solid)
-      P.fadeDown(0, A4.h * 0.40, A4.w, A4.h * 0.36, DARK, 0.97, 30);
-      P.rect(0, A4.h * 0.76, A4.w, A4.h * 0.24, DARK, 0.97);
+      // smooth fade to brand dark — starts lower, canvas-rendered so it never bands
+      var fTop = A4.h * 0.52, fH = A4.h * 0.28;
+      if (fadeImg) P.image(fadeImg, 0, fTop, A4.w, fH, 1);
+      else P.fadeDown(0, fTop, A4.w, fH, DARK, 1, 56);
+      P.rect(0, fTop + fH - 1, A4.w, A4.h - (fTop + fH) + 1, DARK, 1);
     }
     // inset frame
     P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
-
-    // brand lockup — larger mark, wordmark centred against it
-    P.logo(M, 48, 44, GOLD);
-    P.tracked('SONOR', M + 58, 55, 19, F.b, CREAM, 4.2);
-    P.tracked('CINEMA SEATING', M + 58, 81, 7.5, F.r, GOLDL, 3.4);
 
     // title block — range-led, sits on the fade
     var ty = 596;
@@ -150,7 +170,7 @@
     P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 64, 20, F.l, GOLDL);
 
     // client / project info (print-asset style)
-    var iy = 716, cw = (A4.w - M * 2) / 3;
+    var iy = 698, cw = (A4.w - M * 2) / 3;
     P.hline(M, A4.w - M, iy - 14, GOLD, 0.5, 0.45);
     var info = [
       ['PREPARED FOR', m.client || '—'],
@@ -164,20 +184,23 @@
     });
     P.hline(M, A4.w - M, iy + 42, GOLD, 0.5, 0.45);
 
-    // footer — CEDIA member logo (official asset) right-aligned
-    P.tracked('PROJECTS@SONOR.CO.UK  ·  SONOR.CO.UK  ·  SINCE 2003', M, A4.h - 59, 7, F.r, GOLDL, 1.3);
+    // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
+    // CEDIA member logo bottom-right. Nothing else.
+    var fy = A4.h - 86;
+    P.logo(M, fy, 26, CREAM);
+    P.tracked('SONOR', M + 36, fy + 6.5, 14, F.b, CREAM, 3.1);
     if (m._cedia) {
-      var ch = 12, cwd = ch * (m._cedia.width / m._cedia.height);
-      P.image(m._cedia, A4.w - M - cwd, A4.h - 63, cwd, ch, 0.92);
+      var ch = 13, cwd = ch * (m._cedia.width / m._cedia.height);
+      P.image(m._cedia, A4.w - M - cwd, fy + 6.5, cwd, ch, 0.92);
     } else {
-      P.trackedRight('CEDIA MEMBER', A4.w - M, A4.h - 59, 7, F.r, [168, 156, 136], 1.3);
+      P.trackedRight('CEDIA MEMBER', A4.w - M, fy + 9, 7, F.r, [168, 156, 136], 1.3);
     }
   }
 
   // ── PAGE 2 · SPECIFICATION + QUOTE + TERMS ───────────────────────────────────
   function quote(P, F, m, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, 'SEATING PROPOSAL');
+    pageHead(P, F, m, 'SPECIFICATION & ESTIMATE');
 
     P.tracked((m.manufacturer || 'SONOR').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
@@ -452,8 +475,11 @@
       catch (e) { dsDoc = null; m._dsAppended = false; console.warn('[SeatingPdf] datasheet fetch failed (CORS?):', e && e.message); }
     }
 
+    var fadeImg = null;
+    try { var fd = fadePngDataUrl(); if (fd) fadeImg = await doc.embedPng(fd); } catch (e) {}
+
     var TOTAL = 4 + (dsDoc ? dsDoc.getPageCount() : 0);
-    cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero);
+    cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero, fadeImg);
     quote(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     drawing(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     techspec(mk(doc.addPage([A4.w, A4.h]), doc), F, m, rangeImg, TOTAL);
