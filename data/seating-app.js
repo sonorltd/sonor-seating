@@ -12,7 +12,7 @@
     layout: Object.assign({ prefs: {} }, CFG.defaultRoom),
     rangeId: null, material: null, colour: null, motor: null,
     includeArmrests: true, accessories: {}, finishes: {},
-    client: { name: '', project: '' }
+    client: { name: '', project: '' }, rowOverrides: {}
   };
 
   function $(id) { return document.getElementById(id); }
@@ -51,7 +51,7 @@
   function goNext() { if (cfg.step < STEPS.length && !nextDisabled()) { cfg.step++; renderStep(); } }
   function goBack() { if (cfg.step > 1) { cfg.step--; renderStep(); } }
   function jumpTo(n) { if (n < cfg.step) { cfg.step = n; renderStep(); } }
-  function restart() { var keepClient = cfg.client; cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: keepClient || { name: '', project: '' } }; renderStep(); }
+  function restart() { var keepClient = cfg.client; cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: keepClient || { name: '', project: '' }, rowOverrides: {} }; renderStep(); }
   function setClient(k, v) { cfg.client[k] = v; }
   function nextDisabled() {
     if (cfg.step === 2) return !cfg.rangeId;
@@ -155,7 +155,7 @@
       '</div></div>';
   }
   function pickRange(id) {
-    cfg.rangeId = id; cfg.material = null; cfg.colour = null; cfg.motor = null; cfg.accessories = {};
+    cfg.rangeId = id; cfg.material = null; cfg.colour = null; cfg.motor = null; cfg.accessories = {}; cfg.rowOverrides = {};
     var r = E.range(id); var mats = r.materials || [];
     if (mats.length) { cfg.material = mats[0].id; if ((mats[0].colours || []).length) cfg.colour = mats[0].colours[0].name; }
     var motors = E.motorOptions(r); cfg.motor = motors[0] || null;
@@ -288,13 +288,42 @@
     return priced[0] || seats[0];
   }
   function itemById(id) { return E.itemsOf(cfg.rangeId).find(function (i) { return i.id === id; }); }
+  // ── per-row overrides (different seats / finishes per row, edited at the end) ─
+  function hasRowOverrides() { return Object.keys(cfg.rowOverrides).some(function (k) { var o = cfg.rowOverrides[k]; return o && (o.seatId || o.material || o.colour); }); }
+  function rowConfig(rowIdx) {
+    var o = cfg.rowOverrides[rowIdx] || {};
+    var r = E.range(cfg.rangeId);
+    var seat = o.seatId ? itemById(o.seatId) : primarySeat();
+    var matId = o.material || cfg.material;
+    var mat = ((r && r.materials) || []).find(function (x) { return x.id === matId; }) || null;
+    var colour = o.material ? (o.colour || (mat && (mat.colours || [])[0] ? mat.colours[0].name : null)) : (o.colour || cfg.colour);
+    return { seat: seat, mat: mat, colour: colour, upcharge: mat ? (mat.upcharge || 0) : 0 };
+  }
+  function rowSet(rowIdx, key, val) {
+    var o = cfg.rowOverrides[rowIdx] = cfg.rowOverrides[rowIdx] || {};
+    o[key] = val || null;
+    if (key === 'material') o.colour = null;      // colour follows the material
+    renderSummary();
+  }
+  function rowsReset() { cfg.rowOverrides = {}; renderSummary(); }
+
   function quoteLines() {
     var lines = [], total = cfg.layout.rows * cfg.layout.seatsPerRow;
-    var up = 1 + materialUpcharge() / 100;
-    var seat = primarySeat();
-    if (seat) { var su = E.itemSell(seat); lines.push({ label: seat.label, qty: total, unit: su != null ? Math.round(su * up) : null }); }
+    var globalUp = 1 + materialUpcharge() / 100;
+    if (hasRowOverrides()) {
+      for (var ri = 0; ri < cfg.layout.rows; ri++) {
+        var rc = rowConfig(ri);
+        if (!rc.seat) continue;
+        var u = E.itemSell(rc.seat), up2 = 1 + (rc.upcharge || 0) / 100;
+        var lbl = 'Row ' + (ri + 1) + ' — ' + rc.seat.label + (rc.mat ? ' · ' + rc.mat.name + (rc.colour ? ' (' + rc.colour + ')' : '') : '');
+        lines.push({ label: lbl, qty: cfg.layout.seatsPerRow, unit: u != null ? Math.round(u * up2) : null });
+      }
+    } else {
+      var seat = primarySeat();
+      if (seat) { var su = E.itemSell(seat); lines.push({ label: seat.label, qty: total, unit: su != null ? Math.round(su * globalUp) : null }); }
+    }
     var arms = E.armrestItems(cfg.rangeId);
-    if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a); lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * up) : null }); }
+    if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a); lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * globalUp) : null }); }
     Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it) }); });
     return lines;
   }
@@ -353,6 +382,7 @@
           cell('Lead time', lt || 'On request', 'from order') +
           cell('Total inc VAT', anyPriced ? money(Math.round(vb.gross)) : 'On request', 'inc. delivery & VAT') +
         '</div>' +
+        rowEditorHtml(r) +
         '<div class="planbig">' + planSVG(true) + '</div>' +
         '<table class="quote"><thead><tr><th>Item</th><th>Qty</th><th class="r">Unit MSRP</th><th class="r">Line MSRP</th></tr></thead><tbody>' +
           lines.map(function (l) { return '<tr><td>' + esc(l.label) + '</td><td>' + l.qty + '</td><td class="r">' + money(l.unit) + '</td><td class="r">' + (l.unit != null ? money(l.unit * l.qty) : 'POA') + '</td></tr>'; }).join('') +
@@ -368,6 +398,35 @@
       '</div>';
   }
   function cell(l, v, n) { return '<div class="cellx"><div class="cl">' + l + '</div><div class="cv">' + v + '</div>' + (n ? '<div class="cn">' + n + '</div>' : '') + '</div>'; }
+
+  // ── per-row editor (Summary) ─────────────────────────────────────────────────
+  function rowEditorHtml(r) {
+    var seats = E.seatItems(cfg.rangeId);
+    var mats = (r.materials || []).filter(function (m) { return m.available !== false; });
+    if (seats.length < 2 && mats.length < 2) return '';   // nothing to vary
+    var any = hasRowOverrides();
+    var rowsHtml = '';
+    for (var ri = 0; ri < cfg.layout.rows; ri++) {
+      var o = cfg.rowOverrides[ri] || {}, rc = rowConfig(ri);
+      var seatOpts = '<option value="">' + esc((primarySeat() || {}).label || 'Standard seat') + ' (default)</option>' +
+        seats.map(function (s) { return '<option value="' + s.id + '"' + (o.seatId === s.id ? ' selected' : '') + '>' + esc(s.label) + (E.itemSell(s) != null ? ' — ' + money(E.itemSell(s)) : '') + '</option>'; }).join('');
+      var matOpts = '<option value="">' + esc(cfg.material ? ((mats.find(function (m) { return m.id === cfg.material; }) || {}).name || 'As configured') : 'As configured') + ' (default)</option>' +
+        mats.map(function (m) { return '<option value="' + m.id + '"' + (o.material === m.id ? ' selected' : '') + '>' + esc(m.name) + (m.upcharge > 0 ? ' (+' + m.upcharge + '%)' : '') + '</option>'; }).join('');
+      var colOpts = '';
+      if (rc.mat && (rc.mat.colours || []).length) {
+        colOpts = '<select onchange="SeatingApp.rowSet(' + ri + ',\'colour\',this.value)"><option value="">' + esc(rc.colour || 'Colour') + '</option>' +
+          rc.mat.colours.map(function (c) { return '<option' + ((o.colour || rc.colour) === c.name ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select>';
+      }
+      rowsHtml += '<div class="rowed"><span class="rowed-n">Row ' + (ri + 1) + '</span>' +
+        '<select onchange="SeatingApp.rowSet(' + ri + ',\'seatId\',this.value?Number(this.value):null)">' + seatOpts + '</select>' +
+        '<select onchange="SeatingApp.rowSet(' + ri + ',\'material\',this.value||null)">' + matOpts + '</select>' +
+        colOpts + '</div>';
+    }
+    return '<div class="panel" style="margin-bottom:22px"><div class="ptt">Row configuration <span class="opt-tag">optional — mix seats &amp; finishes per row</span>' +
+      (any ? '<button class="rowed-reset" onclick="SeatingApp.rowsReset()">Reset all rows</button>' : '') + '</div>' +
+      rowsHtml +
+      '<div class="hint">Rows are priced individually when varied — the quote below updates as you change them.</div></div>';
+  }
 
   // ── plans (SVG) ──────────────────────────────────────────────────────────────
   function roomSVG(L, big) {
@@ -434,6 +493,7 @@
       },
       roomWidthMm: cfg.layout.widthMm, roomLengthMm: cfg.layout.lengthMm,
       accessories: accLines, includeArmrests: cfg.includeArmrests,
+      rowDetails: (function () { if (!hasRowOverrides()) return null; var out = []; for (var ri = 0; ri < cfg.layout.rows; ri++) { var rc = rowConfig(ri); out.push('Row ' + (ri + 1) + ': ' + ((rc.seat && rc.seat.label) || '—') + (rc.mat ? ' · ' + rc.mat.name + (rc.colour ? ' (' + rc.colour + ')' : '') : '')); } return out; })(),
       materialName: mat ? mat.name : null, colourName: cfg.colour || null,
       productUrl: meta.product_url || null,
       datasheetUrl: meta.datasheet_url || null,
@@ -492,6 +552,7 @@
     boot: boot, enter: enter, backToIntro: backToIntro, goBack: goBack, jumpTo: jumpTo, restart: restart,
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
-    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish, setClient: setClient
+    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish, setClient: setClient,
+    rowSet: rowSet, rowsReset: rowsReset
   };
 })(typeof window !== 'undefined' ? window : this);

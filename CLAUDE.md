@@ -1,4 +1,20 @@
-# Seating Configurator — Claude Code Context (v0.8.0)
+# Seating Configurator — Claude Code Context (v0.9.0)
+
+> **v0.9.0 — per-row config + datasheets + original imagery + PDF polish.**
+> **Per-row editor (Summary):** `cfg.rowOverrides` — each row can take a different seat model,
+> upholstery and colour (`rowEditorHtml`, `rowConfig`, `SeatingApp.rowSet/rowsReset`). Quote emits
+> one line per varied row ("Row 1 — Como Seat Fixed · Borium (Black)"), per-row upcharge applied;
+> spec + PDF page 2 show the row breakdown. **Datasheets:** all **41 Fortress spec-sheet PDF URLs**
+> verified from fortresseating.com product pages (names are irregular — each page fetched) and
+> **written into `seating_ranges.metadata.datasheet_url`** (user-directed Library write, logged §8).
+> PDF pre-fetches the datasheet → appends pages when reachable (CORS-dependent) and states it
+> accurately; always linked under References. **Imagery restored:** original pre-repoint URLs from
+> `furniture_ranges` for Cinelux (8), FrontRow, and the 5 imaged Moovia ranges (user: more accurate)
+> — map in range-images.js; scraped files remain for Fortress/Cinema Deco. **Moovia lead time** from
+> the ESSENTIALS price list: 4-wk manufacture ex-works DE → `leadWeeks [5,8]`. **PDF:** bigger
+> aligned lockup, "LUXURY SEATING PROPOSAL", official **CEDIA member logo** (data/cedia-member-wide.png)
+> on the cover footer, content-page header lockup alignment fixed.
+
 
 > **v0.8.0 — proposal-grade PDF (4 pages) + app de-clutter.**
 > **Cover:** hero full-bleed, **no purple wash** — smooth fade to brand dark at the bottom

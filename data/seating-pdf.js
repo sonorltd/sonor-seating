@@ -108,10 +108,10 @@
   // shared page furniture (content pages)
   function pageHead(P, F, m, label) {
     P.rect(0, 0, A4.w, 4, GOLD); P.rect(A4.w - 130, 0, 130, 4, PUR);
-    P.logo(M, 58, 22, GOLD);
-    P.tracked('SONOR', M + 30, 41, 11, F.b, INK, 3);
-    P.trackedRight(label, A4.w - M, 44, 8, F.r, MUT, 2.4);
-    P.hline(M, A4.w - M, 72, LINE, 0.8);
+    P.logo(M, 34, 21, GOLD);                        // mark spans 34–55; wordmark centred beside it
+    P.tracked('SONOR', M + 29, 39, 11.5, F.b, INK, 3);
+    P.trackedRight(label, A4.w - M, 42, 8, F.r, MUT, 2.4);
+    P.hline(M, A4.w - M, 68, LINE, 0.8);
   }
   function pageFoot(P, F, m, pageNo, total) {
     P.hline(M, A4.w - M, A4.h - 52, LINE, 0.8);
@@ -137,15 +137,15 @@
     // inset frame
     P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
 
-    // brand lockup — mark + wordmark on a shared baseline
-    P.logo(M, 74, 26, GOLD);
-    P.tracked('SONOR', M + 36, 52, 14, F.b, CREAM, 3.6);
-    P.tracked('CINEMA SEATING', M + 36, 70.5, 6.5, F.r, GOLDL, 2.9);
+    // brand lockup — larger mark, wordmark centred against it
+    P.logo(M, 48, 44, GOLD);
+    P.tracked('SONOR', M + 58, 55, 19, F.b, CREAM, 4.2);
+    P.tracked('CINEMA SEATING', M + 58, 81, 7.5, F.r, GOLDL, 3.4);
 
     // title block — range-led, sits on the fade
     var ty = 596;
     P.hline(M, M + 26, ty - 20, GOLD, 1, 0.95);
-    P.tracked('SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
+    P.tracked('LUXURY SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
     P.text(m.range || 'Proposal', M - 2, ty, 54, F.b, CREAM);
     P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 64, 20, F.l, GOLDL);
 
@@ -164,9 +164,14 @@
     });
     P.hline(M, A4.w - M, iy + 42, GOLD, 0.5, 0.45);
 
-    // footer
-    P.tracked('PROJECTS@SONOR.CO.UK   ·   SONOR.CO.UK', M, A4.h - 60, 7.5, F.r, GOLDL, 1.6);
-    P.trackedRight('DESIGNED & INSTALLED SINCE 2003   ·   CEDIA MEMBER', A4.w - M, A4.h - 60, 7.5, F.r, [168, 156, 136], 1.4);
+    // footer — CEDIA member logo (official asset) right-aligned
+    P.tracked('PROJECTS@SONOR.CO.UK  ·  SONOR.CO.UK  ·  SINCE 2003', M, A4.h - 59, 7, F.r, GOLDL, 1.3);
+    if (m._cedia) {
+      var ch = 12, cwd = ch * (m._cedia.width / m._cedia.height);
+      P.image(m._cedia, A4.w - M - cwd, A4.h - 63, cwd, ch, 0.92);
+    } else {
+      P.trackedRight('CEDIA MEMBER', A4.w - M, A4.h - 59, 7, F.r, [168, 156, 136], 1.3);
+    }
   }
 
   // ── PAGE 2 · SPECIFICATION + QUOTE + TERMS ───────────────────────────────────
@@ -183,6 +188,7 @@
       ['Room', m.roomText],
       ['Layout', m.layoutText],
       ['Upholstery', m.materialName ? (m.materialName + (m.colourName ? ' · ' + m.colourName : '')) : (m.upholsteryText || 'Confirmed at quotation')],
+      ['Row configuration', (m.rowDetails && m.rowDetails.length) ? m.rowDetails.join('  —  ') : null],
       ['Recline', m.reclineText],
       ['Finish options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
       ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null],
@@ -403,7 +409,8 @@
     P.tracked('REFERENCES', M, top, 8, F.b, GOLD, 2.2); top += 16;
     if (m.productUrl) { P.text('Product page:', M, top, 9.5, F.r, MUT); P.link(m.productUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.productUrl); top += 18; }
     if (m.manufacturerUrl) { P.text('Manufacturer:', M, top, 9.5, F.r, MUT); P.link(m.manufacturerUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.manufacturerUrl); top += 18; }
-    P.text(m.datasheetUrl ? 'Manufacturer datasheet appended to this document.' : 'Manufacturer datasheet available on request.', M, top, 9, F.r, MUT);
+    if (m.datasheetUrl) { P.text('Datasheet:', M, top, 9.5, F.r, MUT); P.link(m.datasheetUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.datasheetUrl); top += 18; }
+    P.text(m._dsAppended ? 'The manufacturer datasheet is appended to this document.' : 'Manufacturer datasheet available via the link above or on request.', M, top, 9, F.r, MUT);
     pageFoot(P, F, m, 4, TOTAL_PAGES);
   }
 
@@ -436,21 +443,23 @@
     try { if (m.heroImage) hero = await loadImage(doc, m.heroImage); } catch (e) {}
     try { if (m.rangeImage) rangeImg = await loadImage(doc, m.rangeImage); } catch (e) {}
     if (!hero && rangeImg) hero = rangeImg;
+    try { m._cedia = await doc.embedPng(await fetchBytes(BASE + 'cedia-member-wide.png')); } catch (e) { m._cedia = null; }
 
-    var TOTAL = 4;
+    // pre-fetch the manufacturer datasheet (Library `datasheet_url`) so pages state it accurately
+    var dsDoc = null;
+    if (m.datasheetUrl) {
+      try { dsDoc = await PDFLib.PDFDocument.load(await fetchBytes(m.datasheetUrl), { updateMetadata: false }); m._dsAppended = true; }
+      catch (e) { dsDoc = null; m._dsAppended = false; console.warn('[SeatingPdf] datasheet fetch failed (CORS?):', e && e.message); }
+    }
+
+    var TOTAL = 4 + (dsDoc ? dsDoc.getPageCount() : 0);
     cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero);
     quote(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     drawing(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     techspec(mk(doc.addPage([A4.w, A4.h]), doc), F, m, rangeImg, TOTAL);
-
-    // append manufacturer datasheet when the Library files one (PDF url)
-    if (m.datasheetUrl) {
-      try {
-        var dsBytes = await fetchBytes(m.datasheetUrl);
-        var ds = await PDFLib.PDFDocument.load(dsBytes, { updateMetadata: false });
-        var pages = await doc.copyPages(ds, ds.getPageIndices());
-        pages.forEach(function (p) { doc.addPage(p); });
-      } catch (e) { console.warn('[SeatingPdf] datasheet append failed:', e && e.message); }
+    if (dsDoc) {
+      try { (await doc.copyPages(dsDoc, dsDoc.getPageIndices())).forEach(function (p) { doc.addPage(p); }); }
+      catch (e) { console.warn('[SeatingPdf] datasheet append failed:', e && e.message); }
     }
 
     var bytes = await doc.save();

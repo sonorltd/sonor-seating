@@ -13,12 +13,24 @@
     'amalfi': '../cineca-assets/amalfi.jpg',
     'como': '../cineca-assets/como.jpg',
     'modena': '../cineca-assets/modena.jpg',
-    // Moovia (moovia.de scrape) — Alpha & Budapest are Habitech-only, no imagery yet
-    'moovia-berlin': A + 'moovia-berlin.jpg',
-    'moovia-chesterfield': A + 'moovia-chesterfield.jpg',
-    'moovia-dallas': A + 'moovia-dallas.jpg',
-    'moovia-ibiza': A + 'moovia-ibiza.jpg',
-    'moovia-venice': A + 'moovia-venice.jpg',
+    // Moovia — ORIGINAL per-range product shots (restored from pre-repoint furniture_ranges).
+    // Alpha & Budapest are Habitech-only, no imagery yet.
+    'moovia-berlin': 'https://images.squarespace-cdn.com/content/v1/5a8ec728f9a61e7fba3ec60b/1542650055789-WNLNQBL1SMZROM78LD50/products-berlin_swarowski_open-home-theater-seating.png',
+    'moovia-chesterfield': 'https://images.squarespace-cdn.com/content/v1/5a8ec728f9a61e7fba3ec60b/1548419092010-Z1SJX7KTD6GXS9450C9W/product-chesterfield_red_velvet_floor_light.png',
+    'moovia-dallas': 'https://images.squarespace-cdn.com/content/v1/5a8ec728f9a61e7fba3ec60b/1580301413904-JBZLJ4JWGV7DC755A03M/Moovia_Dallas6257.jpg',
+    'moovia-ibiza': 'https://images.squarespace-cdn.com/content/v1/5a8ec728f9a61e7fba3ec60b/1580206693505-Z1XX4LEL3ZG9ULKSTTP7/products-ibiza-home-theater-seating.png',
+    'moovia-venice': 'https://images.squarespace-cdn.com/content/v1/5a8ec728f9a61e7fba3ec60b/1542644571271-S4A69FZU7HLL346EJGJN/products-venice-home-theater-seating.png',
+    // Cinelux Seating — ORIGINALS (restored from pre-repoint furniture_ranges)
+    'cinelux-altman': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/6684fb55e3e4821ca53da42c.png',
+    'cinelux-coppola': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/668508f0975d549f2b52fb2a.png',
+    'cinelux-fellini': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/66850e700360f21ce8ee9b36.png',
+    'cinelux-kubrik': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/66851e1a4918dc4523f6cecc.png',
+    'cinelux-lucas': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/6686676132d8475a91f055a8.png',
+    'cinelux-lynch': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/668526790360f22b88eebee2.png',
+    'cinelux-richie': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/668527dc975d5446ad532a13.png',
+    'cinelux-scorsese': 'https://images.leadconnectorhq.com/image/f_webp/q_80/r_1000/u_https://storage.googleapis.com/msgsndr/FQyt5AbKYkJf50Le7p3o/media/66866ae8ea0cce5d39218846.png',
+    // FrontRow Seating — ORIGINAL
+    'frontrow-serenity': 'https://www.homecinemaseating.co.uk/wp-content/uploads/2021/03/FrontRow_Configs_Serenity_2021.png',
     // Cinema Deco (cinemadeco.com scrape)
     'cinemadeco-knightsbridge': A + 'cinemadeco-knightsbridge.webp',
     'cinemadeco-chelsea': A + 'cinemadeco-chelsea.webp',
