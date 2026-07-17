@@ -1,4 +1,11 @@
-# Seating Configurator — Claude Code Context (v0.10.0)
+# Seating Configurator — Claude Code Context (v0.10.1)
+
+> **v0.10.1 —** terms now lead with "Indicative proposal for the seating package only — refer
+> to the main cinema design plans for the final room specification" (also on the drawing notes);
+> "SPECIFICATION" label removed under the model name (p2); content-page footer relaid: email LHS ·
+> **centred gold mark + SONOR** · WhatsApp number RHS; page numbers moved into the header,
+> before the RHS page label ("2 / 4 · Specification & Estimate").
+
 
 > **v0.10.0 — installation fee, spec swatches, model photo, rear-wall plan.**
 > **Installation:** `CFG.installation` {base £50, +⅓ × base per extra seat} → `installCost()`;

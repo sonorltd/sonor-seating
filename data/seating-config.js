@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.10.0',
+    version: '0.10.1',
     buildDate: '2026-07-17',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
@@ -16,6 +16,7 @@
     // Payment terms shown on the proposal + summary
     paymentTerms: '50% deposit on order · 50% balance prior to delivery',
     termsLines: [
+      'Indicative proposal for the seating package only — refer to the main cinema design plans for the final room specification.',
       'This proposal is an indicative estimate prepared from the Sonor seating library. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation.',
       'Payment: 50% deposit on order, 50% balance prior to delivery. Prices include VAT at the prevailing rate where stated.',
       'Lead times are from order confirmation and fabric approval. Standard stock items (e.g. black leather) typically ship sooner than bespoke finishes.',

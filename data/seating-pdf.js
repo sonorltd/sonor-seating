@@ -127,29 +127,33 @@
   function mm(v) { return v != null ? Math.round(v) + ' mm' : null; }
 
   // shared page furniture (content pages)
-  function pageHead(P, F, m, label) {
+  function pageHead(P, F, m, label, pageNo, total) {
     P.rect(0, 0, A4.w, 4, GOLD); P.rect(A4.w - 130, 0, 130, 4, PUR);
     P.tracked('LUXURY SEATING PROPOSAL', M, 42, 8, F.r, [150, 138, 116], 2.4);
-    P.trackedRight(label, A4.w - M, 42, 8, F.r, MUT, 2.4);
+    // page number sits before the RHS page label
+    var lw = P.trackedRight(label, A4.w - M, 42, 8, F.r, MUT, 2.4);
+    if (pageNo) P.trackedRight(pageNo + ' / ' + total + '   ·', A4.w - M - lw - 10, 42, 8, F.r, [170, 160, 140], 1.6);
     P.hline(M, A4.w - M, 68, LINE, 0.8);
   }
-  function pageFoot(P, F, m, pageNo, total) {
+  function pageFoot(P, F, m) {
     var GDEEP = [140, 116, 60];
     P.hline(M, A4.w - M, A4.h - 56, LINE, 0.8);
-    // golden lockup — once per page, here only
-    P.logo(M, A4.h - 47, 15, GOLD);
-    var wx = M + 21;
-    wx += P.tracked('SONOR', wx, A4.h - 44, 9.5, F.b, GDEEP, 2.6) + 8;
-    P.tracked('SMART HOMES', wx, A4.h - 42.4, 6.8, F.l, GOLD, 2.8);
-    // contact: email · WhatsApp number — page number far right
-    P.right(pageNo + ' / ' + total, A4.w - M, A4.h - 44.5, 8, F.r, MUT);
+    // email LHS
+    P.tracked('PROJECTS@SONOR.CO.UK', M, A4.h - 44.2, 7.2, F.r, MUT, 1.4);
+    // centre: Sonor mark + wordmark only
+    var s = 'SONOR', ss = 9.5, tr = 2.8, tw = 0;
+    for (var i = 0; i < s.length; i++) tw += F.b.widthOfTextAtSize(s[i], ss) + tr;
+    tw -= tr;
+    var markW = 15 * (93 / 95), gap = 7, totW = markW + gap + tw;
+    var cx0 = (A4.w - totW) / 2;
+    P.logo(cx0, A4.h - 47.5, 15, GOLD);
+    P.tracked(s, cx0 + markW + gap, A4.h - 44.6, ss, F.b, GDEEP, tr);
+    // WA RHS
     var phone = '07933 684 000', ps = 8;
-    var phW = 0; for (var i = 0; i < phone.length; i++) phW += F.r.widthOfTextAtSize(phone[i], ps) + 1.2;
-    var phX = A4.w - M - 34 - phW;
+    var phW = 0; for (var j = 0; j < phone.length; j++) phW += F.r.widthOfTextAtSize(phone[j], ps) + 1.2;
+    var phX = A4.w - M - phW;
     P.tracked(phone, phX, A4.h - 44.4, ps, F.r, INK2, 1.2);
-    // WhatsApp glyph before the number (pdf-lib y = distance from bottom; glyph draws downward)
     P.page.drawSvgPath(WA, { x: phX - 14, y: 45.6, scale: 9.5 / 24, color: col([37, 165, 88]) });
-    P.trackedRight('PROJECTS@SONOR.CO.UK', phX - 26, A4.h - 44.2, 7.2, F.r, MUT, 1.4);
   }
 
   // ── PAGE 1 · COVER ───────────────────────────────────────────────────────────
@@ -206,7 +210,7 @@
   // ── PAGE 2 · SPECIFICATION + QUOTE + TERMS ───────────────────────────────────
   function quote(P, F, m, TOTAL_PAGES, rangeImg, swatchImg) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, 'SPECIFICATION & ESTIMATE');
+    pageHead(P, F, m, 'SPECIFICATION & ESTIMATE', 2, TOTAL_PAGES);
 
     P.tracked((m.manufacturer || 'SONOR').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
@@ -227,7 +231,6 @@
       ['Armrests', m.includeArmrests ? 'Included (1 per seat + row ends)' : null],
       ['Lead time', m.leadText || 'On request']
     ].filter(function (r) { return r[1]; });
-    P.tracked('SPECIFICATION', M, top - 22, 8, F.b, GOLD, 2.2);
     var sy = top;
     rows.forEach(function (r) {
       P.tracked(String(r[0]).toUpperCase(), M, sy, 6.5, F.r, MUT, 1.5);
@@ -308,7 +311,7 @@
       lines.forEach(function (ln, li) { P.text(ln, M + 10, y + li * 10.5, 8, F.r, MUT); });
       y += lines.length * 10.5 + 5;
     });
-    pageFoot(P, F, m, 2, TOTAL_PAGES);
+    pageFoot(P, F, m);
   }
 
   function wrap(str, font, size, maxW) {
@@ -345,7 +348,7 @@
   // ── PAGE 3 · DIMENSIONED SEATING PLAN (CAD-style) ────────────────────────────
   function drawing(P, F, m, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, 'SEATING PLAN');
+    pageHead(P, F, m, 'SEATING PLAN', 3, TOTAL_PAGES);
     P.tracked('DIMENSIONED LAYOUT', M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range + ' — ' + (m.rows || 2) + ' rows × ' + (m.seatsPerRow || 3), M - 1, 106, 22, F.b, INK);
     P.right('All dimensions in mm', A4.w - M, 108, 9, F.r, MUT);
@@ -417,15 +420,15 @@
     // notes
     var ny = bTop + bh + 26;
     P.hline(M, A4.w - M, ny - 12, LINE, 0.7);
-    var notes = 'Seat width ' + Math.round(seatW) + 'mm' + (S.reclinedDepthMm ? ' · reclined depth ' + Math.round(S.reclinedDepthMm) + 'mm' : ' · plan depth ' + Math.round(seatD) + 'mm') + ' · row spacing ' + rowGap + 'mm · side clearance ' + sideWall + 'mm each side' + (wallClear ? ' · wall clearance ' + wallClear + 'mm' : '') + '. Indicative layout for discussion — site survey confirms final setting-out.';
+    var notes = 'Seat width ' + Math.round(seatW) + 'mm' + (S.reclinedDepthMm ? ' · reclined depth ' + Math.round(S.reclinedDepthMm) + 'mm' : ' · plan depth ' + Math.round(seatD) + 'mm') + ' · row spacing ' + rowGap + 'mm · side clearance ' + sideWall + 'mm each side' + (wallClear ? ' · wall clearance ' + wallClear + 'mm' : '') + '. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
     wrap(notes, F.r, 8.5, A4.w - M * 2).forEach(function (ln, li) { P.text(ln, M, ny + li * 11, 8.5, F.r, MUT); });
-    pageFoot(P, F, m, 3, TOTAL_PAGES);
+    pageFoot(P, F, m);
   }
 
   // ── PAGE 4 · TECHNICAL SPECIFICATION ─────────────────────────────────────────
   function techspec(P, F, m, rangeImg, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, 'TECHNICAL SPECIFICATION');
+    pageHead(P, F, m, 'TECHNICAL SPECIFICATION', 4, TOTAL_PAGES);
     P.tracked((m.manufacturer || '').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
     if (m.spec && m.spec.style) P.right(m.spec.style, A4.w - M, 108, 10, F.r, MUT);
@@ -474,7 +477,7 @@
     if (m.manufacturerUrl) { P.text('Manufacturer:', M, top, 9.5, F.r, MUT); P.link(m.manufacturerUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.manufacturerUrl); top += 18; }
     if (m.datasheetUrl) { P.text('Datasheet:', M, top, 9.5, F.r, MUT); P.link(m.datasheetUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.datasheetUrl); top += 18; }
     P.text(m._dsAppended ? 'The manufacturer datasheet is appended to this document.' : 'Manufacturer datasheet available via the link above or on request.', M, top, 9, F.r, MUT);
-    pageFoot(P, F, m, 4, TOTAL_PAGES);
+    pageFoot(P, F, m);
   }
 
   function download(bytes, filename) {
