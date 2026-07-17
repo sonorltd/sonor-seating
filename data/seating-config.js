@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.3.1',
+    version: '0.4.0',
     buildDate: '2026-07-17',
     // Client-facing landing hero. One-line swap: drop a new file at the app root and repoint.
     heroImage: '../venice-double-seats.png',

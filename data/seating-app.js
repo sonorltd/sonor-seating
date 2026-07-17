@@ -281,7 +281,7 @@
           deliveryRow +
           '<tr class="tot"><td colspan="3">Estimated total (ex VAT)</td><td class="r">' + money(total) + '</td></tr>' +
         '</tbody></table>' +
-        '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button><button class="btn primary" onclick="SeatingApp.print()">🖨 Print / Save PDF</button></div>' +
+        '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button><button class="btn primary" onclick="SeatingApp.savePdf()">⬇ Download PDF proposal</button></div>' +
         '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation.</div>' +
       '</div>';
   }
@@ -293,16 +293,16 @@
     var rw = L.widthMm * scale, id = big ? 'pb' : 'pr';
     return '<svg viewBox="0 0 ' + (rw + 20) + ' ' + (H + 36) + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' +
       '<defs>' +
-        '<linearGradient id="' + id + 'scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eccf86"/><stop offset="1" stop-color="#c9a85c" stop-opacity="0.25"/></linearGradient>' +
-        '<radialGradient id="' + id + 'amb" cx="50%" cy="0%" r="85%"><stop offset="0" stop-color="rgba(201,168,92,0.16)"/><stop offset="55%" stop-color="rgba(128,88,161,0.12)"/><stop offset="100%" stop-color="rgba(128,88,161,0)"/></radialGradient>' +
+        '<linearGradient id="' + id + 'scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8b48e"/><stop offset="1" stop-color="#ad9978" stop-opacity="0.25"/></linearGradient>' +
+        '<radialGradient id="' + id + 'amb" cx="50%" cy="0%" r="85%"><stop offset="0" stop-color="rgba(173,153,120,0.16)"/><stop offset="55%" stop-color="rgba(128,88,161,0.12)"/><stop offset="100%" stop-color="rgba(128,88,161,0)"/></radialGradient>' +
         '<linearGradient id="' + id + 'seat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a883cc"/><stop offset="1" stop-color="#66467f"/></linearGradient>' +
       '</defs>' +
-      '<rect x="10" y="14" width="' + rw + '" height="' + H + '" rx="9" fill="#09070f" stroke="rgba(201,168,92,0.22)"/>' +
+      '<rect x="10" y="14" width="' + rw + '" height="' + H + '" rx="9" fill="#09070f" stroke="rgba(173,153,120,0.24)"/>' +
       '<rect x="10" y="14" width="' + rw + '" height="' + H + '" rx="9" fill="url(#' + id + 'amb)"/>' +
       '<rect x="14" y="8" width="' + (rw - 8) + '" height="7" rx="3.5" fill="url(#' + id + 'scr)"/>' +
-      '<text x="' + (10 + rw / 2) + '" y="5.5" text-anchor="middle" fill="rgba(236,207,134,0.9)" font-size="6.5" letter-spacing="3.5" font-family="system-ui">S C R E E N</text>' +
+      '<text x="' + (10 + rw / 2) + '" y="5.5" text-anchor="middle" fill="rgba(200,180,142,0.92)" font-size="6.5" letter-spacing="3.5" font-family="Gilroy,system-ui">S C R E E N</text>' +
       seatsSVG(L, 10, 26, rw, H - 16, scale, id) +
-      '<text x="' + (10 + rw / 2) + '" y="' + (H + 31) + '" text-anchor="middle" fill="rgba(143,133,116,0.85)" font-size="9" font-family="system-ui">' + (L.widthMm / 1000).toFixed(1) + 'm wide · ' + (L.rows * L.seatsPerRow) + ' seats</text></svg>';
+      '<text x="' + (10 + rw / 2) + '" y="' + (H + 31) + '" text-anchor="middle" fill="rgba(143,133,116,0.85)" font-size="9" font-family="Gilroy,system-ui">' + (L.widthMm / 1000).toFixed(1) + 'm wide · ' + (L.rows * L.seatsPerRow) + ' seats</text></svg>';
   }
   function seatsSVG(L, x0, y0, rw, rh, scale, id) {
     var sw = (CFG.clearance.seatFallbackWidthMm) * scale;
@@ -315,12 +315,47 @@
       for (var s = 0; s < per; s++) {
         var cx = sx + s * (sw + 4);
         out += '<rect x="' + cx + '" y="' + sy + '" width="' + (sw - 3) + '" height="' + seatH + '" rx="4" fill="url(#' + id + 'seat)" stroke="rgba(180,143,214,0.55)"/>';
-        out += '<rect x="' + (cx + 2) + '" y="' + (sy + 2) + '" width="' + (sw - 7) + '" height="' + Math.max(3, seatH * 0.26) + '" rx="2" fill="rgba(236,207,134,0.18)"/>';
+        out += '<rect x="' + (cx + 2) + '" y="' + (sy + 2) + '" width="' + (sw - 7) + '" height="' + Math.max(3, seatH * 0.26) + '" rx="2" fill="rgba(200,180,142,0.18)"/>';
       }
     }
     return out;
   }
   function planSVG(large) { return roomSVG(cfg.layout, large); }
+
+  // ── luxury PDF proposal ──────────────────────────────────────────────────────
+  function pdfModel() {
+    var r = E.range(cfg.rangeId); if (!r) return null;
+    var lines = quoteLines(), prod = productTotal(lines), di = deliveryInfo(), total = prod + (di.cost || 0);
+    var anyPriced = lines.some(function (l) { return l.unit != null; });
+    var mat = (r.materials || []).find(function (m) { return m.id === cfg.material; });
+    var uph = mat ? mat.name : (catFinish(r) || 'Confirmed at quotation');
+    if (mat && cfg.colour) uph += ' · ' + cfg.colour;
+    var recline = cfg.motor ? ((CFG.motorLabels || {})[cfg.motor] || cfg.motor) : null;
+    var slug = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+    return {
+      range: r.name, manufacturer: r.manufacturer,
+      roomText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm',
+      roomWidthText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm wide',
+      layoutText: (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats · ' + cfg.layout.rows + ' × ' + cfg.layout.seatsPerRow,
+      rows: cfg.layout.rows, seatsPerRow: cfg.layout.seatsPerRow,
+      upholsteryText: uph, reclineText: recline,
+      leadText: leadText(di.lead),
+      lines: lines, productTotal: prod, deliveryCost: di.cost, deliveryLabel: CFG.deliveryLabel || 'Delivery',
+      totalText: anyPriced ? money(total) : 'On request',
+      dateText: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      filename: 'sonor-' + slug(r.manufacturer) + '-' + slug(r.name) + '-proposal.pdf'
+    };
+  }
+  async function savePdf() {
+    try {
+      if (global.SeatingPdf && global.SeatingPdf.available()) {
+        toast('Building PDF…');
+        var ok = await global.SeatingPdf.generate(pdfModel());
+        if (ok) { toast('PDF downloaded'); return; }
+      }
+    } catch (e) { console.warn('[SeatingPdf]', e && e.message); toast('PDF failed — using print'); }
+    global.print();
+  }
 
   // ── export ───────────────────────────────────────────────────────────────────
   function csv() {
@@ -342,6 +377,6 @@
     boot: boot, enter: enter, backToIntro: backToIntro, goBack: goBack, jumpTo: jumpTo, restart: restart,
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
-    toggleArm: toggleArm, acc: acc, csv: csv, print: print
+    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf
   };
 })(typeof window !== 'undefined' ? window : this);

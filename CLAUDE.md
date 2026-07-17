@@ -1,4 +1,22 @@
-# Seating Configurator — Claude Code Context (v0.3.0)
+# Seating Configurator — Claude Code Context (v0.4.0)
+
+> **v0.4.0 — luxury PDF proposal.** `data/seating-pdf.js` (`SeatingPdf.generate(model)`)
+> builds a crisp **vector** A4 PDF with **pdf-lib** + embedded Gilroy (`@pdf-lib/fontkit`),
+> gold-standard aligned in our cinema aesthetic: **Page 1** dark dramatic cover (house-mark,
+> gold eyebrow, "Cinema Seating / Proposal", range + summary chips), **Page 2** cream
+> specification + itemised quote (vector seating plan, products/delivery/total, lead time,
+> terms, contact). Summary "Download PDF proposal" → `SeatingApp.savePdf()` (builds `pdfModel()`,
+> falls back to `window.print()` if pdf-lib/CDN unavailable). pdf-lib + fontkit load from
+> jsDelivr; fonts fetched from `data/fonts/*.otf` (same-origin on Pages).
+
+
+> **v0.3.2 — whole-app consistency.** The wizard now shares the front-page/website
+> design language end-to-end: **Gilroy** type (800 headings, 200 ultralight for large
+> numerals) replacing Cormorant; website gold `#ad9978`/`#c8b48e` + `#8058a1` purple;
+> flat dark buttons with gold hover (matching `.cta-lg`/site `.btn-p`). The header uses the
+> **real Sonor house-mark SVG** (from the official logo components) + SONOR wordmark, not a
+> text placeholder. Plan-SVG gold retuned to match. Cinema purple+gold luxury retained.
+
 
 > **v0.3.0 — client-facing landing (deviation, this app only).** Unlike every other
 > Sonor app, this one is customer-facing, so it **replaces the SonorShell chrome with a
