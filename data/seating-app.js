@@ -252,23 +252,32 @@
   // ── plans (SVG) ──────────────────────────────────────────────────────────────
   function roomSVG(L, big) {
     var W = big ? 640 : 420, scale = W / Math.max(L.widthMm, 3000), H = Math.max(140, Math.min(big ? 340 : 240, L.lengthMm * scale * 0.5));
-    var rw = L.widthMm * scale;
-    return '<svg viewBox="0 0 ' + (rw + 20) + ' ' + (H + 30) + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' +
-      '<rect x="10" y="10" width="' + rw + '" height="' + H + '" rx="6" fill="rgba(255,255,255,.03)" stroke="rgba(201,168,92,.25)"/>' +
-      '<rect x="10" y="6" width="' + rw + '" height="6" fill="rgba(201,168,92,.5)"/><text x="' + (10 + rw / 2) + '" y="4" text-anchor="middle" fill="rgba(201,168,92,.7)" font-size="7" font-family="system-ui">SCREEN</text>' +
-      seatsSVG(L, 10, 22, rw, H - 12, scale) +
-      '<text x="' + (10 + rw / 2) + '" y="' + (H + 26) + '" text-anchor="middle" fill="rgba(122,112,96,.7)" font-size="9" font-family="system-ui">' + (L.widthMm / 1000).toFixed(1) + 'm wide · ' + (L.rows * L.seatsPerRow) + ' seats</text></svg>';
+    var rw = L.widthMm * scale, id = big ? 'pb' : 'pr';
+    return '<svg viewBox="0 0 ' + (rw + 20) + ' ' + (H + 36) + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' +
+      '<defs>' +
+        '<linearGradient id="' + id + 'scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eccf86"/><stop offset="1" stop-color="#c9a85c" stop-opacity="0.25"/></linearGradient>' +
+        '<radialGradient id="' + id + 'amb" cx="50%" cy="0%" r="85%"><stop offset="0" stop-color="rgba(201,168,92,0.16)"/><stop offset="55%" stop-color="rgba(128,88,161,0.12)"/><stop offset="100%" stop-color="rgba(128,88,161,0)"/></radialGradient>' +
+        '<linearGradient id="' + id + 'seat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a883cc"/><stop offset="1" stop-color="#66467f"/></linearGradient>' +
+      '</defs>' +
+      '<rect x="10" y="14" width="' + rw + '" height="' + H + '" rx="9" fill="#09070f" stroke="rgba(201,168,92,0.22)"/>' +
+      '<rect x="10" y="14" width="' + rw + '" height="' + H + '" rx="9" fill="url(#' + id + 'amb)"/>' +
+      '<rect x="14" y="8" width="' + (rw - 8) + '" height="7" rx="3.5" fill="url(#' + id + 'scr)"/>' +
+      '<text x="' + (10 + rw / 2) + '" y="5.5" text-anchor="middle" fill="rgba(236,207,134,0.9)" font-size="6.5" letter-spacing="3.5" font-family="system-ui">S C R E E N</text>' +
+      seatsSVG(L, 10, 26, rw, H - 16, scale, id) +
+      '<text x="' + (10 + rw / 2) + '" y="' + (H + 31) + '" text-anchor="middle" fill="rgba(143,133,116,0.85)" font-size="9" font-family="system-ui">' + (L.widthMm / 1000).toFixed(1) + 'm wide · ' + (L.rows * L.seatsPerRow) + ' seats</text></svg>';
   }
-  function seatsSVG(L, x0, y0, rw, rh, scale) {
+  function seatsSVG(L, x0, y0, rw, rh, scale, id) {
     var sw = (CFG.clearance.seatFallbackWidthMm) * scale;
     if (cfg.rangeId && E) sw = E.seatWidthMm(E.range(cfg.rangeId)) * scale;
     var out = '', rows = L.rows, per = L.seatsPerRow;
-    var gap = 6, seatH = Math.max(14, (rh - (rows + 1) * gap) / rows);
+    var gap = 7, seatH = Math.max(15, (rh - (rows + 1) * gap) / rows);
     for (var r = 0; r < rows; r++) {
-      var totalW = per * sw + (per - 1) * 3;
+      var totalW = per * sw + (per - 1) * 4;
       var sx = x0 + (rw - totalW) / 2, sy = y0 + gap + r * (seatH + gap);
       for (var s = 0; s < per; s++) {
-        out += '<rect x="' + (sx + s * (sw + 3)) + '" y="' + sy + '" width="' + (sw - 2) + '" height="' + seatH + '" rx="3" fill="rgba(128,88,161,.28)" stroke="rgba(128,88,161,.55)"/>';
+        var cx = sx + s * (sw + 4);
+        out += '<rect x="' + cx + '" y="' + sy + '" width="' + (sw - 3) + '" height="' + seatH + '" rx="4" fill="url(#' + id + 'seat)" stroke="rgba(180,143,214,0.55)"/>';
+        out += '<rect x="' + (cx + 2) + '" y="' + (sy + 2) + '" width="' + (sw - 7) + '" height="' + Math.max(3, seatH * 0.26) + '" rx="2" fill="rgba(236,207,134,0.18)"/>';
       }
     }
     return out;
