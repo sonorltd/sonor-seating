@@ -31,6 +31,21 @@
     } catch (err) { var m = $('stepBody'); if (m) m.innerHTML = '<div class="empty">Failed to load catalogue: ' + esc(err && err.message) + '</div>'; }
   }
 
+  // ── intro / wizard toggle (client-facing landing) ────────────────────────────
+  function enter() {
+    var intro = $('intro'), wiz = $('wizard');
+    if (intro) intro.style.display = 'none';
+    if (wiz) wiz.style.display = 'flex';
+    cfg.step = 1; renderStep();
+    global.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  function backToIntro() {
+    var intro = $('intro'), wiz = $('wizard');
+    if (wiz) wiz.style.display = 'none';
+    if (intro) intro.style.display = 'block';
+    global.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
   // ── nav ─────────────────────────────────────────────────────────────────────
   function goNext() { if (cfg.step < STEPS.length && !nextDisabled()) { cfg.step++; renderStep(); } }
   function goBack() { if (cfg.step > 1) { cfg.step--; renderStep(); } }
@@ -216,19 +231,39 @@
     Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it) }); });
     return lines;
   }
+  // ── delivery + lead time (per manufacturer) ──────────────────────────────────
+  function productTotal(lines) { return lines.reduce(function (s, l) { return s + (l.unit || 0) * l.qty; }, 0); }
+  function deliveryInfo() {
+    var r = E.range(cfg.rangeId); if (!r) return { cost: null, lead: null };
+    var lines = quoteLines(), seats = cfg.layout.rows * cfg.layout.seatsPerRow, sub = productTotal(lines);
+    return { cost: E.deliveryCost(r.manufacturer, { seats: seats, orderTotal: sub }), lead: E.leadWeeks(r.manufacturer) };
+  }
+  function leadText(lead) { return lead ? (lead[0] === lead[1] ? lead[0] + ' weeks' : lead[0] + '–' + lead[1] + ' weeks') : null; }
+  function grandTotal(lines, di) { return productTotal(lines) + ((di && di.cost) || 0); }
+
   function updateLive() {
     var lines = quoteLines(), any = lines.some(function (l) { return l.unit != null; });
-    var total = lines.reduce(function (s, l) { return s + (l.unit || 0) * l.qty; }, 0);
+    var di = deliveryInfo(), total = grandTotal(lines, di);
     var poa = lines.some(function (l) { return l.unit == null; });
     $('planWrap').innerHTML = planSVG();
-    $('liveTotal').innerHTML = '<div class="lt-row"><span>Estimated MSRP</span><b>' + (any ? money(total) + (poa ? ' + POA items' : '') : 'On request') + '</b></div><div class="lt-sub">ex VAT · indicative — confirmed at quotation</div>';
+    var extra = di.cost != null
+      ? '<div class="lt-sub">Incl. ' + esc((CFG.deliveryLabel || 'Delivery').toLowerCase()) + ' ' + money(di.cost) + (leadText(di.lead) ? ' · lead time ' + leadText(di.lead) : '') + '</div>'
+      : (leadText(di.lead) ? '<div class="lt-sub">Lead time ' + leadText(di.lead) + '</div>' : '<div class="lt-sub">Delivery &amp; lead time confirmed at quotation</div>');
+    $('liveTotal').innerHTML = '<div class="lt-row"><span>Estimated MSRP</span><b>' + (any ? money(total) + (poa ? ' + POA items' : '') : 'On request') + '</b></div><div class="lt-sub">ex VAT · indicative — confirmed at quotation</div>' + extra;
   }
 
   // ── Step 4 · Summary ─────────────────────────────────────────────────────────
   function renderSummary() {
     var r = E.range(cfg.rangeId); if (!r) { cfg.step = 2; return renderStep(); }
-    var lines = quoteLines(), total = lines.reduce(function (s, l) { return s + (l.unit || 0) * l.qty; }, 0);
+    var lines = quoteLines(), prod = productTotal(lines);
+    var di = deliveryInfo(), total = prod + (di.cost || 0);
+    var anyPriced = lines.some(function (l) { return l.unit != null; });
+    var lt = leadText(di.lead);
+    var delLbl = CFG.deliveryLabel || 'Delivery';
     var mat = (r.materials || []).find(function (m) { return m.id === cfg.material; });
+    var deliveryRow = di.cost != null
+      ? '<tr><td>' + esc(delLbl) + '</td><td>1</td><td class="r">' + money(di.cost) + '</td><td class="r">' + money(di.cost) + '</td></tr>'
+      : '<tr><td>' + esc(delLbl) + '</td><td>1</td><td class="r">—</td><td class="r">On request</td></tr>';
     $('stepBody').innerHTML =
       '<div class="summary">' +
         '<div class="sm-head"><div><div class="sm-mfr">' + esc(r.manufacturer) + '</div><h2>' + esc(r.name) + '</h2></div><div class="sm-date">' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + '</div></div>' +
@@ -236,15 +271,18 @@
           cell('Room', (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm') +
           cell('Layout', (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats', cfg.layout.rows + ' rows × ' + cfg.layout.seatsPerRow) +
           cell('Upholstery', mat ? esc(mat.name) : (catFinish(r) || 'TBC'), cfg.colour ? esc(cfg.colour) : '') +
-          cell('Estimated MSRP', lines.some(function (l) { return l.unit != null; }) ? money(total) : 'On request', 'ex VAT') +
+          cell('Lead time', lt || 'On request', 'from order') +
+          cell('Estimated MSRP', anyPriced ? money(total) : 'On request', 'inc. delivery · ex VAT') +
         '</div>' +
         '<div class="planbig">' + planSVG(true) + '</div>' +
         '<table class="quote"><thead><tr><th>Item</th><th>Qty</th><th class="r">Unit MSRP</th><th class="r">Line MSRP</th></tr></thead><tbody>' +
           lines.map(function (l) { return '<tr><td>' + esc(l.label) + '</td><td>' + l.qty + '</td><td class="r">' + money(l.unit) + '</td><td class="r">' + (l.unit != null ? money(l.unit * l.qty) : 'POA') + '</td></tr>'; }).join('') +
+          '<tr class="sub2"><td colspan="3">Products subtotal</td><td class="r">' + money(prod) + '</td></tr>' +
+          deliveryRow +
           '<tr class="tot"><td colspan="3">Estimated total (ex VAT)</td><td class="r">' + money(total) + '</td></tr>' +
         '</tbody></table>' +
         '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button><button class="btn primary" onclick="SeatingApp.print()">🖨 Print / Save PDF</button></div>' +
-        '<div class="disc">Indicative MSRP from the Sonor library. Final pricing, fabric grades and lead times are confirmed on a formal quotation.</div>' +
+        '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation.</div>' +
       '</div>';
   }
   function cell(l, v, n) { return '<div class="cellx"><div class="cl">' + l + '</div><div class="cv">' + v + '</div>' + (n ? '<div class="cn">' + n + '</div>' : '') + '</div>'; }
@@ -287,15 +325,21 @@
   // ── export ───────────────────────────────────────────────────────────────────
   function csv() {
     var r = E.range(cfg.rangeId), lines = quoteLines();
+    var di = deliveryInfo(), prod = productTotal(lines), total = prod + (di.cost || 0), lt = leadText(di.lead);
+    var delLbl = CFG.deliveryLabel || 'Delivery';
     var rows = [['Manufacturer', 'Range', 'Item', 'Qty', 'Unit MSRP', 'Line MSRP']];
     lines.forEach(function (l) { rows.push([r.manufacturer, r.name, l.label, l.qty, l.unit != null ? l.unit.toFixed(2) : 'POA', l.unit != null ? (l.unit * l.qty).toFixed(2) : 'POA']); });
+    rows.push([r.manufacturer, r.name, 'Products subtotal', '', '', prod.toFixed(2)]);
+    rows.push([r.manufacturer, r.name, delLbl, 1, di.cost != null ? di.cost.toFixed(2) : 'On request', di.cost != null ? di.cost.toFixed(2) : 'On request']);
+    rows.push([r.manufacturer, r.name, 'Estimated total (ex VAT)', '', '', total.toFixed(2)]);
+    rows.push([r.manufacturer, r.name, 'Lead time', '', '', lt || 'On request']);
     var csvs = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csvs], { type: 'text/csv' })); a.download = 'seating-msrp-' + cfg.rangeId + '.csv'; a.click(); toast('CSV exported');
   }
   function print() { global.print(); }
 
   global.SeatingApp = {
-    boot: boot, goBack: goBack, jumpTo: jumpTo, restart: restart,
+    boot: boot, enter: enter, backToIntro: backToIntro, goBack: goBack, jumpTo: jumpTo, restart: restart,
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
     toggleArm: toggleArm, acc: acc, csv: csv, print: print

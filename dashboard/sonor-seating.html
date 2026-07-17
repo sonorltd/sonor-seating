@@ -151,7 +151,7 @@
     .strip { display:flex; flex-wrap:wrap; background:var(--bg2); border:1px solid var(--brd); border-radius:14px; overflow:hidden; margin-bottom:22px; } .cellx { flex:1; min-width:150px; padding:15px 19px; border-right:1px solid var(--brd); } .cellx:last-child{ border:none; } .cl { font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); } .cv { font-family:'Cormorant Garamond',serif; font-size:19px; color:var(--cream); margin-top:3px; } .cn { font-size:10px; color:var(--muted); margin-top:2px; }
     .planbig { border-radius:14px; padding:24px; display:flex; justify-content:center; margin-bottom:22px;
       background:radial-gradient(700px 240px at 50% 0%, rgba(201,168,92,.08), transparent 68%), var(--bg0); border:1px solid var(--brd2); }
-    .quote { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:18px; } .quote th { text-align:left; font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); padding:9px 11px; border-bottom:1px solid var(--brd); } .quote td { padding:12px 11px; border-bottom:1px solid var(--brd2); color:var(--cream); } .quote .r { text-align:right; } .quote .tot td { font-weight:700; color:var(--gold2); border-top:1px solid var(--brd); font-size:14px; }
+    .quote { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:18px; } .quote th { text-align:left; font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); padding:9px 11px; border-bottom:1px solid var(--brd); } .quote td { padding:12px 11px; border-bottom:1px solid var(--brd2); color:var(--cream); } .quote .r { text-align:right; } .quote .tot td { font-weight:700; color:var(--gold2); border-top:1px solid var(--brd); font-size:14px; } .quote .sub2 td { color:var(--muted); font-size:12px; }
     .actions { display:flex; gap:11px; } .disc { font-size:11px; color:var(--muted); margin-top:16px; line-height:1.55; }
     .empty { padding:60px; text-align:center; color:var(--muted); }
 
@@ -163,13 +163,216 @@
     .btn.ghost { background:rgba(128,88,161,.08); color:var(--gold); border:1px solid rgba(201,168,92,.4); } .btn.ghost:hover { background:rgba(128,88,161,.16); border-color:var(--gold); }
     .btn.sec { background:var(--bg3); color:var(--muted); border:1px solid var(--dim); } .btn.sec:hover { color:var(--cream); border-color:var(--pur); }
 
-    @media print { #sonor-header,.topbar,.steps,.footer,.actions { display:none!important; } body,.sc { background:#fff!important; color:#111; } .sc::after{ display:none; } .cv,.quote td,.sm-head h2,.lead h2,.big,.lt-row b,.rc-name { color:#111!important; -webkit-text-fill-color:#111; } }
+    /* ══ CLIENT-FACING HEADER + LANDING — aligned to sonor.co.uk design tokens ══
+       Gilroy type · muted gold #ad9978 · flat dark buttons w/ gold hover · ultralight .lt.
+       Scoped to #intro + .site-hdr; the .sc wizard keeps its cinema-luxury look. ── */
+    @font-face { font-family:'Gilroy'; src:url('../data/fonts/gilroy-extrabold.otf') format('opentype'); font-weight:800; font-display:swap; }
+    @font-face { font-family:'Gilroy'; src:url('../data/fonts/gilroy-regular.otf') format('opentype'); font-weight:400; font-display:swap; }
+    @font-face { font-family:'Gilroy'; src:url('../data/fonts/gilroy-ultralight.otf') format('opentype'); font-weight:200; font-display:swap; }
+
+    #sonor-header { display:none !important; }        /* hide spine chrome; mount kept for version/selfTest */
+    #intro, .site-hdr { --w-bg0:#090807; --w-bg1:#111010; --w-bg2:#1a1814; --w-bg3:#222018;
+      --w-txt:#F4F1EC; --w-txt2:#b0a898; --w-muted:#666050; --w-gold:#ad9978; --w-gold-l:#c8b48e;
+      --w-purple:#8058a1; --w-cta:#151310; --w-brd:rgba(255,255,255,.07); --w-brd2:rgba(255,255,255,.13);
+      font-family:'Gilroy','DM Sans',system-ui,sans-serif; }
+
+    /* ── SITE HEADER ── */
+    .site-hdr { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:20px; height:64px;
+      padding:0 clamp(18px,5vw,48px); background:rgba(9,8,7,.97); backdrop-filter:blur(18px);
+      border-bottom:1px solid var(--w-brd); }
+    .site-hdr .wm { display:flex; align-items:baseline; gap:10px; text-decoration:none; }
+    .site-hdr .wm b { font-weight:800; font-size:15px; letter-spacing:.22em; text-transform:uppercase; color:var(--w-txt); line-height:1; }
+    .site-hdr .wm i { font-style:normal; font-size:9px; letter-spacing:.24em; text-transform:uppercase; color:var(--w-gold-l); }
+    .site-hdr .tag { display:none; padding-left:16px; margin-left:2px; border-left:1px solid var(--w-brd2);
+      font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--w-muted); }
+    @media(min-width:760px){ .site-hdr .tag { display:inline-block; } }
+    .site-hdr nav { margin-left:auto; display:flex; align-items:center; gap:28px; }
+    .site-hdr nav a.lnk { display:none; font-size:11px; font-weight:400; letter-spacing:.12em; text-transform:uppercase; color:var(--w-txt2); text-decoration:none; transition:color .3s; }
+    .site-hdr nav a.lnk:hover { color:var(--w-gold); }
+    @media(min-width:920px){ .site-hdr nav a.lnk { display:inline; } }
+    .hdr-cta { padding:.72rem 1.5rem; border-radius:2px; font-size:.66rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase;
+      text-decoration:none; color:var(--w-txt); background:var(--w-cta); border:1px solid var(--w-brd2); transition:background .3s,color .3s; white-space:nowrap; }
+    .hdr-cta:hover { background:var(--w-gold); color:var(--w-cta); border-color:var(--w-gold); }
+
+    /* ── HERO ── */
+    #intro { color:var(--w-txt); background:var(--w-bg0); }
+    .hero { position:relative; min-height:clamp(560px,90vh,900px); display:flex; align-items:center; overflow:hidden; background:var(--w-bg0); }
+    .hero-bg { position:absolute; inset:0; background:#0a0908 center/cover no-repeat; }
+    .hero-bg::after { content:''; position:absolute; inset:0;
+      background:
+        linear-gradient(90deg, rgba(9,8,7,.94) 0%, rgba(9,8,7,.74) 40%, rgba(9,8,7,.30) 70%, rgba(9,8,7,.52) 100%),
+        radial-gradient(ellipse 70% 70% at 78% 42%, rgba(128,88,161,.05) 0%, rgba(173,153,120,.03) 42%, transparent 72%),
+        linear-gradient(0deg, rgba(9,8,7,.9), transparent 44%); }
+    .hero-inner { position:relative; z-index:2; width:100%; max-width:1180px; margin:0 auto; padding:2.5rem clamp(20px,5vw,48px) 4rem; }
+    .hero-copy { max-width:720px; animation:fadeUp .9s ease both; }
+    @keyframes fadeUp { from{ opacity:0; transform:translateY(26px); } to{ opacity:1; transform:translateY(0); } }
+    .eyebrow { display:inline-flex; align-items:center; gap:.8rem; font-size:.67rem; letter-spacing:.3em; text-transform:uppercase; color:var(--w-txt2); margin-bottom:1.6rem; }
+    .eyebrow::before { content:''; width:26px; height:1px; background:var(--w-gold); }
+    .hero h1 { font-weight:800; font-size:clamp(3.2rem,7.5vw,6.6rem); line-height:.94; letter-spacing:-.03em; color:var(--w-txt); margin:0 0 1.7rem; }
+    .lt { font-weight:200; color:var(--w-gold-l); }
+    .hero-sub { font-size:1rem; line-height:1.85; color:var(--w-txt2); max-width:500px; margin:0 0 2.6rem; font-weight:400; }
+    .hero-ctas { display:flex; flex-wrap:wrap; gap:.85rem; align-items:center; }
+    .cta-lg { padding:.95rem 2.1rem; border-radius:2px; font-size:.72rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase;
+      cursor:pointer; text-decoration:none; transition:background .3s,color .3s,border-color .3s; display:inline-block; }
+    .cta-lg.gold { color:var(--w-txt); background:var(--w-cta); border:1px solid var(--w-brd2); }
+    .cta-lg.gold:hover { background:var(--w-gold); color:var(--w-cta); border-color:var(--w-gold); }
+    .cta-lg.ghost { color:var(--w-txt2); background:transparent; border:1px solid var(--w-brd2); font-weight:400; }
+    .cta-lg.ghost:hover { border-color:var(--w-gold); color:var(--w-gold); }
+    .hero-tags { display:flex; flex-wrap:wrap; gap:.6rem 1.8rem; margin-top:2.4rem; padding-top:1.6rem; border-top:1px solid rgba(173,153,120,.1);
+      font-size:.62rem; letter-spacing:.09em; text-transform:uppercase; font-weight:600; color:var(--w-muted); }
+    .hero-tags span { display:inline-flex; align-items:center; gap:.55rem; }
+    .hero-tags span::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--w-gold); }
+
+    /* ── SECTIONS ── */
+    .strip2 { background:var(--w-bg1); }
+    #tiers { background:var(--w-bg2); }
+    .wrap { max-width:1180px; margin:0 auto; padding:clamp(3.5rem,8vw,5.5rem) clamp(20px,5vw,48px); }
+    .sl { display:flex; align-items:center; gap:.7rem; font-size:.62rem; letter-spacing:.28em; text-transform:uppercase; color:var(--w-gold-l); margin-bottom:.9rem; font-weight:600; }
+    .sl span { width:20px; height:1px; background:var(--w-gold-l); }
+    .sec-h { font-weight:800; font-size:clamp(1.9rem,4vw,3rem); line-height:1.02; letter-spacing:-.02em; margin:0 0 1rem; color:var(--w-txt); }
+    .sec-p { font-size:.92rem; line-height:1.8; color:var(--w-muted); max-width:620px; margin:0; }
+
+    .tier-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; margin-top:2.8rem; background:var(--w-brd); border:1px solid var(--w-brd); }
+    @media(max-width:860px){ .tier-grid{ grid-template-columns:1fr; } }
+    .tier { position:relative; background:var(--w-bg2); padding:2.2rem 1.8rem; overflow:hidden; transition:background .3s; }
+    .tier::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; transform:scaleX(0); transform-origin:left; transition:transform .38s; background:var(--w-purple); }
+    .tier:hover { background:var(--w-bg3); } .tier:hover::after { transform:scaleX(1); }
+    .tier.feat::after { transform:scaleX(1); background:var(--w-gold); }
+    .tier .tn { font-weight:800; font-size:1.15rem; letter-spacing:-.01em; color:var(--w-txt); margin-bottom:.3rem; }
+    .tier .tt { font-size:.6rem; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--w-gold-l); margin-bottom:1.1rem; }
+    .tier .td { font-size:.78rem; line-height:1.72; color:var(--w-muted); }
+    .tier .tl { margin:1.2rem 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.55rem; }
+    .tier .tl li { font-size:.75rem; color:var(--w-txt2); padding-left:1.2rem; position:relative; }
+    .tier .tl li::before { content:''; position:absolute; left:0; top:.5em; width:8px; height:1px; background:var(--w-gold); }
+    .tier .badge { position:absolute; top:1.1rem; right:1.1rem; font-size:.54rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
+      padding:.3rem .7rem; border-radius:2px; background:var(--w-gold); color:var(--w-cta); }
+
+    .steps3 { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin-top:2.8rem; counter-reset:st; background:var(--w-brd); border:1px solid var(--w-brd); }
+    @media(max-width:860px){ .steps3{ grid-template-columns:1fr 1fr; } }
+    @media(max-width:520px){ .steps3{ grid-template-columns:1fr; } }
+    .st { position:relative; padding:1.9rem 1.4rem; background:var(--w-bg1); }
+    .st::before { counter-increment:st; content:counter(st,decimal-leading-zero); font-weight:800; font-size:.7rem; color:var(--w-gold); letter-spacing:.1em; }
+    .st h4 { font-weight:800; font-size:.86rem; color:var(--w-txt); margin:.8rem 0 .5rem; }
+    .st p { font-size:.74rem; line-height:1.7; color:var(--w-muted); margin:0; }
+
+    .band { position:relative; overflow:hidden; background:var(--w-bg0); }
+    .band::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 60% 80% at 50% -10%, rgba(173,153,120,.07), transparent 62%); pointer-events:none; }
+    .band .wrap { position:relative; text-align:center; }
+    .band .sl { justify-content:center; }
+    .band .sec-p { margin:0 auto 1.9rem; }
+    .band .hero-ctas { justify-content:center; }
+
+    .foot { padding:2rem clamp(20px,5vw,48px); background:#050403; border-top:1px solid var(--w-brd); display:flex; flex-wrap:wrap; align-items:center; gap:1rem;
+      color:var(--w-muted); font-size:.68rem; letter-spacing:.02em; }
+    .foot .wm2 { font-weight:800; font-size:.8rem; letter-spacing:.22em; text-transform:uppercase; color:var(--w-txt2); }
+    .foot .sp { margin-left:auto; }
+    .foot a { color:var(--w-gold); text-decoration:none; }
+
+    /* wizard back-to-overview link */
+    .to-overview { font-size:11.5px; letter-spacing:.03em; color:#8f8574; text-decoration:none; margin-right:4px; transition:.15s; }
+    .to-overview:hover { color:var(--gold); }
+
+    @media print { .site-hdr,#sonor-header,.topbar,.steps,.footer,.actions,#intro { display:none!important; } body,.sc { background:#fff!important; color:#111; } .sc::after{ display:none; } .cv,.quote td,.sm-head h2,.lead h2,.big,.lt-row b,.rc-name { color:#111!important; -webkit-text-fill-color:#111; } }
   </style>
 </head>
 <body>
+  <!-- keep spine mount for version self-report + selfTest (hidden on this client-facing app) -->
   <header class="header" id="sonor-header"></header>
-  <div class="sc">
-    <div class="topbar"><span class="brandline">Seating Configurator</span><span class="src-note" id="sourceNote">Loading…</span></div>
+
+  <!-- ── CLIENT-FACING SITE HEADER (aligned to sonor.co.uk) ── -->
+  <header class="site-hdr">
+    <a class="wm" href="https://sonor.co.uk" target="_blank" rel="noopener"><b>Sonor</b><i>Smart Homes</i></a>
+    <span class="tag">Luxury Cinema Seating</span>
+    <nav>
+      <a class="lnk" href="#why">Why seating</a>
+      <a class="lnk" href="#tiers">Ranges</a>
+      <a class="lnk" href="#how">How it works</a>
+      <a class="hdr-cta" href="mailto:projects@sonor.co.uk?subject=Home%20Cinema%20Seating%20Enquiry">Book a consultation</a>
+    </nav>
+  </header>
+
+  <!-- ── INTRO / LANDING ── -->
+  <main id="intro">
+    <section class="hero">
+      <div class="hero-bg" id="heroBg"></div>
+      <div class="hero-inner"><div class="hero-copy">
+        <div class="eyebrow">Luxury Home Cinema Seating</div>
+        <h1>Every seat,<br>the <span class="lt">best seat</span><br>in the house.</h1>
+        <p class="hero-sub">Bespoke cinema seating from the finest European makers — recliners, sofas, daybeds and loungers, configured to fit your room to the millimetre. Tell us your space and we'll recommend the ranges that suit it, then build your layout live.</p>
+        <div class="hero-ctas">
+          <button class="cta-lg gold" onclick="SeatingApp.enter()">Design your cinema →</button>
+          <a class="cta-lg ghost" href="mailto:projects@sonor.co.uk?subject=Home%20Cinema%20Seating%20Enquiry">Book a consultation</a>
+        </div>
+        <div class="hero-tags"><span>Multiple manufacturers</span><span>Made to measure</span><span>Designed &amp; installed since 2003</span></div>
+      </div></div>
+    </section>
+
+    <section class="strip2" id="why"><div class="wrap">
+      <div class="sl"><span></span>Why dedicated seating</div>
+      <h2 class="sec-h">A cinema is only as good as <span class="lt">the seat you watch it from</span>.</h2>
+      <p class="sec-p">The screen and sound get the attention, but the seating decides whether a room gets used every night or admired once a month. The right range fits your dimensions, seats everyone with proper sightlines, and reclines without touching the wall behind. We size it around your room first — then show only what genuinely fits.</p>
+    </div></section>
+
+    <section id="tiers"><div class="wrap">
+      <div class="sl"><span></span>The ranges</div>
+      <h2 class="sec-h">From refined to <span class="lt">fully bespoke</span>.</h2>
+      <p class="sec-p">Our library spans multiple manufacturers and styles, grouped by how far you want to take it. The configurator recommends across all of them based on your room.</p>
+      <div class="tier-grid">
+        <div class="tier">
+          <div class="tn">Entry</div><div class="tt">Considered comfort</div>
+          <p class="td">Beautifully made powered recliners in leather or fabric — the essentials done properly, ready for most rooms.</p>
+          <ul class="tl"><li>Powered recline</li><li>Leather &amp; fabric options</li><li>Single &amp; double seats</li></ul>
+        </div>
+        <div class="tier feat">
+          <span class="badge">Most chosen</span>
+          <div class="tn">Premium</div><div class="tt">The Sonor standard</div>
+          <p class="td">Wider seat geometry, motorised headrests and lumbar, and finish choices that let the room feel designed rather than furnished.</p>
+          <ul class="tl"><li>Motorised headrest &amp; lumbar</li><li>Wide upholstery range</li><li>Armrests, ottomans &amp; accessories</li></ul>
+        </div>
+        <div class="tier">
+          <div class="tn">Bespoke</div><div class="tt">Made to your room</div>
+          <p class="td">Daybeds, loungers, corner units and made-to-measure configurations — for rooms that deserve something built entirely around them.</p>
+          <ul class="tl"><li>Daybeds &amp; loungers</li><li>Corner &amp; chaise units</li><li>Custom layouts &amp; materials</li></ul>
+        </div>
+      </div>
+    </div></section>
+
+    <section class="strip2" id="how"><div class="wrap">
+      <div class="sl"><span></span>How it works</div>
+      <h2 class="sec-h">Your layout, <span class="lt">then your quote</span>.</h2>
+      <p class="sec-p">Four steps, a few minutes. You'll leave with an indicative MSRP and a plan we can turn into a formal quotation.</p>
+      <div class="steps3">
+        <div class="st"><h4>Your room</h4><p>Enter width, length and how many seats you'd like. We show what will realistically fit.</p></div>
+        <div class="st"><h4>Choose a range</h4><p>We recommend ranges that suit your space and flag anything that won't — like no daybed in a range.</p></div>
+        <div class="st"><h4>Configure</h4><p>Upholstery, colour, recline and add-ons, with a live layout plan and running MSRP.</p></div>
+        <div class="st"><h4>Your quote</h4><p>An itemised MSRP summary to export or print — the starting point for your formal quotation.</p></div>
+      </div>
+    </div></section>
+
+    <section class="band"><div class="wrap">
+      <div class="sl" style="justify-content:center"><span></span>Ready when you are</div>
+      <h2 class="sec-h">Design your cinema seating <span class="lt">in minutes</span>.</h2>
+      <p class="sec-p">No obligation — build a layout, see indicative pricing, and we'll take it from there.</p>
+      <div class="hero-ctas">
+        <button class="cta-lg gold" onclick="SeatingApp.enter()">Design your cinema →</button>
+        <a class="cta-lg ghost" href="mailto:projects@sonor.co.uk?subject=Home%20Cinema%20Seating%20Enquiry">Book a consultation</a>
+      </div>
+    </div></section>
+
+    <footer class="foot">
+      <span class="wm2">Sonor</span>
+      <span>Home cinema &amp; smart home — Cheshire · Wirral · Wales · since 2003</span>
+      <span class="sp"><a href="mailto:projects@sonor.co.uk">projects@sonor.co.uk</a></span>
+    </footer>
+  </main>
+
+  <!-- ── CONFIGURATOR (hidden until "Design your cinema") ── -->
+  <div class="sc" id="wizard" style="display:none">
+    <div class="topbar">
+      <a class="to-overview" href="#" onclick="SeatingApp.backToIntro();return false;">← Overview</a>
+      <span class="brandline">Seating Configurator</span>
+      <span class="src-note" id="sourceNote">Loading…</span>
+    </div>
     <div class="steps" id="stepPills"></div>
     <div class="body" id="stepBody"><div class="empty">Loading…</div></div>
     <div class="footer">
@@ -177,8 +380,12 @@
       <button class="btn primary" id="btnNext" disabled>Continue →</button>
     </div>
   </div>
+
   <script>
-    const APP_VERSION = '0.2.3';
+    const APP_VERSION = '0.3.1';
+    // one-line swappable hero image (see seating-config.js → heroImage)
+    (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
+      if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();
     SonorShell.mount({ appKey:'seating', appName:'Seating Configurator', repo:'sonor-seating', version:APP_VERSION, faviconHref:'../data/favicon.svg', assetBase:'../data/', supabase:false, palette:{ self:'seating' } });
     SeatingApp.boot();
   </script>

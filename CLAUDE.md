@@ -1,4 +1,26 @@
-# Seating Configurator — Claude Code Context (v0.2.1)
+# Seating Configurator — Claude Code Context (v0.3.0)
+
+> **v0.3.0 — client-facing landing (deviation, this app only).** Unlike every other
+> Sonor app, this one is customer-facing, so it **replaces the SonorShell chrome with a
+> website-aligned header + intro/landing** modelled on sonor.co.uk. `#sonor-header` is
+> hidden (SonorShell.mount is still called for version self-report + selfTest). The landing
+> (`#intro`) uses the **website design tokens** — Gilroy type (bundled `data/fonts/*.otf`),
+> muted gold `#ad9978` / `#c8b48e`, flat dark buttons w/ gold hover, ultralight `.lt`.
+> `SeatingApp.enter()` hides the intro and reveals the `.sc` wizard (`#wizard`);
+> `backToIntro()` returns. Hero image is one-line swappable via `config.heroImage`
+> (currently `../venice-double-seats.png` at app root). The `.sc` wizard keeps its
+> cinema-luxury look (Cormorant + gold/purple). Other apps are untouched.
+>
+> **v0.3.1 — delivery + lead time (per manufacturer).** `config.manufacturerTerms`
+> (keyed by manufacturer name) holds Sonor's own delivery pricing + typical lead time —
+> NOT catalogue data. `delivery.type` = `flat` (£/order) · `perSeat` (£×seats) · `band`
+> (bands[] by order £); `leadWeeks:[min,max]`. Engine: `deliveryCost(mfr,{seats,orderTotal})`
+> + `leadWeeks(mfr)`. Summary shows a Products subtotal, a **Delivery line folded into the
+> ex-VAT total**, and a **Lead time** strip cell; CSV mirrors it. Any null/missing manufacturer
+> → "confirmed at quotation" (nothing added to total). **Figures are placeholders (null)** —
+> awaiting real per-manufacturer numbers. **SSOT-migrate** these to `seating_manufacturers`
+> when the Library exposes them (contract §6).
+
 
 > **⚠ READ `/SEATING-SSOT-CONTRACT.md` (workspace root) BEFORE any catalogue/schema/consumer work.**
 > That file is the binding cross-session contract (Library ↔ Configurator ↔ WeQuote).

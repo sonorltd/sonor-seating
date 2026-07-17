@@ -96,11 +96,34 @@
   // MSRP for an item (sell). qty pricing
   function itemSell(it) { return it && it.sell_price_gbp != null ? Number(it.sell_price_gbp) : null; }
 
+  // ── commercial terms per manufacturer (delivery £ + lead time) ───────────────
+  // Read from config (Sonor-set); SSOT-migrate later (contract §6). Not catalogue data.
+  function manufacturerTerms(mfr) {
+    var T = CFG.manufacturerTerms || {};
+    var t = Object.prototype.hasOwnProperty.call(T, mfr) ? T[mfr] : T._default;
+    return t || null;
+  }
+  // delivery £ for a manufacturer given order context {seats, orderTotal}. null = on request.
+  function deliveryCost(mfr, ctx) {
+    var t = manufacturerTerms(mfr); if (!t || !t.delivery) return null;
+    var d = t.delivery, seats = (ctx && ctx.seats) || 0, order = (ctx && ctx.orderTotal) || 0;
+    if (d.type === 'flat') return d.gbp != null ? Number(d.gbp) : null;
+    if (d.type === 'perSeat') return d.gbp != null ? Number(d.gbp) * seats : null;
+    if (d.type === 'band') {
+      var bands = d.bands || [];
+      for (var i = 0; i < bands.length; i++) { var b = bands[i]; if (b.maxOrder == null || order <= b.maxOrder) return b.gbp != null ? Number(b.gbp) : null; }
+    }
+    return null;
+  }
+  // lead time [minWeeks, maxWeeks] for a manufacturer, or null.
+  function leadWeeks(mfr) { var t = manufacturerTerms(mfr); return t && t.leadWeeks && t.leadWeeks.length ? t.leadWeeks : null; }
+
   global.SonorSeating = {
     load: load, get source() { return source; },
     seatingRanges: seatingRanges, range: range, itemsOf: itemsOf,
     seatItems: seatItems, armrestItems: armrestItems, accessoryItems: accessoryItems,
     motorOptions: motorOptions, seatWidthMm: seatWidthMm, seatDepthMm: seatDepthMm, feature: feature,
-    priced: priced, fromPrice: fromPrice, itemSell: itemSell
+    priced: priced, fromPrice: fromPrice, itemSell: itemSell,
+    manufacturerTerms: manufacturerTerms, deliveryCost: deliveryCost, leadWeeks: leadWeeks
   };
 })(typeof window !== 'undefined' ? window : this);

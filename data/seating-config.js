@@ -1,11 +1,30 @@
-/* Sonor Seating Configurator — static flow config (v0.2.0)
+/* Sonor Seating Configurator — static flow config (v0.3.0)
    window.__SEATING_CONFIG__ — UI rules + labels only. Catalogue = Library SSOT.
-   Flow: Layout → Recommended Ranges → Configure → Summary. MSRP only (trade later).
+   Flow: Intro (landing) → Layout → Recommended Ranges → Configure → Summary. MSRP only (trade later).
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.2.3',
+    version: '0.3.1',
     buildDate: '2026-07-17',
+    // Client-facing landing hero. One-line swap: drop a new file at the app root and repoint.
+    heroImage: '../venice-double-seats.png',
+    // ── Commercial terms per manufacturer (Sonor-set: delivery £ + lead time). ──
+    //   NOT catalogue data — these are Sonor's own delivery pricing & typical lead times.
+    //   Transitional home: migrate to SSOT seating_manufacturers when the Library exposes
+    //   it (contract §6). Keyed by manufacturer name (as it appears in the library).
+    //   delivery.type: 'flat' (gbp per order) · 'perSeat' (gbp × seats) · 'band' (bands[] by order £).
+    //   leadWeeks: [min, max]. Any null / missing manufacturer → "confirmed at quotation".
+    deliveryLabel: 'Delivery',
+    manufacturerTerms: {
+      _default:            null,
+      'Cineca':            { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
+      'Cineak':            { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
+      'Cinelux Seating':   { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
+      'Fortress Seating':  { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
+      'FrontRow Seating':  { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
+      'Moovia':            { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' },
+      'Palliser':          { delivery: { type: 'flat', gbp: null }, leadWeeks: null, note: '' }
+    },
     steps: ['Layout', 'Choose Range', 'Configure', 'Summary'],
     // Step 1 generic setup — standard defaults per the brief
     rowOptions: [1, 2, 3, 4],
