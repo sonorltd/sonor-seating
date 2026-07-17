@@ -171,11 +171,12 @@
     var motorHtml = motors.length > 1 ? '<div class="panel"><div class="ptt">Recline</div><div class="opts">' +
       motors.map(function (mt) { return '<button class="opt ' + (cfg.motor === mt ? 'on' : '') + '" onclick="SeatingApp.setMotor(\'' + mt + '\')">' + esc((CFG.motorLabels || {})[mt] || mt) + '</button>'; }).join('') + '</div></div>' : '';
     var accs = E.accessoryItems(cfg.rangeId);
-    var accHtml = accs.length ? '<div class="panel"><div class="ptt">Add-ons</div>' + accs.map(function (it) {
+    var accHtml = accs.length ? '<div class="panel"><div class="ptt">Choose your accessories</div>' + accs.map(function (it) {
       var q = cfg.accessories[it.id] || 0, s = E.itemSell(it);
       return '<div class="acc"><div><div class="acc-n">' + esc(it.label) + '</div><div class="acc-p">' + (s != null ? money(s) + ' each' : 'POA') + '</div></div>' +
         '<div class="qty"><button onclick="SeatingApp.acc(\'' + it.id + '\',-1)">−</button><span id="q_' + it.id + '">' + q + '</span><button onclick="SeatingApp.acc(\'' + it.id + '\',1)">+</button></div></div>';
-    }).join('') + '</div>' : '';
+    }).join('') + '</div>'
+      : '<div class="panel"><div class="ptt">Choose your accessories</div><div class="hint">Wine trays, ottomans and other extras for this range are specified and priced at quotation — ask us what\'s available.</div></div>';
     var arm = E.armrestItems(cfg.rangeId).length ? '<div class="panel"><div class="ptt">Armrests</div><label class="toggle"><input type="checkbox" ' + (cfg.includeArmrests ? 'checked' : '') + ' onchange="SeatingApp.toggleArm(this.checked)"> Include separate armrests (1 per seat + row ends)</label></div>' : '';
 
     $('stepBody').innerHTML =
@@ -338,15 +339,22 @@
     return { cost: E.deliveryCost(r.manufacturer, { seats: seats, orderTotal: sub }), lead: E.leadWeeks(r.manufacturer) };
   }
   function leadText(lead) { return lead ? (lead[0] === lead[1] ? lead[0] + ' weeks' : lead[0] + '–' + lead[1] + ' weeks') : null; }
-  function grandTotal(lines, di) { return productTotal(lines) + ((di && di.cost) || 0); }
+  // installation: base £ for the first seat + increment × base per additional seat
+  function installCost() {
+    var I = CFG.installation; if (!I || I.baseGbp == null) return null;
+    var seats = cfg.layout.rows * cfg.layout.seatsPerRow;
+    return Math.round(I.baseGbp * (1 + Math.max(0, seats - 1) * (I.incrementFactor || 0)));
+  }
+  function grandTotal(lines, di) { return productTotal(lines) + ((di && di.cost) || 0) + (installCost() || 0); }
 
   function updateLive() {
     var lines = quoteLines(), any = lines.some(function (l) { return l.unit != null; });
     var di = deliveryInfo(), total = grandTotal(lines, di);
     var poa = lines.some(function (l) { return l.unit == null; });
     $('planWrap').innerHTML = planSVG();
+    var inst = installCost();
     var extra = di.cost != null
-      ? '<div class="lt-sub">Incl. ' + esc((CFG.deliveryLabel || 'Delivery').toLowerCase()) + ' ' + money(di.cost) + (leadText(di.lead) ? ' · lead time ' + leadText(di.lead) : '') + '</div>'
+      ? '<div class="lt-sub">Incl. ' + esc((CFG.deliveryLabel || 'Delivery').toLowerCase()) + ' ' + money(di.cost) + (inst != null ? ' &amp; installation ' + money(inst) : '') + (leadText(di.lead) ? ' · lead time ' + leadText(di.lead) : '') + '</div>'
       : (leadText(di.lead) ? '<div class="lt-sub">Lead time ' + leadText(di.lead) + '</div>' : '<div class="lt-sub">Delivery &amp; lead time confirmed at quotation</div>');
     var vb = vatBreakdown(total);
     $('liveTotal').innerHTML = '<div class="lt-row"><span>Estimated MSRP</span><b>' + (any ? money(total) + (poa ? ' + POA' : '') : 'On request') + '</b></div><div class="lt-sub">ex VAT' + (any ? ' · inc VAT ' + money(Math.round(vb.gross)) : '') + ' — indicative</div>' + extra;
@@ -356,7 +364,7 @@
   function renderSummary() {
     var r = E.range(cfg.rangeId); if (!r) { cfg.step = 2; return renderStep(); }
     var lines = quoteLines(), prod = productTotal(lines);
-    var di = deliveryInfo(), total = prod + (di.cost || 0);
+    var di = deliveryInfo(), inst = installCost(), total = prod + (di.cost || 0) + (inst || 0);
     var anyPriced = lines.some(function (l) { return l.unit != null; });
     var lt = leadText(di.lead);
     var delLbl = CFG.deliveryLabel || 'Delivery';
@@ -386,8 +394,10 @@
         '<div class="planbig">' + planSVG(true) + '</div>' +
         '<table class="quote"><thead><tr><th>Item</th><th>Qty</th><th class="r">Unit MSRP</th><th class="r">Line MSRP</th></tr></thead><tbody>' +
           lines.map(function (l) { return '<tr><td>' + esc(l.label) + '</td><td>' + l.qty + '</td><td class="r">' + money(l.unit) + '</td><td class="r">' + (l.unit != null ? money(l.unit * l.qty) : 'POA') + '</td></tr>'; }).join('') +
+          '<tr class="divrow"><td colspan="4"></td></tr>' +
           '<tr class="sub2"><td colspan="3">Products subtotal</td><td class="r">' + money(prod) + '</td></tr>' +
           deliveryRow +
+          (inst != null ? '<tr><td>' + esc((CFG.installation || {}).label || 'Installation') + '</td><td>1</td><td class="r">' + money(inst) + '</td><td class="r">' + money(inst) + '</td></tr>' : '') +
           '<tr class="sub2"><td colspan="3">Subtotal (ex VAT)</td><td class="r">' + money(total) + '</td></tr>' +
           '<tr class="sub2"><td colspan="3">VAT @ ' + Math.round(vatRate() * 100) + '%</td><td class="r">' + money(Math.round(vb.vat)) + '</td></tr>' +
           '<tr class="tot"><td colspan="3">Total (inc VAT)</td><td class="r">' + money(Math.round(vb.gross)) + '</td></tr>' +
@@ -466,7 +476,7 @@
   // ── luxury PDF proposal ──────────────────────────────────────────────────────
   function pdfModel() {
     var r = E.range(cfg.rangeId); if (!r) return null;
-    var lines = quoteLines(), prod = productTotal(lines), di = deliveryInfo(), total = prod + (di.cost || 0);
+    var lines = quoteLines(), prod = productTotal(lines), di = deliveryInfo(), inst = installCost(), total = prod + (di.cost || 0) + (inst || 0);
     var anyPriced = lines.some(function (l) { return l.unit != null; });
     var mat = (r.materials || []).find(function (m) { return m.id === cfg.material; });
     var uph = mat ? mat.name : (catFinish(r) || 'Confirmed at quotation');
@@ -495,6 +505,12 @@
       accessories: accLines, includeArmrests: cfg.includeArmrests,
       rowDetails: (function () { if (!hasRowOverrides()) return null; var out = []; for (var ri = 0; ri < cfg.layout.rows; ri++) { var rc = rowConfig(ri); out.push('Row ' + (ri + 1) + ': ' + ((rc.seat && rc.seat.label) || '—') + (rc.mat ? ' · ' + rc.mat.name + (rc.colour ? ' (' + rc.colour + ')' : '') : '')); } return out; })(),
       materialName: mat ? mat.name : null, colourName: cfg.colour || null,
+      materialGroup: mat ? (mat.group || null) : null,
+      materialTier: mat ? (mat.tierLabel || null) : null,
+      materialSwatchHex: mat ? (mat.swatch || null) : null,
+      colourHex: (function () { if (!mat || !cfg.colour) return null; var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); return (c && c.hex) || guessHex(cfg.colour); })(),
+      swatchImg: mat ? (mat.swatchImg || null) : null,
+      installCost: inst, installLabel: (CFG.installation || {}).label || 'Installation',
       productUrl: meta.product_url || null,
       datasheetUrl: meta.datasheet_url || null,
       manufacturerUrl: (CFG.manufacturerSites || {})[r.manufacturer] || null,
@@ -529,12 +545,14 @@
   // ── export ───────────────────────────────────────────────────────────────────
   function csv() {
     var r = E.range(cfg.rangeId), lines = quoteLines();
-    var di = deliveryInfo(), prod = productTotal(lines), total = prod + (di.cost || 0), lt = leadText(di.lead);
+    var di = deliveryInfo(), prod = productTotal(lines), total = prod + (di.cost || 0) + (installCost() || 0), lt = leadText(di.lead);
     var delLbl = CFG.deliveryLabel || 'Delivery';
     var rows = [['Manufacturer', 'Range', 'Item', 'Qty', 'Unit MSRP', 'Line MSRP']];
     lines.forEach(function (l) { rows.push([r.manufacturer, r.name, l.label, l.qty, l.unit != null ? l.unit.toFixed(2) : 'POA', l.unit != null ? (l.unit * l.qty).toFixed(2) : 'POA']); });
     rows.push([r.manufacturer, r.name, 'Products subtotal', '', '', prod.toFixed(2)]);
     rows.push([r.manufacturer, r.name, delLbl, 1, di.cost != null ? di.cost.toFixed(2) : 'On request', di.cost != null ? di.cost.toFixed(2) : 'On request']);
+    var instC = installCost();
+    if (instC != null) rows.push([r.manufacturer, r.name, (CFG.installation || {}).label || 'Installation', 1, instC.toFixed(2), instC.toFixed(2)]);
     rows.push([r.manufacturer, r.name, 'Subtotal (ex VAT)', '', '', total.toFixed(2)]);
     var vb = vatBreakdown(total);
     rows.push([r.manufacturer, r.name, 'VAT @ ' + Math.round(vatRate() * 100) + '%', '', '', vb.vat.toFixed(2)]);

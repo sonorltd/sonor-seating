@@ -88,6 +88,12 @@
       vline: function (x, top1, top2, c, t, o) { page.drawLine({ start: { x: x, y: A4.h - top1 }, end: { x: x, y: A4.h - top2 }, thickness: t || 0.6, color: col(c), opacity: o == null ? 1 : o }); },
       logo: function (x, top, h, c) { var sc = h / 95; page.drawSvgPath(HOUSE, { x: x, y: A4.h - top, scale: sc, color: col(c || GOLD) }); },
       image: function (img, x, top, w, h, o) { page.drawImage(img, { x: x, y: A4.h - top - h, width: w, height: h, opacity: o == null ? 1 : o }); },
+      dot: function (x, top, r, c, borderC) { page.drawCircle({ x: x, y: A4.h - top, size: r, color: col(c), borderColor: borderC ? col(borderC) : undefined, borderWidth: borderC ? 0.6 : 0 }); },
+      rrect: function (x, top, w, h, r, c, bw, o) {
+        r = Math.min(r, w / 2, h / 2);
+        var p = 'M ' + r + ',0 H ' + (w - r) + ' A ' + r + ',' + r + ' 0 0 1 ' + w + ',' + r + ' V ' + (h - r) + ' A ' + r + ',' + r + ' 0 0 1 ' + (w - r) + ',' + h + ' H ' + r + ' A ' + r + ',' + r + ' 0 0 1 0,' + (h - r) + ' V ' + r + ' A ' + r + ',' + r + ' 0 0 1 ' + r + ',0 Z';
+        page.drawSvgPath(p, { x: x, y: A4.h - top, borderColor: col(c), borderWidth: bw || 0.8, borderOpacity: o == null ? 1 : o });
+      },
       // vertical fade: stacked slices from transparent → solid `c` moving DOWN
       fadeDown: function (x, top, w, h, c, maxO, steps) {
         steps = steps || 56; maxO = maxO == null ? 1 : maxO;
@@ -198,7 +204,7 @@
   }
 
   // ── PAGE 2 · SPECIFICATION + QUOTE + TERMS ───────────────────────────────────
-  function quote(P, F, m, TOTAL_PAGES) {
+  function quote(P, F, m, TOTAL_PAGES, rangeImg, swatchImg) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
     pageHead(P, F, m, 'SPECIFICATION & ESTIMATE');
 
@@ -207,10 +213,13 @@
     P.right(m.dateText || '', A4.w - M, 104, 10, F.r, MUT);
 
     var top = 158, colW = 250;
+    var grpLabel = m.materialGroup ? (m.materialGroup.charAt(0).toUpperCase() + m.materialGroup.slice(1).toLowerCase()) : null;
     var rows = [
       ['Room', m.roomText],
       ['Layout', m.layoutText],
-      ['Upholstery', m.materialName ? (m.materialName + (m.colourName ? ' · ' + m.colourName : '')) : (m.upholsteryText || 'Confirmed at quotation')],
+      ['Upholstery type', grpLabel ? (grpLabel + (m.materialTier ? ' · ' + m.materialTier : '')) : null],
+      ['Material', m.materialName || (m.upholsteryText || 'Confirmed at quotation'), m.materialSwatchHex || null],
+      ['Colour', m.colourName, m.colourHex || null],
       ['Row configuration', (m.rowDetails && m.rowDetails.length) ? m.rowDetails.join('  —  ') : null],
       ['Recline', m.reclineText],
       ['Finish options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
@@ -222,17 +231,40 @@
     var sy = top;
     rows.forEach(function (r) {
       P.tracked(String(r[0]).toUpperCase(), M, sy, 6.5, F.r, MUT, 1.5);
-      var txt = String(r[1]);
-      var lines = wrap(txt, F.b, 11.5, colW);
-      lines.forEach(function (ln, li) { P.text(ln, M, sy + 10 + li * 13, 11.5, F.b, INK); });
+      var tx = M, swHex = r[2];
+      if (swHex) {   // swatch symbol beside the chosen upholstery / colour
+        var hx = String(swHex).replace('#', '');
+        var rgb = /^[0-9a-f]{6}$/i.test(hx) ? [parseInt(hx.slice(0, 2), 16), parseInt(hx.slice(2, 4), 16), parseInt(hx.slice(4, 6), 16)] : [140, 130, 115];
+        P.dot(M + 5, sy + 16, 5, rgb, [160, 150, 130]);
+        tx = M + 15;
+      }
+      var lines = wrap(String(r[1]), F.b, 11.5, colW - (tx - M));
+      lines.forEach(function (ln, li) { P.text(ln, tx, sy + 10 + li * 13, 11.5, F.b, INK); });
       sy += 10 + lines.length * 13 + 9;
       P.hline(M, M + colW, sy - 6, LINE, 0.5, 0.7);
     });
+    // photo of the actual swatch — when the Library files material.swatch_img
+    if (swatchImg) {
+      P.tracked('SWATCH', M + colW - 60, top - 22, 6.5, F.r, MUT, 1.5);
+      P.image(swatchImg, M + colW - 60, top - 14, 60, 44, 1);
+      P.rectB(M + colW - 60, top - 14, 60, 44, LINE, 0.7);
+    }
 
-    // plan thumbnail (right)
+    // the chosen model (right) — hero photograph, plan lives on page 3
     var planX = M + colW + 22, planW = A4.w - M - planX;
-    P.tracked('YOUR CINEMA', planX, top - 22, 8, F.b, GOLD, 2.2);
-    drawMiniPlan(P, F, m, planX, top - 4, planW, 168);
+    P.tracked('THE MODEL', planX, top - 22, 8, F.b, GOLD, 2.2);
+    if (rangeImg) {
+      var bh = 190, iw = rangeImg.width, ih = rangeImg.height;
+      var s = Math.max(planW / iw, bh / ih);           // cover-fit crop
+      var cw2 = planW / s, ch2 = bh / s;
+      P.rect(planX, top - 4, planW, bh, DARK2);
+      try {
+        P.page.drawImage(rangeImg, { x: planX + (planW - iw * Math.min(planW / iw, bh / ih)) / 2, y: A4.h - (top - 4) - bh + (bh - ih * Math.min(planW / iw, bh / ih)) / 2, width: iw * Math.min(planW / iw, bh / ih), height: ih * Math.min(planW / iw, bh / ih) });
+      } catch (e) {}
+      P.rectB(planX, top - 4, planW, bh, LINE, 0.8);
+    } else {
+      drawMiniPlan(P, F, m, planX, top - 4, planW, 168);
+    }
 
     // quote table
     var qy = Math.max(sy + 18, top + 190);
@@ -252,11 +284,14 @@
       P.hline(M, A4.w - M, y + 5, LINE, 0.5, 0.7);
       y += 22;
     });
-    y += 2;
-    [['Products subtotal', money(m.productTotal)],
-     [m.deliveryLabel || 'Delivery', m.deliveryCost != null ? money(m.deliveryCost) : 'On request'],
-     ['Subtotal (ex VAT)', money(Math.round(m.exVat))],
-     ['VAT @ ' + Math.round((m.vatRate || 0) * 100) + '%', money(Math.round(m.vat))]].forEach(function (r) {
+    // divider below products
+    P.hline(M, A4.w - M, y - 4, INK, 1.1, 0.55); y += 6;
+    var totRows = [['Products subtotal', money(m.productTotal)],
+     [m.deliveryLabel || 'Delivery', m.deliveryCost != null ? money(m.deliveryCost) : 'On request']];
+    if (m.installCost != null) totRows.push([m.installLabel || 'Installation', money(m.installCost)]);
+    totRows.push(['Subtotal (ex VAT)', money(Math.round(m.exVat))]);
+    totRows.push(['VAT @ ' + Math.round((m.vatRate || 0) * 100) + '%', money(Math.round(m.vat))]);
+    totRows.forEach(function (r) {
       P.text(r[0], M, y - 9, 10, F.r, MUT); P.right(r[1], cLine, y - 9, 10, F.r, INK2); y += 17;
     });
     P.hline(cQty, A4.w - M, y - 2, INK, 0.8, 0.6); y += 16;
@@ -335,44 +370,49 @@
     P.rect(rx + rw * 0.14, rTop + 8, rw * 0.72, 5, GOLD, 0.85);
     P.center('S C R E E N', rx + rw / 2, rTop + 18, 6, F.r, [140, 120, 88], 2);
 
-    // seats
-    var totalRowW = per * seatW + (per - 1) * 40;                 // 40mm between seats
+    // seats — anchored to the REAR wall (opposite the screen), wall clearance behind
+    var seatGapMm = 40;
+    var totalRowW = per * seatW + (per - 1) * seatGapMm;
     var sx0 = rx + (rw - totalRowW * sc) / 2;
-    var firstRowTop = rTop + (wallClear * 0.6) * sc + rl * 0.16;  // sit rows in the lower ⅔
-    var seatPX = seatW * sc, seatPD = seatD * sc, gapPX = 40 * sc, rowGapPX = rowGap * sc;
+    var seatPX = seatW * sc, seatPD = seatD * sc, gapPX = seatGapMm * sc, rowGapPX = rowGap * sc;
+    var lastRowBottom = rTop + rl - wallClear * sc;
+    var firstRowTop = lastRowBottom - (rows * seatPD + (rows - 1) * rowGapPX);
     for (var r = 0; r < rows; r++) {
       var ry = firstRowTop + r * (seatPD + rowGapPX);
       for (var s = 0; s < per; s++) {
         var cx = sx0 + s * (seatPX + gapPX);
-        P.rectB(cx, ry, seatPX, seatPD, INK2, 0.9, 0.85);
-        P.rectB(cx + seatPX * 0.12, ry + seatPD * 0.08, seatPX * 0.76, seatPD * 0.24, INK2, 0.6, 0.6); // backrest
-        P.rectB(cx + seatPX * 0.08, ry + seatPD * 0.38, seatPX * 0.84, seatPD * 0.5, INK2, 0.6, 0.6);  // cushion
+        var aw = seatPX * 0.15;                                        // armrest width
+        P.rrect(cx, ry, seatPX, seatPD, 4, INK2, 1, 0.9);              // seat outline
+        P.rrect(cx + 1.2, ry + 1.2, aw, seatPD - 2.4, 2.5, INK2, 0.6, 0.55);              // left arm
+        P.rrect(cx + seatPX - aw - 1.2, ry + 1.2, aw, seatPD - 2.4, 2.5, INK2, 0.6, 0.55); // right arm
+        P.rrect(cx + aw + 2.5, ry + seatPD * 0.06, seatPX - 2 * aw - 5, seatPD * 0.26, 3, INK2, 0.7, 0.75); // backrest
+        P.rrect(cx + aw + 2.5, ry + seatPD * 0.38, seatPX - 2 * aw - 5, seatPD * 0.54, 3, INK2, 0.7, 0.75); // cushion
       }
     }
-    var lastRowBottom = firstRowTop + rows * seatPD + (rows - 1) * rowGapPX;
 
     // ── dimension helpers ──
     function dimH(x1, x2, top, label, above) {
-      var ty = above ? top - 4 : top + 6;
       P.hline(x1, x2, top, DIM, 0.7); P.vline(x1, top - 4, top + 4, DIM, 0.7); P.vline(x2, top - 4, top + 4, DIM, 0.7);
       P.center(label, (x1 + x2) / 2, above ? top - 13 : top + 6, 7.5, F.b, DIM);
     }
-    function dimV(x, t1, t2, label) {
+    function dimV(x, t1, t2, label, leftSide) {
       P.vline(x, t1, t2, DIM, 0.7); P.hline(x - 4, x + 4, t1, DIM, 0.7); P.hline(x - 4, x + 4, t2, DIM, 0.7);
-      P.center(label, x + 16, (t1 + t2) / 2 - 4, 7.5, F.b, DIM);
+      P.center(label, x + (leftSide ? -18 : 16), (t1 + t2) / 2 - 4, 7.5, F.b, DIM);
     }
     // room width (top, above room)
     dimH(rx, rx + rw, rTop - 16, roomW + '', true);
-    // total seating run (below last row)
-    dimH(sx0, sx0 + totalRowW * sc, lastRowBottom + 14, Math.round(totalRowW) + '', false);
-    // seat width (first seat, below its row)
-    dimH(sx0, sx0 + seatPX, firstRowTop + seatPD + 12, Math.round(seatW) + '', false);
-    // room length (left)
-    dimV(rx - 18, rTop, rTop + rl, roomL + '');
-    // seat depth + row gap (right of last seat)
+    // total seating run (below plan, outside the room)
+    dimH(sx0, sx0 + totalRowW * sc, rTop + rl + 14, Math.round(totalRowW) + '', false);
+    // seat width (above the first row, first seat)
+    dimH(sx0, sx0 + seatPX, firstRowTop - 10, Math.round(seatW) + '', true);
+    // room length (left, outside)
+    dimV(rx - 18, rTop, rTop + rl, roomL + '', true);
+    // right-hand chain: viewing distance → seat depth → row gap → rear clearance
     var rgx = sx0 + totalRowW * sc + 16;
+    dimV(rgx, rTop, firstRowTop, Math.round((firstRowTop - rTop) / sc) + '');
     dimV(rgx, firstRowTop, firstRowTop + seatPD, Math.round(seatD) + '');
     if (rows > 1) dimV(rgx, firstRowTop + seatPD, firstRowTop + seatPD + rowGapPX, Math.round(rowGap) + '');
+    dimV(rgx, lastRowBottom, rTop + rl, Math.round(wallClear) + '');
 
     // notes
     var ny = bTop + bh + 26;
@@ -478,9 +518,12 @@
     var fadeImg = null;
     try { var fd = fadePngDataUrl(); if (fd) fadeImg = await doc.embedPng(fd); } catch (e) {}
 
+    var swatchImg = null;
+    try { if (m.swatchImg) swatchImg = await loadImage(doc, m.swatchImg); } catch (e) {}
+
     var TOTAL = 4 + (dsDoc ? dsDoc.getPageCount() : 0);
     cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero, fadeImg);
-    quote(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
+    quote(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL, rangeImg, swatchImg);
     drawing(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     techspec(mk(doc.addPage([A4.w, A4.h]), doc), F, m, rangeImg, TOTAL);
     if (dsDoc) {

@@ -191,7 +191,7 @@
     .strip { display:flex; flex-wrap:wrap; background:var(--bg2); border:1px solid var(--brd); border-radius:14px; overflow:hidden; margin-bottom:22px; } .cellx { flex:1; min-width:150px; padding:15px 19px; border-right:1px solid var(--brd); } .cellx:last-child{ border:none; } .cl { font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); } .cv { font-family:'Gilroy','DM Sans',sans-serif; font-weight:800; font-size:16px; color:var(--cream); margin-top:4px; } .cn { font-size:10px; color:var(--muted); margin-top:2px; }
     .planbig { border-radius:14px; padding:24px; display:flex; justify-content:center; margin-bottom:22px;
       background:radial-gradient(700px 240px at 50% 0%, rgba(173,153,120,.08), transparent 68%), var(--bg0); border:1px solid var(--brd2); }
-    .quote { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:18px; } .quote th { text-align:left; font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); padding:9px 11px; border-bottom:1px solid var(--brd); } .quote td { padding:12px 11px; border-bottom:1px solid var(--brd2); color:var(--cream); } .quote .r { text-align:right; } .quote .tot td { font-weight:700; color:var(--gold2); border-top:1px solid var(--brd); font-size:14px; } .quote .sub2 td { color:var(--muted); font-size:12px; }
+    .quote { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:18px; } .quote th { text-align:left; font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); padding:9px 11px; border-bottom:1px solid var(--brd); } .quote td { padding:12px 11px; border-bottom:1px solid var(--brd2); color:var(--cream); } .quote .r { text-align:right; } .quote .tot td { font-weight:700; color:var(--gold2); border-top:1px solid var(--brd); font-size:14px; } .quote .sub2 td { color:var(--muted); font-size:12px; } .quote .divrow td { padding:0; border-bottom:2px solid var(--brd); height:2px; }
     .actions { display:flex; gap:11px; } .disc { font-size:11px; color:var(--muted); margin-top:16px; line-height:1.55; }
     .empty { padding:60px; text-align:center; color:var(--muted); }
 
@@ -390,7 +390,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.9.1';
+    const APP_VERSION = '0.10.0';
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();

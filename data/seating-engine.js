@@ -39,6 +39,7 @@
         group: m.material_group || 'Fabric', groupKey: g || 'fabric',
         tier: m.tier || null, tierLabel: TIER_LABEL[m.tier] || null,
         available: m.available !== false, upcharge: Number(m.upcharge_pct || 0),
+        swatchImg: m.swatch_img || null,     // photo of the actual swatch — when the Library files one
         colours: cols
       });
     });

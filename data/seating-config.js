@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.9.1',
+    version: '0.10.0',
     buildDate: '2026-07-17',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
@@ -39,13 +39,13 @@
     //   delivery.type: 'flat' (gbp per order) · 'perSeat' (gbp × seats) · 'band' (bands[] by order £).
     //   leadWeeks: [min, max]. Any null / missing manufacturer → "confirmed at quotation".
     deliveryLabel: 'Delivery',
-    // Interim assumption until accurate per-manufacturer figures: £50 per seat, 8–12 weeks
-    // (standard stock items ship sooner). Add manufacturer keys here to override the default.
+    // Installation: base £50 for the first seat, each additional seat adds 1/3 of base
+    // (e.g. 6 seats = 50 + 5 × 16.67 ≈ £133).
+    installation: { baseGbp: 50, incrementFactor: 1 / 3, label: 'Installation' },
+    // Interim assumption until accurate per-manufacturer figures: £50 per seat delivery;
+    // custom builds 8–12 weeks (standard stock items e.g. black leather ship sooner).
     manufacturerTerms: {
-      _default: { delivery: { type: 'perSeat', gbp: 50 }, leadWeeks: [8, 12], note: 'Standard stock items (e.g. black leather) ship sooner; bespoke finishes 8–12 weeks.' },
-      // Source: Moovia ESSENTIALS UK price list (22.05.24) — "Manufacturing leadtime: 4 weeks
-      // after receipt of order confirmation", FoB Germany → + freight allowance.
-      'Moovia': { delivery: { type: 'perSeat', gbp: 50 }, leadWeeks: [5, 8], note: 'Essentials: 4-week manufacture ex-works Germany, plus freight. Bespoke specifications longer.' }
+      _default: { delivery: { type: 'perSeat', gbp: 50 }, leadWeeks: [8, 12], note: 'Custom builds 8–12 weeks; standard stock items (e.g. black leather) ship sooner.' }
     },
     steps: ['Layout', 'Choose Range', 'Configure', 'Summary'],
     // Step 1 generic setup — standard defaults per the brief

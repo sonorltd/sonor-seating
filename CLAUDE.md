@@ -1,4 +1,19 @@
-# Seating Configurator — Claude Code Context (v0.9.1)
+# Seating Configurator — Claude Code Context (v0.10.0)
+
+> **v0.10.0 — installation fee, spec swatches, model photo, rear-wall plan.**
+> **Installation:** `CFG.installation` {base £50, +⅓ × base per extra seat} → `installCost()`;
+> line in summary/CSV/PDF with a **divider below products**; included in ex-VAT/VAT/gross.
+> **Lead:** custom = 8–12 wks everywhere (Moovia override removed per user). **PDF p2:** right
+> column now shows **the model's photo** (plan lives on p3); upholstery split into **Type
+> (Leather/Fabric · tier) → Material → Colour** with **swatch dots** (material swatch + colour
+> hex/guessHex); hook for a **photo of the actual swatch** when the Library files
+> `materials[].swatch_img` (none yet — §6 ask). **PDF p3:** rows anchored to the **rear wall**
+> (wallClearance behind); right-hand dim chain = viewing distance → seat depth → row gap →
+> rear clearance; improved rounded seat glyphs w/ armrests (`P.rrect`). **Configure:** panel
+> renamed **"Choose your accessories"**; graceful note when a range has none (only Cineca /
+> Cinema Deco / FrontRow have accessory items in the SSOT — wine trays/extras for Moovia,
+> Fortress, Cinelux are a §6 Library ask).
+
 
 > **v0.9.1 — PDF brand polish (user review round).** Cover: fade is now a **canvas-rendered
 > alpha-gradient PNG** (zero banding, starts lower ~52%); top lockup removed — **Sonor lockup
