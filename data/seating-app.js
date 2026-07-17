@@ -97,17 +97,33 @@
   }
 
   // ── Step 2 · Choose Range ────────────────────────────────────────────────────
+  var _bestId = null;
   function renderRanges() {
     var ranked = R.rank(cfg.layout);
     var fitCount = ranked.filter(function (x) { return x.fits; }).length;
+    _bestId = (ranked.find(function (x) { return x.fits; }) || ranked[0] || {}).range && (ranked.find(function (x) { return x.fits; }) || ranked[0]).range.id;
+    // group by manufacturer, preserving fit order (first appearance = best-fit-first)
+    var groups = {}, order = [];
+    ranked.forEach(function (x) { var m = x.range.manufacturer; if (!groups[m]) { groups[m] = []; order.push(m); } groups[m].push(x); });
+    var sections = order.map(function (m) {
+      var items = groups[m];
+      var logo = items.map(function (it) { return (it.range.metadata || {}).manufacturer_logo; }).find(Boolean) || null;
+      var head = logo
+        ? '<img class="mfr-logo" src="' + esc(logo) + '" alt="' + esc(m) + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\'"><span class="mfr-word" style="display:none">' + esc(m) + '</span>'
+        : '<span class="mfr-word">' + esc(m) + '</span>';
+      var nFit = items.filter(function (x) { return x.fits; }).length;
+      return '<section class="mfr-sec"><div class="mfr-head">' + head +
+        '<span class="mfr-count">' + items.length + ' range' + (items.length !== 1 ? 's' : '') + (nFit ? ' · ' + nFit + ' fit' : '') + '</span></div>' +
+        '<div class="range-grid">' + items.map(rangeCard).join('') + '</div></section>';
+    }).join('');
     $('stepBody').innerHTML =
-      '<div class="lead"><h2>Recommended ranges</h2><p>' + fitCount + ' of ' + ranked.length + ' ranges suit a ' + cfg.layout.seatsPerRow + '-across, ' + cfg.layout.rows + '-row layout in your ' + (cfg.layout.widthMm / 1000).toFixed(1) + 'm room. Ranked by fit.</p></div>' +
-      '<div class="range-grid">' + ranked.map(rangeCard).join('') + '</div>';
+      '<div class="lead"><h2>Recommended ranges</h2><p>' + fitCount + ' of ' + ranked.length + ' ranges suit a ' + cfg.layout.seatsPerRow + '-across, ' + cfg.layout.rows + '-row layout in your ' + (cfg.layout.widthMm / 1000).toFixed(1) + 'm room. Grouped by manufacturer, ranked by fit.</p></div>' +
+      sections;
   }
-  function rangeCard(x, i) {
+  function rangeCard(x) {
     var r = x.range, sel = cfg.rangeId === r.id;
     var from = E.fromPrice(r);
-    var badge = i === 0 && x.fits ? '<span class="rec">Best fit</span>' : (x.fits ? '<span class="fit">Fits</span>' : '<span class="nofit">Tight fit</span>');
+    var badge = r.id === _bestId && x.fits ? '<span class="rec">Best fit</span>' : (x.fits ? '<span class="fit">Fits</span>' : '<span class="nofit">Tight fit</span>');
     var flags = x.flags.map(function (f) { return '<span class="flag ' + f.kind + '">' + (f.kind === 'warn' ? '⚠ ' : '') + esc(f.text) + '</span>'; }).join('');
     var plus = x.plus.slice(0, 3).map(function (p) { return '<span class="plus">✓ ' + esc(p) + '</span>'; }).join('');
     var img = r.hero_img ? '<div class="rc-img" style="background-image:url(\'' + esc(r.hero_img) + '\')"></div>' : '<div class="rc-img rc-noimg">' + esc(r.manufacturer) + '</div>';

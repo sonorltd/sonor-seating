@@ -74,6 +74,11 @@
     @media(max-width:820px){ .layout-grid{ grid-template-columns:1fr; } }
     .roomview { margin-top:22px; display:flex; justify-content:center; padding:20px; background:var(--bg1); border:1px solid var(--brd2); border-radius:12px; }
 
+    .mfr-sec { margin-bottom:34px; }
+    .mfr-head { display:flex; align-items:center; gap:14px; padding:0 2px 12px; margin-bottom:16px; border-bottom:1px solid var(--brd); }
+    .mfr-logo { height:30px; max-width:200px; object-fit:contain; filter:brightness(1.05); }
+    .mfr-word { font-family:'Cormorant Garamond',serif; font-size:26px; letter-spacing:.06em; color:var(--gold); }
+    .mfr-count { margin-left:auto; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
     .range-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
     .rcard { background:var(--bg2); border:1.5px solid var(--brd2); border-radius:14px; overflow:hidden; cursor:pointer; transition:.18s; display:flex; flex-direction:column; }
     .rcard:hover { border-color:rgba(201,168,92,.4); transform:translateY(-2px); } .rcard.sel { border-color:var(--gold); box-shadow:0 0 0 2px rgba(201,168,92,.2); }
@@ -122,7 +127,7 @@
     </div>
   </div>
   <script>
-    const APP_VERSION = '0.2.1';
+    const APP_VERSION = '0.2.2';
     SonorShell.mount({ appKey:'seating', appName:'Seating Configurator', repo:'sonor-seating', version:APP_VERSION, faviconHref:'../data/favicon.svg', assetBase:'../data/', supabase:false, palette:{ self:'seating' } });
     SeatingApp.boot();
   </script>
