@@ -7008,19 +7008,48 @@ const SonorPdf = (function () {
         // v1.46.0 — Combined Plans omit CCTV view cones (cameras still
         // visible). Cones live on the dedicated CCTV plan page only.
         const snap = _snapshotCanvasNoCctvCones();
-        const legend = (typeof opts.buildLegendForActive === 'function') ? opts.buildLegendForActive() : (opts.legend || []);
+        let legend = (typeof opts.buildLegendForActive === 'function') ? opts.buildLegendForActive() : (opts.legend || []);
         const summary = (typeof opts.buildSummaryForActive === 'function') ? opts.buildSummaryForActive() : (opts.summary || []);
-        // v5.172.0 (Bryn: "only show a total luminaires in the combined plans
-        // with a note to see lighting plan for details") — circuit links are
-        // stashed off the combined snapshot; the SUMMARY panel points at the
-        // Lighting plan instead.
+        // v5.172.0 appended a Luminaires total; v5.173.0 (Bryn: "the pdf export
+        // still does not collapse luminaires to a single total with reference
+        // to see lighting plan") — the per-type luminaire item rows are now
+        // REMOVED from the Combined Plans SUMMARY and replaced by ONE total
+        // line under 04 · LIGHTING. Full luminaire detail lives on the
+        // Lighting plan pages (untouched — they build their own legends).
+        // Non-luminaire 04 rows (LKP keypads, sensors, drivers) stay itemised.
         try {
-          const _lumN = canvas.getObjects().filter(o => o && o.sonorSymbol
-            && ((typeof window !== 'undefined' && typeof window._isLuminaire === 'function')
-                ? window._isLuminaire(o.sonorSymbol)
-                : String(o.sonorSymbol.service_nn || '') === '04')).length;
-          if (_lumN > 0 && Array.isArray(legend)) {
-            legend.push({ kind: 'group', level: 'sub', label: 'Luminaires \u00d7' + _lumN + ' \u2014 LC circuits: see Lighting plan' });
+          const _isLum = (sym) => (typeof window !== 'undefined' && typeof window._isLuminaire === 'function')
+            ? window._isLuminaire(sym)
+            : String(sym && sym.service_nn || '') === '04';
+          const _lumSyms = canvas.getObjects()
+            .filter(o => o && o.sonorSymbol && _isLum(o.sonorSymbol))
+            .map(o => o.sonorSymbol);
+          if (_lumSyms.length > 0 && Array.isArray(legend)) {
+            const _lumShorts = new Set(_lumSyms.map(sy =>
+              (typeof _shortFromSymbol === 'function') ? _shortFromSymbol(sy) : (sy.short_code || sy.code || '?')));
+            // pass 1: drop luminaire item rows
+            const _noLums = legend.filter(rw => !(rw && rw.kind === 'item' && rw.short != null && _lumShorts.has(rw.short)));
+            // pass 2: drop sub-group headers emptied by pass 1
+            const _out = [];
+            for (let li = 0; li < _noLums.length; li++) {
+              const rw = _noLums[li];
+              if (rw && rw.kind === 'group' && rw.level === 'sub') {
+                const nx = _noLums[li + 1];
+                if (!nx || nx.kind === 'group') continue;
+              }
+              _out.push(rw);
+            }
+            // insert the single total at the END of the 04 · LIGHTING section
+            const _total = { kind: 'group', level: 'sub', label: 'Luminaires \u00d7' + _lumSyms.length + ' \u2014 see Lighting plan' };
+            let _svcIdx = _out.findIndex(rw => rw && rw.kind === 'group' && rw.level === 'service' && String(rw.label || '').indexOf('04') === 0);
+            if (_svcIdx === -1) {
+              _out.push(_total);
+            } else {
+              let _end = _svcIdx + 1;
+              while (_end < _out.length && !(_out[_end] && _out[_end].kind === 'group' && _out[_end].level === 'service')) _end++;
+              _out.splice(_end, 0, _total);
+            }
+            legend = _out;
           }
         } catch (_) {}
         captured.push({ floor: f, snap, legend, summary });

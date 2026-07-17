@@ -49,12 +49,12 @@
     module.exports = factory();
   } else {
     root.SonorCanvasCore = factory();
-    root.SONOR_CANVAS_CORE_VERSION = '0.1.0';
+    root.SONOR_CANVAS_CORE_VERSION = '0.3.2'; // B-414 — was frozen at '0.1.0' while VERSION advanced; keep in lock-step with VERSION below
   }
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '0.3.1';
+  const VERSION = '0.3.2';
 
   // ===========================================================================
   // PRIMITIVE TYPES — Block / Shape / Link

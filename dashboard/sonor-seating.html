@@ -67,7 +67,8 @@
     .src-note { margin-left:auto; font-size:10.5px; letter-spacing:.05em; color:var(--muted); border:1px solid var(--brd); border-radius:20px; padding:4px 12px; }
     .src-supabase{ color:#7fc98a; border-color:rgba(90,173,96,.35); } .src-cache,.src-seed{ color:#e0a05a; border-color:rgba(212,136,58,.3); }
 
-    .steps { display:flex; align-items:center; justify-content:center; gap:2px; padding:16px; border-bottom:1px solid var(--brd); flex-wrap:wrap; }
+    .steps { display:flex; align-items:center; gap:14px; padding:13px clamp(16px,3vw,30px); border-bottom:1px solid var(--brd); flex-wrap:wrap; }
+    .pillrow { flex:1; display:flex; align-items:center; justify-content:center; gap:2px; flex-wrap:wrap; }
     .pill { display:flex; align-items:center; gap:8px; padding:7px 17px; border-radius:22px; font-size:12px; letter-spacing:.02em; color:var(--muted); transition:.2s; }
     .pill.done { color:rgba(173,153,120,.75); cursor:pointer; }
     .pill.active { color:var(--gold); border:1px solid rgba(173,153,120,.3);
@@ -170,6 +171,12 @@
     .lt-row { display:flex; justify-content:space-between; align-items:baseline; } .lt-row b { font-size:32px; font-weight:200; font-family:'Gilroy','DM Sans',sans-serif; background:linear-gradient(135deg,var(--gold2),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; } .lt-sub { font-size:10px; color:var(--muted); margin-top:5px; letter-spacing:.02em; }
 
     .summary { max-width:880px; margin:0 auto; }
+    .client-row { display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px; }
+    .cfld { display:flex; flex-direction:column; gap:5px; flex:1; min-width:200px; }
+    .cfld span { font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); }
+    .cfld input { background:var(--bg2); border:1px solid var(--brd2); border-radius:7px; color:var(--cream); padding:10px 13px; font-size:13px; transition:.15s; }
+    .cfld input:focus { outline:none; border-color:var(--gold); box-shadow:0 0 0 3px rgba(173,153,120,.1); }
+    .cfld-hint { font-size:10px; color:var(--muted); padding-bottom:11px; }
     .sm-head { display:flex; justify-content:space-between; align-items:flex-end; padding-bottom:18px; margin-bottom:22px; position:relative; }
     .sm-head::after { content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:linear-gradient(90deg, rgba(173,153,120,.5), rgba(128,88,161,.4), transparent); }
     .sm-mfr { font-size:10px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); } .sm-head h2 { font-family:'Gilroy','DM Sans',sans-serif; font-weight:800; letter-spacing:-.02em; font-size:30px; margin:4px 0 0; background:linear-gradient(90deg,var(--gold2),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; } .sm-date { font-size:12px; color:var(--muted); }
@@ -362,12 +369,11 @@
 
   <!-- ── CONFIGURATOR (hidden until "Design your cinema") ── -->
   <div class="sc" id="wizard" style="display:none">
-    <div class="topbar">
+    <div class="steps">
       <a class="to-overview" href="#" onclick="SeatingApp.backToIntro();return false;">← Overview</a>
-      <span class="brandline">Seating Configurator</span>
+      <div class="pillrow" id="stepPills"></div>
       <span class="src-note" id="sourceNote">Loading…</span>
     </div>
-    <div class="steps" id="stepPills"></div>
     <div class="body" id="stepBody"><div class="empty">Loading…</div></div>
     <div class="footer">
       <button class="btn sec" id="btnBack" onclick="SeatingApp.goBack()" style="visibility:hidden">← Back</button>
@@ -376,7 +382,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.7.0';
+    const APP_VERSION = '0.8.0';
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();

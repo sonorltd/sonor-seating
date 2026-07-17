@@ -4,8 +4,23 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.7.0',
+    version: '0.8.0',
     buildDate: '2026-07-17',
+    // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
+    manufacturerSites: {
+      'Moovia': 'https://moovia.de',
+      'Fortress Seating': 'https://fortresseating.com',
+      'Cinema Deco': 'https://cinemadeco.com',
+      'Cineca': 'https://sonor.co.uk'
+    },
+    // Payment terms shown on the proposal + summary
+    paymentTerms: '50% deposit on order · 50% balance prior to delivery',
+    termsLines: [
+      'This proposal is an indicative estimate prepared from the Sonor seating library. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation.',
+      'Payment: 50% deposit on order, 50% balance prior to delivery. Prices include VAT at the prevailing rate where stated.',
+      'Lead times are from order confirmation and fabric approval. Standard stock items (e.g. black leather) typically ship sooner than bespoke finishes.',
+      'Delivery includes placement to room of choice; installation and integration by Sonor as quoted. E&OE.'
+    ],
     // Client-facing landing hero. One-line swap: drop a new file at the app root and repoint.
     heroImage: '../venice-double-seats.png',
     // VAT (UK) applied at the summary to show gross totals. Library prices are ex-VAT.

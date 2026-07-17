@@ -1,4 +1,21 @@
-# Seating Configurator — Claude Code Context (v0.7.0)
+# Seating Configurator — Claude Code Context (v0.8.0)
+
+> **v0.8.0 — proposal-grade PDF (4 pages) + app de-clutter.**
+> **Cover:** hero full-bleed, **no purple wash** — smooth fade to brand dark at the bottom
+> (`fadeDown` stacked-slice gradient); refined lockup; range-led title ("Dallas / by Moovia" —
+> "cinema seating" no longer repeated); **client/project/date info block** (fields on the Summary
+> step, `cfg.client`, kept across restarts); **no pricing or room/lead chips on the cover**.
+> **Page 2:** full specification (upholstery+colour, finish options, accessories, armrests, lead
+> time) + VAT quote + **Terms & Payment** (50% deposit / 50% before delivery — `CFG.paymentTerms`
+> + `CFG.termsLines`). **Page 3:** CAD-style **dimensioned seating plan** (room outline, screen,
+> seat symbols, dim lines w/ ticks: room W/L, seat width, seat depth, row gap, total run; notes
+> line). **Page 4:** technical specification — range photo (webp → canvas→jpg transcode), model
+> data grid, **clickable links** (product page from SSOT `metadata.product_url`, manufacturer site
+> from `CFG.manufacturerSites`); **datasheet auto-append hook** — when the Library files
+> `metadata.datasheet_url` (PDF), its pages are fetched + appended (ask logged §6).
+> **App:** duplicate topbar removed — one steps bar (← Overview · pills · source chip); source
+> chip now shows the **version** ("Live catalogue · v0.8.0").
+
 
 > **v0.7.0 — range imagery + colour swatch fix.**
 > **Images:** curated 53 per-range photos from the manufacturer site scrapes

@@ -114,7 +114,7 @@
 // Add-panel NOT NULL failures). (2) Sub-group management API: getSubgroups /
 // createSubgroup / renameSubgroup / reorderSubgroups, backed by new table
 // sonor_block_subgroups. See CONSUMER-API.md §Subgroups.
-window.SONOR_LIBRARY_VERSION = '3.6.2';
+window.SONOR_LIBRARY_VERSION = '3.7.0';
 window.SonorLibrary = window.SonorLibrary || {};
 
 (function (SL) {
@@ -809,6 +809,50 @@ window.SonorLibrary = window.SonorLibrary || {};
   SL.getSymbols  = function () { return state.symbols.slice(); };
   SL.getServices = function () { return state.services.slice(); };
   SL.getMeta     = function () { return { tier: state.lastTier, fetched_at: state.lastFetchedAt }; };
+
+  // ── v3.7.0 (B-410) — library status pill ─────────────────────────────────
+  // Surfaces WHICH tier the app is actually running on (supabase / snapshot /
+  // localStorage / seed) + data age + module version. The 2026-07-14 view
+  // outage silently dropped every app to snapshot data with only a console
+  // warn. Opt-in mount: give any app an element with id "sonor-library-pill"
+  // (or call SL.renderStatusPill(el) explicitly). Fully guarded — no-op when
+  // no host exists. Refreshes every 60s while mounted.
+  SL.renderStatusPill = function (target) {
+    try {
+      const host = (typeof target === 'string') ? document.querySelector(target)
+                 : (target || document.getElementById('sonor-library-pill'));
+      if (!host) return false;
+      const m = SL.getMeta() || {};
+      const tier = String(m.tier || 'not loaded');
+      const live = /supabase/i.test(tier);
+      let ageMs = null;
+      if (m.fetched_at) { const t = Date.parse(m.fetched_at); if (!isNaN(t)) ageMs = Date.now() - t; }
+      const stale = ageMs != null && ageMs > 24 * 3600 * 1000;
+      const ageTxt = ageMs == null ? '' : (ageMs < 90000 ? 'just now' : ageMs < 3600000 ? Math.round(ageMs / 60000) + 'm ago' : ageMs < 86400000 ? Math.round(ageMs / 3600000) + 'h ago' : Math.round(ageMs / 86400000) + 'd ago');
+      const col = live && !stale ? { bg:'#f0fdf4', fg:'#065f46', bd:'#86efac', dot:'#22c55e' }
+                : stale          ? { bg:'#fef2f2', fg:'#991b1b', bd:'#fca5a5', dot:'#ef4444' }
+                :                  { bg:'#fffbeb', fg:'#92400e', bd:'#fcd34d', dot:'#f59e0b' };
+      host.innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:10px;font:600 10px \'DM Sans\',sans-serif;background:' + col.bg + ';color:' + col.fg + ';border:1px solid ' + col.bd + ';white-space:nowrap;" title="Library data tier: ' + tier + (ageTxt ? ' · fetched ' + ageTxt : '') + ' · sonor-library v' + (window.SONOR_LIBRARY_VERSION || '?') + '">' +
+        '<span style="width:7px;height:7px;border-radius:50%;background:' + col.dot + ';display:inline-block;"></span>' +
+        'LIB ' + (live ? 'live' : tier.split(' ')[0]) + (ageTxt ? ' · ' + ageTxt : '') + '</span>';
+      if (!state._pillTimer) state._pillTimer = setInterval(function () { SL.renderStatusPill(host); }, 60000);
+      return true;
+    } catch (e) { return false; }
+  };
+  // Auto-mount attempt (opt-in host) — try now-ish and once more after load
+  // has had time to settle. Silent no-ops when the host id is absent.
+  if (typeof document !== 'undefined') {
+    setTimeout(function () { SL.renderStatusPill(); }, 1500);
+    setTimeout(function () {
+      SL.renderStatusPill();
+      try {
+        const m = SL.getMeta() || {};
+        if (m.tier && !/supabase/i.test(String(m.tier))) {
+          console.warn('[SonorLibrary] ⚠ running on tier "' + m.tier + '" — library data may be stale (B-410)');
+        }
+      } catch (e) {}
+    }, 5000);
+  }
   SL.getSupabaseClient = function () { _ensureInit(); return state.client; };
 
   // ── Sub-group management (v3.2.0) ─────────────────────────────────────────
@@ -1599,8 +1643,13 @@ window.SonorLibrary = window.SonorLibrary || {};
     const { data: existing, error: readErr } = await state.client.from(table).select('metadata').eq(idCol, id).maybeSingle();
     if (readErr) throw readErr;
     const newMeta = Object.assign({}, (existing && existing.metadata) || {}, { ports: Array.isArray(ports) ? ports : [] });
-    const { error: writeErr } = await state.client.from(table).update({ metadata: newMeta }).eq(idCol, id);
-    if (writeErr) throw writeErr;
+    // v3.7.0 (B-409) — zero-row update = loud error, same guard as SL.save /
+    // saveDeviceCatalogue. .update().eq() matching no row returns ok silently.
+    const wres = await state.client.from(table).update({ metadata: newMeta }).eq(idCol, id).select(idCol);
+    if (wres.error) throw wres.error;
+    if (!Array.isArray(wres.data) || wres.data.length === 0) {
+      throw new Error(`savePortsMeta: ${idCol} "${id}" not found in ${table} — nothing written`);
+    }
   };
 
   SL.markVerified = async function (kind, id) {
@@ -1613,8 +1662,12 @@ window.SonorLibrary = window.SonorLibrary || {};
     if (readErr) throw readErr;
     const meta = Object.assign({}, (existing && existing.metadata) || {});
     delete meta._needs_review;
-    const { error: writeErr } = await state.client.from(table).update({ metadata: meta }).eq(idCol, id);
-    if (writeErr) throw writeErr;
+    // v3.7.0 (B-409) — zero-row guard (see savePortsMeta).
+    const wres = await state.client.from(table).update({ metadata: meta }).eq(idCol, id).select(idCol);
+    if (wres.error) throw wres.error;
+    if (!Array.isArray(wres.data) || wres.data.length === 0) {
+      throw new Error(`markVerified: ${idCol} "${id}" not found in ${table} — nothing written`);
+    }
   };
 
   // Connection patterns (v2.6.0 — Library v1.18.0 R105).
@@ -1675,6 +1728,9 @@ window.SonorLibrary = window.SonorLibrary || {};
       const { data, error } = await state.client.from('sonor_connection_patterns')
         .update(payload).eq('id', pattern.id).select().maybeSingle();
       if (error) throw error;
+      // v3.7.0 (B-409) — maybeSingle() returns null when the id matched no
+      // row, which looked exactly like a successful update.
+      if (!data) throw new Error(`savePattern: id "${pattern.id}" not found — nothing written`);
       return data;
     } else {
       // Use UPSERT on the unique constraint so a re-add of an existing

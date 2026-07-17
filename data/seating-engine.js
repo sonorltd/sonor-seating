@@ -68,7 +68,7 @@
             max_seats: cfg.max_seats || null, features: {}
           },
           materials: adaptMaterials(row.materials, COLOURS), finishes: [],
-          metadata: { seating_range: true, needs_review: !!meta._needs_review, is_cineca: row.manufacturer_slug === 'cineca', manufacturer_logo: MFR_LOGO[row.manufacturer_slug] || null, range_style: meta.range_style || null },
+          metadata: { seating_range: true, needs_review: !!meta._needs_review, is_cineca: row.manufacturer_slug === 'cineca', manufacturer_logo: MFR_LOGO[row.manufacturer_slug] || null, range_style: meta.range_style || null, product_url: meta.product_url || null, datasheet_url: meta.datasheet_url || null },
           _items: []
         };
       }

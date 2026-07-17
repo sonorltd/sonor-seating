@@ -11,7 +11,8 @@
     step: 1,
     layout: Object.assign({ prefs: {} }, CFG.defaultRoom),
     rangeId: null, material: null, colour: null, motor: null,
-    includeArmrests: true, accessories: {}, finishes: {}
+    includeArmrests: true, accessories: {}, finishes: {},
+    client: { name: '', project: '' }
   };
 
   function $(id) { return document.getElementById(id); }
@@ -25,7 +26,7 @@
     try {
       var res = await E.load();
       var note = $('sourceNote');
-      if (note) { note.textContent = { supabase: 'Live catalogue', cache: 'Offline (cached)', seed: 'Offline (bundled)', inline: 'No data' }[E.source] || E.source; note.className = 'src-note src-' + E.source; }
+      if (note) { note.textContent = ({ supabase: 'Live catalogue', cache: 'Offline (cached)', seed: 'Offline (bundled)', inline: 'No data' }[E.source] || E.source) + ' · v' + (CFG.version || '?'); note.className = 'src-note src-' + E.source; }
       renderStep();
       try { if (global.SonorShell && res.db) global.SonorShell.selfTest(res.db); } catch (e) {}
     } catch (err) { var m = $('stepBody'); if (m) m.innerHTML = '<div class="empty">Failed to load catalogue: ' + esc(err && err.message) + '</div>'; }
@@ -50,7 +51,8 @@
   function goNext() { if (cfg.step < STEPS.length && !nextDisabled()) { cfg.step++; renderStep(); } }
   function goBack() { if (cfg.step > 1) { cfg.step--; renderStep(); } }
   function jumpTo(n) { if (n < cfg.step) { cfg.step = n; renderStep(); } }
-  function restart() { cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {} }; renderStep(); }
+  function restart() { var keepClient = cfg.client; cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: keepClient || { name: '', project: '' } }; renderStep(); }
+  function setClient(k, v) { cfg.client[k] = v; }
   function nextDisabled() {
     if (cfg.step === 2) return !cfg.rangeId;
     return false;
@@ -339,6 +341,11 @@
     $('stepBody').innerHTML =
       '<div class="summary">' +
         '<div class="sm-head"><div><div class="sm-mfr">' + esc(r.manufacturer) + '</div><h2>' + esc(r.name) + '</h2></div><div class="sm-date">' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + '</div></div>' +
+        '<div class="client-row">' +
+          '<label class="cfld"><span>Client</span><input type="text" placeholder="Client name" value="' + esc(cfg.client.name) + '" oninput="SeatingApp.setClient(\'name\', this.value)"></label>' +
+          '<label class="cfld"><span>Project</span><input type="text" placeholder="Project / address" value="' + esc(cfg.client.project) + '" oninput="SeatingApp.setClient(\'project\', this.value)"></label>' +
+          '<div class="cfld-hint">Shown on the proposal cover.</div>' +
+        '</div>' +
         '<div class="strip">' +
           cell('Room', (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm') +
           cell('Layout', (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats', cfg.layout.rows + ' rows × ' + cfg.layout.seatsPerRow) +
@@ -357,7 +364,7 @@
         '</tbody></table>' +
         finNote +
         '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button><button class="btn primary" onclick="SeatingApp.savePdf()">⬇ Download PDF proposal</button></div>' +
-        '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation. VAT at ' + Math.round(vatRate() * 100) + '%.</div>' +
+        '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation. VAT at ' + Math.round(vatRate() * 100) + '%. <b style="color:var(--gold2)">' + esc(CFG.paymentTerms || '') + '</b>.</div>' +
       '</div>';
   }
   function cell(l, v, n) { return '<div class="cellx"><div class="cl">' + l + '</div><div class="cv">' + v + '</div>' + (n ? '<div class="cn">' + n + '</div>' : '') + '</div>'; }
@@ -408,9 +415,30 @@
     var recline = cfg.motor ? ((CFG.motorLabels || {})[cfg.motor] || cfg.motor) : null;
     var vb = vatBreakdown(total);
     var slug = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+    var cap = r.capability || {}, meta = r.metadata || {};
+    var seatW = E.seatWidthMm(r), seatD = E.seatDepthMm(r);
+    var accLines = [];
+    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) accLines.push(q + ' × ' + it.label); });
     return {
       range: r.name, manufacturer: r.manufacturer,
+      client: (cfg.client.name || '').trim(), project: (cfg.client.project || '').trim(),
       heroImage: CFG.heroImage || null,
+      rangeImage: r.hero_img || null,
+      spec: {
+        seatWidthMm: cap.seat_width_mm || seatW, seatDepthMm: cap.seat_depth_mm || null,
+        reclinedDepthMm: cap.reclined_depth_mm || null, wallClearanceMm: cap.wall_clearance_mm || null,
+        planSeatWidthMm: seatW, planSeatDepthMm: seatD,
+        rowGapMm: (CFG.clearance && CFG.clearance.rowGapMm) || 600,
+        sideWallMm: (CFG.clearance && CFG.clearance.sideWallMm) || 150,
+        style: r.style || meta.range_style || null
+      },
+      roomWidthMm: cfg.layout.widthMm, roomLengthMm: cfg.layout.lengthMm,
+      accessories: accLines, includeArmrests: cfg.includeArmrests,
+      materialName: mat ? mat.name : null, colourName: cfg.colour || null,
+      productUrl: meta.product_url || null,
+      datasheetUrl: meta.datasheet_url || null,
+      manufacturerUrl: (CFG.manufacturerSites || {})[r.manufacturer] || null,
+      paymentTerms: CFG.paymentTerms || '', termsLines: CFG.termsLines || [],
       roomText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm',
       roomWidthText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm wide',
       layoutText: (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats · ' + cfg.layout.rows + ' × ' + cfg.layout.seatsPerRow,
@@ -464,6 +492,6 @@
     boot: boot, enter: enter, backToIntro: backToIntro, goBack: goBack, jumpTo: jumpTo, restart: restart,
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
-    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish
+    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish, setClient: setClient
   };
 })(typeof window !== 'undefined' ? window : this);
