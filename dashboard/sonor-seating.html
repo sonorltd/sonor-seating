@@ -17,6 +17,7 @@
   <script src="../data/sonor-palette.js"></script>
   <script src="../data/sonor-shell.js"></script>
   <script src="../data/seating-config.js"></script>
+  <script src="../data/range-images.js"></script>
   <script src="../data/seating-catalogue.js"></script>
   <script src="../data/seating-engine.js"></script>
   <script src="../data/seating-recommend.js"></script>
@@ -140,7 +141,12 @@
     .cfg-grid { display:grid; grid-template-columns:1fr 350px; gap:18px; align-items:start; } @media(max-width:860px){ .cfg-grid{ grid-template-columns:1fr; } }
     .cfg-left { display:flex; flex-direction:column; gap:14px; } .sticky { position:sticky; top:14px; }
     .swatches { display:flex; flex-wrap:wrap; gap:9px; } .sw { display:flex; align-items:center; gap:8px; padding:8px 13px; border-radius:9px; border:1.5px solid var(--brd2); background:var(--bg3); color:var(--cream); font-size:12px; cursor:pointer; transition:.15s; } .sw span { width:16px; height:16px; border-radius:50%; background:var(--c); border:1px solid rgba(255,255,255,.18); } .sw:hover { border-color:var(--brdP); } .sw.on { border-color:var(--gold); box-shadow:0 0 0 2px rgba(173,153,120,.18); }
-    .cols { display:flex; flex-wrap:wrap; gap:7px; } .col { width:27px; height:27px; border-radius:50%; background:var(--c); border:2px solid rgba(255,255,255,.12); cursor:pointer; transition:.15s; } .col:hover { transform:scale(1.1); } .col.on { border-color:var(--gold); box-shadow:0 0 0 2px rgba(173,153,120,.3); }
+    .cols { display:flex; flex-wrap:wrap; gap:7px; } .col { position:relative; width:27px; height:27px; border-radius:50%; background:var(--c); border:2px solid rgba(255,255,255,.14); cursor:pointer; transition:.15s; box-shadow:inset 0 1px 3px rgba(0,0,0,.35); } .col:hover { transform:scale(1.12); border-color:rgba(255,255,255,.35); } .col.on { border-color:var(--gold); box-shadow:0 0 0 2px rgba(173,153,120,.35), inset 0 1px 3px rgba(0,0,0,.35); }
+    /* fast tooltip — colour name on hover */
+    .col::after { content:attr(title); position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%) translateY(3px);
+      background:#0b0a0c; color:var(--cream); font-size:10.5px; font-weight:600; letter-spacing:.03em; padding:5px 10px; border-radius:6px;
+      border:1px solid var(--brd); white-space:nowrap; opacity:0; pointer-events:none; transition:.14s; z-index:30; }
+    .col:hover::after { opacity:1; transform:translateX(-50%) translateY(0); }
     /* Cineca-style upholstery cards */
     .mgrp { margin-bottom:16px; } .mgrp:last-of-type { margin-bottom:6px; }
     .mat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
@@ -370,7 +376,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.6.0';
+    const APP_VERSION = '0.7.0';
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();

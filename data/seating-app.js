@@ -220,13 +220,42 @@
     }).join('');
     return '<div class="panel"><div class="ptt">Upholstery</div>' + secs + colourHtml(r) + '</div>';
   }
+  // colour-name → hex fallback (many library colourways have no hex filed yet)
+  var COLOUR_WORDS = [
+    ['anthracite', '#3a3c3e'], ['charcoal', '#37393b'], ['graphite', '#4a4c4e'], ['black', '#141416'], ['onyx', '#1c1c20'],
+    ['white', '#e9e6df'], ['ivory', '#e8e2d2'], ['cream', '#e5dcc6'], ['linen', '#ddd3bc'], ['beige', '#cfc0a2'], ['sand', '#c9b791'], ['stone', '#b3aa98'], ['taupe', '#9a8d7b'],
+    ['chocolate', '#4a352a'], ['espresso', '#3d2c22'], ['brown', '#5d4632'], ['walnut', '#5a4230'], ['chestnut', '#6b4630'], ['cognac', '#8a512e'], ['tan', '#a97e50'], ['camel', '#b08a56'], ['caramel', '#a9713d'], ['tobacco', '#71512f'], ['mocha', '#6b5340'],
+    ['bordeaux', '#5c1f2c'], ['burgundy', '#5e1e2b'], ['wine', '#63212f'], ['merlot', '#5a1f2e'], ['crimson', '#8e2230'], ['scarlet', '#a02532'], ['cherry', '#8c1f2c'], ['red', '#8e2230'], ['brick', '#8a4032'],
+    ['terracotta', '#a3573a'], ['rust', '#96502f'], ['copper', '#a05f34'], ['orange', '#b06232'], ['amber', '#b07a35'],
+    ['mustard', '#a9862f'], ['gold', '#a98b3f'], ['yellow', '#b59a3a'], ['ochre', '#a67e33'],
+    ['olive', '#5f6136'], ['sage', '#7c8468'], ['forest', '#2c4a34'], ['emerald', '#1f5c44'], ['racing', '#1f4a35'], ['green', '#3d5c42'], ['moss', '#5a6140'], ['pistachio', '#96a06c'],
+    ['teal', '#1f5c62'], ['petrol', '#1e4c58'], ['turquoise', '#2c7f88'], ['aqua', '#3e8b93'],
+    ['navy', '#1d2a4a'], ['midnight', '#1a2138'], ['royal', '#25407f'], ['cobalt', '#2a4a9c'], ['denim', '#3a5578'], ['sky', '#7796b5'], ['steel', '#5f7186'], ['blue', '#2e4a72'],
+    ['aubergine', '#42283f'], ['plum', '#57324f'], ['violet', '#5a3d78'], ['purple', '#5c3a72'], ['lavender', '#8a7ba5'], ['lilac', '#9a8ab0'], ['mauve', '#8a6f85'],
+    ['magenta', '#8e2f63'], ['fuchsia', '#a03370'], ['pink', '#b06a86'], ['rose', '#a55f6e'], ['blush', '#c39a99'],
+    ['pewter', '#77797c'], ['silver', '#a5a7aa'], ['dove', '#a8a7a2'], ['ash', '#8f9294'], ['smoke', '#6f7276'], ['slate', '#5a6672'], ['grey', '#75777a'], ['gray', '#75777a'], ['mink', '#8d7f72'], ['mushroom', '#a0937f']
+  ];
+  function guessHex(name) {
+    var n = String(name || '').toLowerCase();
+    // earliest keyword in the name wins ("White Onyx" → white, "Onyx Black" → onyx)
+    var bestPos = 1e9, bestHex = null;
+    for (var i = 0; i < COLOUR_WORDS.length; i++) {
+      var p = n.indexOf(COLOUR_WORDS[i][0]);
+      if (p >= 0 && p < bestPos) { bestPos = p; bestHex = COLOUR_WORDS[i][1]; }
+    }
+    if (bestHex) return bestHex;
+    // deterministic muted fallback from the name (never an empty circle)
+    var h = 0; for (var j = 0; j < n.length; j++) h = (h * 31 + n.charCodeAt(j)) % 360;
+    return 'hsl(' + h + ',22%,38%)';
+  }
   function colourHtml(r) {
     var m = (r.materials || []).find(function (x) { return x.id === cfg.material; });
     var cols = (m && m.colours) || [];
     if (!cols.length) return '';
     return '<div class="colsel"><div class="lbl">Colour — ' + esc(m.name) + ' <span class="opt-tag">' + cols.length + ' colourways</span></div><div class="cols">' + cols.map(function (c) {
-      return '<button class="col ' + (cfg.colour === c.name ? 'on' : '') + '" title="' + esc(c.name) + '" style="--c:' + esc(c.hex) + '" onclick="SeatingApp.setColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')"></button>';
-    }).join('') + '</div><div class="hint">Samples can be arranged on request.</div></div>';
+      var hx = c.hex || guessHex(c.name);
+      return '<button class="col ' + (cfg.colour === c.name ? 'on' : '') + '" title="' + esc(c.name) + '" aria-label="' + esc(c.name) + '" style="--c:' + esc(hx) + '" onclick="SeatingApp.setColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')"></button>';
+    }).join('') + '</div><div class="hint" id="colName">' + (cfg.colour ? 'Selected: <b style="color:var(--cream)">' + esc(cfg.colour) + '</b> · ' : '') + 'Hover a swatch for its name — samples on request.</div></div>';
   }
   function finishesHtml() {
     var fins = CFG.finishOptions || []; if (!fins.length) return '';

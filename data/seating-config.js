@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.6.0',
+    version: '0.7.0',
     buildDate: '2026-07-17',
     // Client-facing landing hero. One-line swap: drop a new file at the app root and repoint.
     heroImage: '../venice-double-seats.png',
@@ -50,6 +50,6 @@
       headrest: 'Motorised Headrest', bean_bag: 'Bean Bag', stool: 'Bar Stool', accessory: 'Accessory'
     },
     accMax: { chaise: 2, _default: 8 },
-    cacheKey: 'sonor_seating_ssot_v3'
+    cacheKey: 'sonor_seating_ssot_v4'
   };
 })();

@@ -1,4 +1,19 @@
-# Seating Configurator — Claude Code Context (v0.6.0)
+# Seating Configurator — Claude Code Context (v0.7.0)
+
+> **v0.7.0 — range imagery + colour swatch fix.**
+> **Images:** curated 53 per-range photos from the manufacturer site scrapes
+> (`~/Downloads/images*.zip` → matched by range name, best room/product shot, resized 1200px
+> ≈7.4MB total) into **`/range-assets/`**; map in **`data/range-images.js`**
+> (`window.__RANGE_IMAGES__`, loaded before the engine). Engine prefers the app-hosted image;
+> SSOT `hero_img` only if absolute http(s) (the view's relative `cineca-assets/...` paths don't
+> resolve here — Cineca maps to `../cineca-assets/{range}.jpg`). Coverage: Cineca 4/4,
+> Moovia 5/7 (Alpha/Budapest are Habitech-only, no imagery), Cinema Deco 7/7, Fortress 41/41;
+> Cinelux + FrontRow have no source imagery → wordmark card. **Rights:** manufacturer marketing
+> photography — confirm usage before public launch. Retire the map when the Library files
+> hero_img URLs (contract §6). **Colours:** `guessHex(name)` (earliest-keyword match + hash
+> fallback) fills swatch circles when the library has no hex (Moovia etc.); fast CSS tooltip
+> shows the colourway name on hover; selected name echoed under the picker. cacheKey v3→v4.
+
 
 > **v0.6.0 — fully-featured Material step + VAT + hero PDF cover.**
 > **Materials (Cineca parity):** adapter keeps `available` / `upcharge` / `tier` and attaches

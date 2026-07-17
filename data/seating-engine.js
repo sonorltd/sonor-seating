@@ -55,7 +55,9 @@
         rmap[rid] = {
           id: rid, manufacturer: row.manufacturer_name, name: row.range_name,
           style: row.range_tagline || meta.range_style || '',
-          hero_img: row.hero_img || null, thumb_img: row.thumb_img || null,
+          // App-hosted imagery wins (SSOT hero_img paths are relative to other apps / absent — contract §6 ask)
+          hero_img: (global.__RANGE_IMAGES__ || {})[rid] || (/^https?:/.test(row.hero_img || '') ? row.hero_img : null),
+          thumb_img: row.thumb_img || null,
           sort_order: row.range_sort || 0, enabled: row.range_enabled !== false,
           pricing_from: { sell: null },
           capability: {
