@@ -22,7 +22,7 @@
         manufacturer_name: r.mf, manufacturer_slug: r.ms, range_id: r.rid, range_name: r.rn, range_tagline: r.rt,
         hero_img: r.hi, thumb_img: r.ti, seat_width_cm: r.sw, reclined_depth_cm: r.rd, seat_depth_cm: r.sd,
         wall_clearance_mm: r.wc, range_enabled: r.re, range_sort: r.rs, range_config: r.rc, range_metadata: r.rmeta,
-        price_srp_from: r.pf, materials: r.mat
+        price_srp_from: r.pf, materials: r.mat, prices_map: r.pr || null
       };
     });
   }
@@ -49,14 +49,31 @@
   }
   // v_seating_catalogue rows → { ranges, catalogue } in the engine's native shape
   function adaptSSOT(rows) {
-    var rmap = {}, order = [];
+    var rmap = {}, order = [], universal = [];
     rows.forEach(function (row) {
-      var rid = row.range_id; if (!rid) return;
+      var rid = row.range_id;
+      if (!rid) {
+        // v0.17.0 — GENERIC items (null range_id): the price list's own grouping —
+        // per-range seats/arms/chaises vs a generic Accessories block. Attach to
+        // the manufacturer, surfaced in every range of that make.
+        var upmap = row.prices_map || null;
+        if (!upmap && Array.isArray(row.prices)) {
+          upmap = {};
+          row.prices.forEach(function (p) { if (p && p.available !== false && p.srp != null) upmap[p.material_id || '_'] = Number(p.srp); });
+          if (!Object.keys(upmap).length) upmap = null;
+        }
+        universal.push({ id: row.item_id, range_id: null, manufacturer_slug: row.manufacturer_slug, is_universal: true,
+          furniture_type: row.item_type || 'accessory', kind: ((row.item_metadata || {}).kind) || null,
+          img: ((row.item_metadata || {}).img) || null, label: row.item_name || 'Accessory',
+          sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, prices: upmap,
+          sort_order: row.item_sort || 0, motor_type: null, size_label: row.size_label || null });
+        return;
+      }
       if (!rmap[rid]) {
         order.push(rid);
         var meta = row.range_metadata || {}, cfg = row.range_config || {};
         rmap[rid] = {
-          id: rid, manufacturer: row.manufacturer_name, name: row.range_name,
+          id: rid, manufacturer: row.manufacturer_name, manufacturer_slug: row.manufacturer_slug || null, name: row.range_name,
           style: row.range_tagline || meta.range_style || '',
           // Library is SSOT for imagery: absolute hero_img from the view wins;
           // the app-side map remains only as a fallback for unfiled ranges.
@@ -78,10 +95,17 @@
       }
       var R = rmap[rid], type = (row.item_type || '').toLowerCase();
       var isArm = type === 'armrest' || /armrest/i.test(row.item_name || '');
-      var ft = (type === 'seat' || isArm) ? 'Seating' : (row.item_type || 'accessory');
+      // v0.17.0 — chaises/daybeds are SEAT TYPES (selectable per row), not accessories
+      var ft = (type === 'seat' || type === 'chaise' || isArm) ? 'Seating' : (row.item_type || 'accessory');
       var label = row.item_name || row.size_label || 'Item';
       if (isArm && !/armrest/i.test(label)) label += ' Armrest';
-      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, img: ((row.item_metadata || {}).img) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
+      var pmap = row.prices_map || null;
+      if (!pmap && Array.isArray(row.prices)) {
+        pmap = {};
+        row.prices.forEach(function (p) { if (p && p.available !== false && p.srp != null) pmap[p.material_id || '_'] = Number(p.srp); });
+        if (!Object.keys(pmap).length) pmap = null;
+      }
+      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, img: ((row.item_metadata || {}).img) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, prices: pmap, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
     });
     var rs = [], cat = [];
     order.forEach(function (rid) {
@@ -95,7 +119,7 @@
       if (/sofa|loveseat|love seat/.test(styleStr) || R._items.some(function (i) { return /sofa|loveseat|double|triple|2-seat|3-seat/i.test(i.label); })) f.sofa = true;
       cat = cat.concat(R._items); delete R._items; rs.push(R);
     });
-    return { ranges: rs, catalogue: cat };
+    return { ranges: rs, catalogue: cat, universal: universal };
   }
 
   async function load() {
@@ -107,8 +131,8 @@
         if (!v.error && (v.data || []).length) {
           try { var cq = await db.client.from('seating_material_colours').select('material_id,name,hex,sort_order,metadata').order('material_id').order('sort_order'); if (!cq.error) { COLOURS = {}; (cq.data || []).forEach(function (c) { (COLOURS[c.material_id] = COLOURS[c.material_id] || []).push({ name: c.name, hex: c.hex, img: (c.metadata && c.metadata.swatch_img) || null }); }); }
           try { var mq = await db.client.from('seating_materials').select('id,metadata').neq('metadata', '{}'); if (!mq.error) { MATMETA = {}; (mq.data || []).forEach(function (m2) { MATMETA[m2.id] = m2.metadata || {}; }); } } catch (e2) {} } catch (e) {}
-          var ad = adaptSSOT(v.data); ranges = ad.ranges; catalogue = ad.catalogue; source = 'supabase';
-          try { localStorage.setItem(CACHE, JSON.stringify({ ranges: ranges, catalogue: catalogue })); } catch (e) {}
+          var ad = adaptSSOT(v.data); ranges = ad.ranges; catalogue = ad.catalogue; UNIVERSAL = ad.universal || []; source = 'supabase';
+          try { localStorage.setItem(CACHE, JSON.stringify({ ranges: ranges, catalogue: catalogue, universal: UNIVERSAL })); } catch (e) {}
           _index(); return { source: source, db: db };
         }
         // legacy fallback — furniture_* (being retired)
@@ -116,7 +140,7 @@
         var c = await db.client.from('furniture_catalogue').select('*').order('sort_order');
         if (!r.error && !c.error && (r.data || []).length) {
           ranges = r.data; catalogue = c.data; source = 'supabase';
-          try { localStorage.setItem(CACHE, JSON.stringify({ ranges: ranges, catalogue: catalogue })); } catch (e) {}
+          try { localStorage.setItem(CACHE, JSON.stringify({ ranges: ranges, catalogue: catalogue, universal: UNIVERSAL })); } catch (e) {}
           _index(); return { source: source, db: db };
         }
       }
@@ -124,21 +148,22 @@
     // Tier 2 — cache (already adapted shape)
     try {
       var cached = JSON.parse(localStorage.getItem(CACHE) || 'null');
-      if (cached && (cached.ranges || []).length) { ranges = cached.ranges; catalogue = cached.catalogue; source = 'cache'; _index(); return { source: source, db: null }; }
+      if (cached && (cached.ranges || []).length) { ranges = cached.ranges; catalogue = cached.catalogue; UNIVERSAL = cached.universal || []; source = 'cache'; _index(); return { source: source, db: null }; }
     } catch (e) {}
     // Tier 3 — bundled seed (ssot_slim | ssot rows | legacy ranges/catalogue)
     var seed = global.__SEATING_SEED__;
     if (seed) {
       if (seed.colours) COLOURS = seed.colours;
       if (seed.matmeta) MATMETA = seed.matmeta;
-      if ((seed.ssot_slim || []).length) { var a2 = adaptSSOT(unslim(seed.ssot_slim)); ranges = a2.ranges; catalogue = a2.catalogue; source = 'seed'; _index(); return { source: source, db: null }; }
-      if ((seed.ssot || []).length) { var a3 = adaptSSOT(seed.ssot); ranges = a3.ranges; catalogue = a3.catalogue; source = 'seed'; _index(); return { source: source, db: null }; }
+      if ((seed.ssot_slim || []).length) { var a2 = adaptSSOT(unslim(seed.ssot_slim)); ranges = a2.ranges; catalogue = a2.catalogue; UNIVERSAL = a2.universal || []; source = 'seed'; _index(); return { source: source, db: null }; }
+      if ((seed.ssot || []).length) { var a3 = adaptSSOT(seed.ssot); ranges = a3.ranges; catalogue = a3.catalogue; UNIVERSAL = a3.universal || []; source = 'seed'; _index(); return { source: source, db: null }; }
       if ((seed.ranges || []).length) { ranges = seed.ranges; catalogue = seed.catalogue; source = 'seed'; _index(); return { source: source, db: null }; }
     }
     // Tier 4 — empty
     ranges = []; catalogue = []; source = 'inline'; _index(); return { source: source, db: null };
   }
 
+  var UNIVERSAL = [];
   function _index() {
     idx = { rangeById: {}, itemsByRange: {} };
     ranges.forEach(function (r) { idx.rangeById[r.id] = r; });
@@ -164,12 +189,17 @@
   // accessories: the Library's metadata.kind='accessory' flag is authoritative;
   // type/label heuristics remain as fallback for unflagged rows.
   function accessoryItems(rangeId) {
-    return itemsOf(rangeId).filter(function (i) {
+    var own = itemsOf(rangeId).filter(function (i) {
       if (i.kind === 'accessory') return true;
       if (i.kind) return false;                                   // flagged as module/config/seat etc.
       var t = (i.furniture_type || '').toLowerCase();
       return t !== 'seating' || /ottoman|footrest|table|console/i.test(i.label || '');
     });
+    // + the manufacturer's GENERIC accessories (price-list 'Accessories' block)
+    var r = idx.rangeById[rangeId];
+    var slug = r ? (r.manufacturer_slug || (r.metadata && r.metadata.is_cineca ? 'cineca' : null)) : null;
+    var gen = slug ? UNIVERSAL.filter(function (u) { return u.manufacturer_slug === slug; }) : [];
+    return own.concat(gen);
   }
 
   // motor variants a range's seat items expose (from Cineca motor_type or capability)
@@ -199,7 +229,31 @@
   }
 
   // MSRP for an item (sell). qty pricing
-  function itemSell(it) { return it && it.sell_price_gbp != null ? Number(it.sell_price_gbp) : null; }
+  // v0.17.0 — EXACT per-material pricing when the library holds real price rows
+  // (e.g. Cineca: six materials priced per item). Falls back to the base 'from'
+  // price (caller applies the % upcharge only in that fallback case).
+  function itemSell(it, materialId) {
+    if (!it) return null;
+    if (it.prices) {
+      if (materialId != null && it.prices[materialId] != null) return Number(it.prices[materialId]);
+      if (it.prices['_'] != null) return Number(it.prices['_']);
+      var vals = Object.keys(it.prices).map(function (k) { return Number(it.prices[k]); });
+      if (vals.length) return Math.min.apply(null, vals);
+    }
+    return it.sell_price_gbp != null ? Number(it.sell_price_gbp) : null;
+  }
+  function hasExactPrice(it, materialId) { return !!(it && it.prices && materialId != null && it.prices[materialId] != null); }
+  // Single COMPLETE chair from-price: cheapest seat + 2 armrests where the range
+  // is modular (price-list realism — a bare seat module understates the chair).
+  function chairFrom(r, materialId) {
+    if (!r) return null;
+    var seats = seatItems(r.id), arms = armrestItems(r.id);
+    var sMin = null, aMin = null;
+    seats.forEach(function (i) { var p = itemSell(i, materialId); if (p != null && (sMin == null || p < sMin)) sMin = p; });
+    arms.forEach(function (i) { var p = itemSell(i, materialId); if (p != null && (aMin == null || p < aMin)) aMin = p; });
+    if (sMin == null) return null;
+    return arms.length && aMin != null ? sMin + 2 * aMin : sMin;
+  }
 
   // ── commercial terms per manufacturer (delivery £ + lead time) ───────────────
   // Read from config (Sonor-set); SSOT-migrate later (contract §6). Not catalogue data.
@@ -226,7 +280,7 @@
   global.SonorSeating = {
     load: load, get source() { return source; },
     seatingRanges: seatingRanges, range: range, itemsOf: itemsOf,
-    seatItems: seatItems, armrestItems: armrestItems, accessoryItems: accessoryItems,
+    seatItems: seatItems, armrestItems: armrestItems, accessoryItems: accessoryItems, chairFrom: chairFrom, hasExactPrice: hasExactPrice,
     motorOptions: motorOptions, seatWidthMm: seatWidthMm, seatDepthMm: seatDepthMm, feature: feature,
     priced: priced, fromPrice: fromPrice, itemSell: itemSell,
     manufacturerTerms: manufacturerTerms, deliveryCost: deliveryCost, leadWeeks: leadWeeks

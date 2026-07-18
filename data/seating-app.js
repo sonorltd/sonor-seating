@@ -263,7 +263,7 @@
       '<div class="rc-b">' +
         '<div class="rc-top"><div><div class="rc-mfr">' + esc(r.manufacturer) + '</div><div class="rc-name">' + esc(r.name) + '</div></div>' + badge + '</div>' +
         (r.style ? '<div class="rc-style">' + esc(r.style) + '</div>' : '') +
-        '<div class="rc-price">' + (from != null ? 'From <b>' + money(from) + '</b> / seat' : '<b>MSRP on request</b>') + '</div>' +
+        '<div class="rc-price">' + (from != null ? 'From <b>' + money(Math.round(from)) + '</b> / chair' : '<b>MSRP on request</b>') + '</div>' +
         (plus ? '<div class="rc-plus">' + plus + '</div>' : '') +
         (flags ? '<div class="rc-flags">' + flags + '</div>' : '') +
       '</div></div>';
@@ -286,11 +286,11 @@
       motors.map(function (mt) { return '<button class="opt ' + (cfg.motor === mt ? 'on' : '') + '" onclick="SeatingApp.setMotor(\'' + mt + '\')">' + esc((CFG.motorLabels || {})[mt] || mt) + '</button>'; }).join('') + '</div></div>' : '';
     var accs = E.accessoryItems(cfg.rangeId);
     var accHtml = accs.length ? '<div class="panel"><div class="ptt">Choose your accessories <span class="opt-tag">' + accs.length + ' available</span></div>' + accs.map(function (it) {
-      var q = cfg.accessories[it.id] || 0, s = E.itemSell(it);
+      var q = cfg.accessories[it.id] || 0, s = E.itemSell(it, cfg.material);
       var img = it.img || null;   // library item_metadata.img — shown as soon as the library files one
       return '<div class="acc' + (q ? ' has-qty' : '') + '">' +
         (img ? '<span class="acc-img" style="background-image:url(\'' + esc(img) + '\')"></span>' : '') +
-        '<div class="acc-body"><div class="acc-n">' + esc(it.label) + '</div><div class="acc-p">' + (s != null ? money(s) + ' each' : 'Priced at quotation') + '</div></div>' +
+        '<div class="acc-body"><div class="acc-n">' + esc(it.label) + (it.is_universal ? ' <span class="opt-tag">' + esc(r.manufacturer) + ' accessory</span>' : '') + '</div><div class="acc-p">' + (s != null ? money(s) + ' each' : 'Priced at quotation') + '</div></div>' +
         '<div class="qty"><button aria-label="fewer" onclick="SeatingApp.acc(\'' + it.id + '\',-1)">−</button><span id="q_' + it.id + '">' + q + '</span><button aria-label="more" onclick="SeatingApp.acc(\'' + it.id + '\',1)">+</button></div></div>';
     }).join('') + '<div class="hint">Quantities carry through to the summary, estimate and PDF proposal.</div></div>'
       : '<div class="panel"><div class="ptt">Choose your accessories</div><div class="hint">Wine trays, ottomans and other extras for this range are specified and priced at quotation — ask us what\'s available.</div></div>';
@@ -361,7 +361,7 @@
     if (!mats.length) {
       return '<div class="panel"><div class="ptt">Upholstery</div><div class="hint">Fabric &amp; leather grades for this range are confirmed at quotation.</div></div>';
     }
-    var from = E.fromPrice(r);
+    var from = E.chairFrom(r) != null ? E.chairFrom(r) : E.fromPrice(r);
     var groups = {}, order = [];
     mats.forEach(function (m) { var g = m.groupKey || 'fabric'; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(m); });
     order.sort(function (a, b) { var ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
@@ -377,11 +377,12 @@
     var secs = order.map(function (g) {
       var cards = groups[g].map(function (m) {
         var sel = cfg.material === m.id, avail = m.available !== false;
-        var price = (from != null && avail) ? from * (1 + (m.upcharge || 0) / 100) : null;
+        var exact = E.chairFrom(r, m.id);
+        var price = avail ? (exact != null ? exact : (from != null ? from * (1 + (m.upcharge || 0) / 100) : null)) : null;
         var meta = groupLabel(g) + (m.tierLabel ? ' · ' + m.tierLabel : '');
         var body = !avail
           ? '<div class="mc-un">Not available for ' + esc(r.name) + '</div>'
-          : (price != null ? '<div class="mc-price">Seat from <b>' + money(Math.round(price)) + '</b></div>' : '<div class="mc-price">MSRP on request</div>') +
+          : (price != null ? '<div class="mc-price">Chair from <b>' + money(Math.round(price)) + '</b></div>' : '<div class="mc-price">MSRP on request</div>') +
             (m.upcharge > 0 ? '<div class="mc-up">⚠ +' + m.upcharge + '% upgrade</div>' : '') +
             (m.colours && m.colours.length ? '<div class="mc-col">' + m.colours.length + ' colourways</div>' : '');
         return '<button class="mcard ' + (sel ? 'on' : '') + (avail ? '' : ' off') + '"' + (avail ? ' onclick="SeatingApp.setMaterial(\'' + m.id + '\')"' : ' disabled') + '>' +
@@ -464,7 +465,9 @@
     var priced = seats.filter(function (s) { return s.sell_price_gbp != null; }).sort(function (a, b) { return a.sell_price_gbp - b.sell_price_gbp; });
     return priced[0] || seats[0];
   }
-  function itemById(id) { return E.itemsOf(cfg.rangeId).find(function (i) { return i.id === id; }); }
+  function itemById(id) {
+    var u = (E.accessoryItems(cfg.rangeId) || []).find(function (x) { return String(x.id) === String(id); });
+    if (u) return u; return E.itemsOf(cfg.rangeId).find(function (i) { return i.id === id; }); }
   // ── per-row overrides (different seats / finishes per row, edited at the end) ─
   function hasRowOverrides() { return Object.keys(cfg.rowOverrides).some(function (k) { var o = cfg.rowOverrides[k]; return o && (o.seatId || o.material || o.colour); }); }
   function rowConfig(rowIdx) {
@@ -491,17 +494,18 @@
       for (var ri = 0; ri < cfg.layout.rows; ri++) {
         var rc = rowConfig(ri);
         if (!rc.seat) continue;
-        var u = E.itemSell(rc.seat), up2 = 1 + (rc.upcharge || 0) / 100;
+        var mid2 = rc.mat ? rc.mat.id : cfg.material;
+        var u = E.itemSell(rc.seat, mid2), up2 = E.hasExactPrice(rc.seat, mid2) ? 1 : 1 + (rc.upcharge || 0) / 100;
         var lbl = 'Row ' + (ri + 1) + ' — ' + rc.seat.label + (rc.mat ? ' · ' + rc.mat.name + (rc.colour ? ' (' + rc.colour + ')' : '') : '');
         lines.push({ label: lbl, qty: cfg.layout.seatsPerRow, unit: u != null ? Math.round(u * up2) : null });
       }
     } else {
       var seat = primarySeat();
-      if (seat) { var su = E.itemSell(seat); lines.push({ label: seat.label, qty: total, unit: su != null ? Math.round(su * globalUp) : null }); }
+      if (seat) { var su = E.itemSell(seat, cfg.material); var gu = E.hasExactPrice(seat, cfg.material) ? 1 : globalUp; lines.push({ label: seat.label, qty: total, unit: su != null ? Math.round(su * gu) : null }); }
     }
     var arms = E.armrestItems(cfg.rangeId);
-    if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a); lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * globalUp) : null }); }
-    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it) }); });
+    if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a, cfg.material); var ga = E.hasExactPrice(a, cfg.material) ? 1 : globalUp; lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * ga) : null }); }
+    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it, cfg.material) }); });
     return lines;
   }
   // ── VAT ──

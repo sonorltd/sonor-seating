@@ -22,7 +22,8 @@ def slim(r):
          'sw': r.get('seat_width_cm'), 'rd': r.get('reclined_depth_cm'), 'sd': r.get('seat_depth_cm'),
          'wc': r.get('wall_clearance_mm'), 're': r.get('range_enabled'), 'rs': r.get('range_sort'),
          'rc': r.get('range_config'), 'rmeta': r.get('range_metadata'), 'pf': r.get('price_srp_from'),
-         'mat': r.get('materials')}
+         'mat': r.get('materials'),
+         'pr': ({(p.get('material_id') or '_'): p.get('srp') for p in (r.get('prices') or []) if p.get('available') and p.get('srp') is not None} or None)}
     return {k: v for k, v in d.items() if v is not None}
 cm = {}
 for c in cols:
