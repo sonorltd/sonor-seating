@@ -163,23 +163,23 @@
       var dw = iw * s, dh = ih * s;
       P.image(hero, (A4.w - dw) / 2, 0, dw, dh, 1);
       // smooth fade to brand dark — starts lower, canvas-rendered so it never bands
-      var fTop = A4.h * 0.64, fH = A4.h * 0.24;
+      var fTop = A4.h * 0.66, fH = A4.h * 0.22;
       if (fadeImg) P.image(fadeImg, 0, fTop, A4.w, fH, 1);
       else P.fadeDown(0, fTop, A4.w, fH, DARK, 1, 56);
       P.rect(0, fTop + fH - 1, A4.w, A4.h - (fTop + fH) + 1, DARK, 1);
     }
-    // inset frame — stops ABOVE the logo strip so the lockup sits outside it
-    P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 0.62 - 64, GOLD, 0.7, 0.34);
+    // inset frame — CONSISTENT inset on all four sides; content sits inside it
+    P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
 
     // title block — range-led, sits on the fade
-    var ty = 628;
+    var ty = 632;
     P.hline(M, M + 26, ty - 20, GOLD, 1, 0.95);
     P.tracked('LUXURY SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
     P.text(m.range || 'Proposal', M - 2, ty, 54, F.b, CREAM);
     P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 62, 19, F.l, GOLDL);
 
     // client / project info (print-asset style)
-    var iy = 732, cw = (A4.w - M * 2) / 3;
+    var iy = 738, cw = (A4.w - M * 2) / 3;
     P.hline(M, A4.w - M, iy - 16, GOLD, 0.5, 0.45);
     var info = [
       ['PREPARED FOR', m.client || '—'],
@@ -196,8 +196,8 @@
 
     // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
     // CEDIA member logo bottom-right. Nothing else.
-    // logo strip OUTSIDE the frame — all three at equal optical height, one centreline
-    var cyL = A4.h - 38;
+    // logo strip — inside the frame's lower band, all three on one centreline
+    var cyL = A4.h - 50;
     P.logo(M, cyL - 11, 22, CREAM);
     P.tracked('SONOR', M + 32, cyL - 6.5, 13, F.b, CREAM, 3.1);
     if (mfrLogoImg) {
@@ -250,10 +250,11 @@
     });
     // swatch square — right of the Colour row: photo, else colour fill
     if (colourRowY != null && (swatchImg || (m.colourHex && !m.colourIsOpenChoice))) {
-      // swatch keeps the photo's TRUE aspect (height-fixed, width follows), right-aligned to the column
-      var swH = 26, swW = 42, swY = colourRowY + 1;
+      // swatch keeps the photo's TRUE aspect (height-fixed, width follows), right-aligned
+      // to the column and vertically clear of the row divider below
+      var swH = 23, swW = 40, swY = colourRowY - 2;
       if (swatchImg) {
-        swW = Math.max(26, Math.min(60, swH * (swatchImg.width / swatchImg.height)));
+        swW = Math.max(23, Math.min(56, swH * (swatchImg.width / swatchImg.height)));
       }
       var swX = M + colW - swW;
       if (swatchImg) {
@@ -286,8 +287,8 @@
     var cQty = A4.w - M - 210, cUnit = A4.w - M - 110, cLine = A4.w - M;
     P.tracked('SEATS', M, qy, 6.5, F.r, MUT, 1.4);
     P.trackedRight('QTY', cQty + 20, qy, 6.5, F.r, MUT, 1.4);
-    P.trackedRight('UNIT MSRP', cUnit + 40, qy, 6.5, F.r, MUT, 1.4);
-    P.trackedRight('LINE MSRP', cLine, qy, 6.5, F.r, MUT, 1.4);
+    P.trackedRight('UNIT', cUnit + 40, qy, 6.5, F.r, MUT, 1.4);
+    P.trackedRight('TOTAL', cLine, qy, 6.5, F.r, MUT, 1.4);
     P.hline(M, A4.w - M, qy + 11, GOLD, 0.8, 0.75);
     var y = qy + 27, accStarted = false, nLines = (m.lines || []).length;
     (m.lines || []).forEach(function (l, li) {
@@ -474,14 +475,9 @@
     pageHead(P, F, m, 'MODEL DATA', 4, TOTAL_PAGES);
     P.tracked((m.manufacturer || '').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
-    if (mfrLogoImg) {
-      // manufacturer logo (white-on-transparent assets) on a dark chip, top right
-      var lw0 = mfrLogoImg.width, lh0 = mfrLogoImg.height;
-      var lh = 20, lw = lw0 * (lh / lh0); if (lw > 120) { lw = 120; lh = lh0 * (lw / lw0); }
-      var chW = lw + 20, chH = lh + 12, chX = A4.w - M - chW, chTop = 92;
-      P.rect(chX, chTop, chW, chH, DARK2);
-      P.image(mfrLogoImg, chX + 10, chTop + 6, lw, lh, 1);
-    } else if (m.spec && m.spec.style) {
+    // v0.22.2 — no logo chip on Model Data (white-on-transparent logos need a dark
+    // chip and it fights the cream page); style descriptor only. Logos live on the cover.
+    if (m.spec && m.spec.style) {
       P.right(m.spec.style, A4.w - M, 108, 10, F.r, MUT);
     }
 
@@ -676,37 +672,69 @@
     });
     var y = by + 2 * 34 + 16;
     P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 18;
-    // line table
-    var cQty = A4.w - M - 210, cUnit = A4.w - M - 110, cLine = A4.w - M;
+    // line table — TRADE breakdown when trade prices came back, MSRP fallback otherwise
+    var hasTrade = !!(m.tradeLines && m.tradeLines.length);
+    var rowsSrc = hasTrade ? m.tradeLines : (m.lines || []);
+    var cQty = A4.w - M - 280, cT1 = A4.w - M - 200, cT2 = A4.w - M - 100, cLine = A4.w - M;
     P.tracked('ITEM', M, y, 6.5, F.r, MUT, 1.4);
-    P.trackedRight('QTY', cQty + 20, y, 6.5, F.r, MUT, 1.4);
-    P.trackedRight('UNIT EX VAT', cUnit + 40, y, 6.5, F.r, MUT, 1.4);
-    P.trackedRight('LINE EX VAT', cLine, y, 6.5, F.r, MUT, 1.4);
+    P.trackedRight('QTY', cQty + 18, y, 6.5, F.r, MUT, 1.4);
+    P.trackedRight(hasTrade ? 'TRADE UNIT' : 'UNIT EX VAT', cT1 + 30, y, 6.5, F.r, MUT, 1.4);
+    P.trackedRight(hasTrade ? 'TRADE LINE' : 'LINE EX VAT', cT2 + 30, y, 6.5, F.r, MUT, 1.4);
+    P.trackedRight(hasTrade ? 'MSRP LINE' : '', cLine, y, 6.5, F.r, MUT, 1.4);
     P.hline(M, A4.w - M, y + 9, GOLD, 0.8, 0.75); y += 24;
-    (m.lines || []).forEach(function (l) {
-      if (y > A4.h - 210) return;
-      P.text(l.label, M, y - 8, 9.5, F.r, INK, { maxWidth: cQty - M - 12 });
-      P.right(String(l.qty), cQty + 20, y - 8, 9.5, F.r, INK2);
-      P.right(money(l.unit), cUnit + 40, y - 8, 9.5, F.r, INK2);
-      P.right(l.unit != null ? money(l.unit * l.qty) : 'POA', cLine, y - 8, 9.5, F.b, INK);
+    rowsSrc.forEach(function (l) {
+      if (y > A4.h - 240) return;
+      P.text(l.label + (l.sku ? '   ·   ' + l.sku : ''), M, y - 8, 9, F.r, INK, { maxWidth: cQty - M - 10 });
+      P.right(String(l.qty), cQty + 18, y - 8, 9.5, F.r, INK2);
+      if (hasTrade) {
+        P.right(l.trade != null ? money(l.trade) : '—', cT1 + 30, y - 8, 9.5, F.r, INK2);
+        P.right(l.trade != null ? money(l.trade * l.qty) : 'n/a', cT2 + 30, y - 8, 9.5, F.b, INK);
+        P.right(l.unit != null ? money(l.unit * l.qty) : 'POA', cLine, y - 8, 9.5, F.r, MUT);
+      } else {
+        P.right(money(l.unit), cT1 + 30, y - 8, 9.5, F.r, INK2);
+        P.right(l.unit != null ? money(l.unit * l.qty) : 'POA', cT2 + 30, y - 8, 9.5, F.b, INK);
+      }
       y += 17;
     });
-    y += 2; P.hline(M, A4.w - M, y - 4, GOLD, 0.8, 0.75); y += 12;
-    var tot = [['Products subtotal', money(m.productTotal)],
-      [m.deliveryLabel || 'Delivery', m.deliveryCost != null ? money(m.deliveryCost) : 'On request']];
-    if (m.installCost != null) tot.push([m.installLabel || 'Installation', money(m.installCost)]);
-    tot.push(['Subtotal (ex VAT)', money(Math.round(m.exVat))]);
-    tot.push(['VAT @ ' + Math.round((m.vatRate || 0) * 100) + '%', money(Math.round(m.vat))]);
-    tot.push(['Total (inc VAT)', m.grossText || 'On request']);
-    tot.forEach(function (r3, i3) {
-      var last = i3 === tot.length - 1;
-      P.text(r3[0], M, y - 8, last ? 10.5 : 9.5, last ? F.b : F.r, last ? INK : MUT);
-      P.right(r3[1], cLine, y - 8, last ? 10.5 : 9.5, last ? F.b : F.r, last ? [140, 116, 60] : INK2);
-      y += last ? 20 : 16;
-    });
+    y += 2; P.hline(M, A4.w - M, y - 4, GOLD, 0.8, 0.75); y += 14;
+    // ── COMMERCIAL SUMMARY — trade cost vs MSRP with margin ──
+    var msrpProd = m.productTotal || 0;
+    if (hasTrade) {
+      var tt = m.tradeTotal || 0;
+      var margin = msrpProd - tt, pct = msrpProd ? Math.round((margin / msrpProd) * 100) : 0;
+      P.tracked('COMMERCIAL SUMMARY', M, y, 7.5, F.b, GOLD, 2.2); y += 18;
+      var sum = [
+        ['Products — trade cost' + (m.tradeComplete ? '' : ' (some lines missing trade — see n/a)'), money(tt)],
+        ['Products — MSRP (ex VAT)', money(msrpProd)],
+        ['Product margin', money(margin) + '   (' + pct + '%)'],
+        [(m.deliveryLabel || 'Delivery') + ' — charged', m.deliveryCost != null ? money(m.deliveryCost) : 'On request'],
+        [(m.installLabel || 'Installation') + ' — charged', m.installCost != null ? money(m.installCost) : '—'],
+        ['Client total (inc VAT)', m.grossText || 'On request']
+      ];
+      sum.forEach(function (r3, i3) {
+        var strong = i3 === 2 || i3 === sum.length - 1;
+        P.text(r3[0], M, y - 8, strong ? 10 : 9.5, strong ? F.b : F.r, strong ? INK : MUT);
+        P.right(r3[1], cLine, y - 8, strong ? 10.5 : 9.5, strong ? F.b : F.r, i3 === 2 ? [110, 140, 90] : (strong ? [140, 116, 60] : INK2));
+        y += strong ? 20 : 16;
+      });
+    } else {
+      var tot = [['Products subtotal (MSRP ex VAT)', money(msrpProd)],
+        [m.deliveryLabel || 'Delivery', m.deliveryCost != null ? money(m.deliveryCost) : 'On request']];
+      if (m.installCost != null) tot.push([m.installLabel || 'Installation', money(m.installCost)]);
+      tot.push(['Subtotal (ex VAT)', money(Math.round(m.exVat))]);
+      tot.push(['VAT @ ' + Math.round((m.vatRate || 0) * 100) + '%', money(Math.round(m.vat))]);
+      tot.push(['Total (inc VAT)', m.grossText || 'On request']);
+      tot.forEach(function (r3, i3) {
+        var last = i3 === tot.length - 1;
+        P.text(r3[0], M, y - 8, last ? 10.5 : 9.5, last ? F.b : F.r, last ? INK : MUT);
+        P.right(r3[1], cLine, y - 8, last ? 10.5 : 9.5, last ? F.b : F.r, last ? [140, 116, 60] : INK2);
+        y += last ? 20 : 16;
+      });
+      P.text('Trade prices unavailable (offline or none filed for this range) — table shows MSRP.', M, y, 8.5, F.r, MUT); y += 14;
+    }
     // finishes + accessories notes
     if (m.finishes && m.finishes.length) { P.text('Options: ' + m.finishes.join(', '), M, y, 8.5, F.r, MUT, { maxWidth: A4.w - M * 2 }); y += 14; }
-    P.text('MSRP values ex VAT unless stated. Internal document — not for client issue; use the proposal PDF for clients.', M, A4.h - 64, 8, F.r, MUT);
+    P.text('Trade values are CONFIDENTIAL. Internal document — not for client issue; use the proposal PDF for clients.', M, A4.h - 64, 8, F.r, MUT);
     P.hline(M, A4.w - M, A4.h - 50, GOLD, 0.5, 0.5);
     P.tracked('SONOR', M, A4.h - 40, 9, F.b, [140, 116, 60], 2.6);
     P.trackedRight((m.quoteRef || '') , A4.w - M, A4.h - 40, 9, F.b, MUT, 1.4);

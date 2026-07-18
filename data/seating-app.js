@@ -618,15 +618,15 @@
         var mid2 = rc.mat ? rc.mat.id : cfg.material;
         var u = E.itemSell(rc.seat, mid2), up2 = E.hasExactPrice(rc.seat, mid2) ? 1 : 1 + (rc.upcharge || 0) / 100;
         var lbl = 'Row ' + (ri + 1) + ' — ' + rc.seat.label + (rc.mat ? ' · ' + rc.mat.name + (rc.colour ? ' (' + rc.colour + ')' : '') : '');
-        lines.push({ label: lbl, qty: cfg.layout.seatsPerRow, unit: u != null ? Math.round(u * up2) : null });
+        lines.push({ label: lbl, qty: cfg.layout.seatsPerRow, unit: u != null ? Math.round(u * up2) : null, iid: rc.seat.id, mid: mid2 });
       }
     } else {
       var seat = primarySeat();
-      if (seat) { var su = E.itemSell(seat, cfg.material); var gu = E.hasExactPrice(seat, cfg.material) ? 1 : globalUp; lines.push({ label: seat.label, qty: total, unit: su != null ? Math.round(su * gu) : null }); }
+      if (seat) { var su = E.itemSell(seat, cfg.material); var gu = E.hasExactPrice(seat, cfg.material) ? 1 : globalUp; lines.push({ label: seat.label, qty: total, unit: su != null ? Math.round(su * gu) : null, iid: seat.id, mid: cfg.material }); }
     }
     var arms = E.armrestItems(cfg.rangeId);
-    if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a, cfg.material); var ga = E.hasExactPrice(a, cfg.material) ? 1 : globalUp; lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * ga) : null }); }
-    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it, cfg.material), acc: true }); });
+    if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a, cfg.material); var ga = E.hasExactPrice(a, cfg.material) ? 1 : globalUp; lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * ga) : null, iid: a.id, mid: cfg.material }); }
+    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it, cfg.material), acc: true, iid: it.id, mid: cfg.material }); });
     return lines;
   }
   // ── VAT ──
@@ -1038,6 +1038,30 @@
     global.print();
   }
   // v0.22.0 — single-page internal BOM (never in the client build; no quote logging)
+  // v0.22.1 — TRADE breakdown: fetches seating_prices trade values on demand (in-house
+  // only — trade never enters the seed or client build) + MSRP/margin summary.
+  async function fetchTradeForLines(lines) {
+    var c = dbc(); if (!c) return null;
+    var ids = lines.map(function (l) { return l.iid; }).filter(function (x) { return x != null; });
+    if (!ids.length) return null;
+    var q = await c.from('seating_prices').select('item_id,material_id,price_trade_gbp,sku').in('item_id', ids);
+    if (q.error || !q.data) return null;
+    function pick(iid, mid) {
+      var rs = q.data.filter(function (r) { return String(r.item_id) === String(iid); });
+      if (!rs.length) return null;
+      var ex = rs.find(function (r) { return r.material_id === mid && r.price_trade_gbp != null; });
+      if (ex) return ex;
+      var un = rs.find(function (r) { return !r.material_id && r.price_trade_gbp != null; });
+      if (un) return un;
+      return rs.filter(function (r) { return r.price_trade_gbp != null; }).sort(function (a, b) { return a.price_trade_gbp - b.price_trade_gbp; })[0] || null;
+    }
+    return lines.map(function (l) {
+      var row = pick(l.iid, l.mid || cfg.material);
+      return { label: l.label, qty: l.qty, unit: l.unit, acc: !!l.acc,
+        trade: row && row.price_trade_gbp != null ? Math.round(Number(row.price_trade_gbp)) : null,
+        sku: (row && row.sku) || null };
+    });
+  }
   async function saveBom() {
     if (global.__SEATING_CLIENT__) return;
     try {
@@ -1046,6 +1070,14 @@
         var _m = pdfModel();
         _m.quoteRef = cfg._lastQuoteRef || makeQuoteRef();
         _m.filename = 'sonor-bom-' + String(cfg.rangeId || 'seating') + '-' + _m.quoteRef + '.pdf';
+        try {
+          var tl = await fetchTradeForLines(quoteLines());
+          if (tl) {
+            _m.tradeLines = tl;
+            _m.tradeTotal = tl.reduce(function (s, l) { return s + (l.trade != null ? l.trade * l.qty : 0); }, 0);
+            _m.tradeComplete = tl.every(function (l) { return l.trade != null; });
+          }
+        } catch (e2) { console.warn('[SeatingBom] trade fetch', e2 && e2.message); }
         var ok = await global.SeatingPdf.generateBom(_m);
         if (ok) { toast('BOM downloaded'); return; }
       }
