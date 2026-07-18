@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.19.0',
+    version: '0.19.1',
     buildDate: '2026-07-17',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
@@ -57,7 +57,7 @@
     // sensible default room (mm)
     defaultRoom: { widthMm: 4000, lengthMm: 6000, rows: 2, seatsPerRow: 3 },
     // clearance rules used by the recommender (mm)
-    clearance: { sideWallMm: 150, aisleMm: 0, rowGapMm: 50, seatFallbackWidthMm: 650 },
+    clearance: { sideWallMm: 150, aisleMm: 0, rowGapMm: 50, seatFallbackWidthMm: 650, genericSeatMm: 600, genericArmMm: 200 },
     prefs: [
       { id: 'reclining', label: 'Powered recliners', hint: 'Motorised recline' },
       { id: 'daybed', label: 'Daybed / lounger', hint: 'A chaise or day-bed style seat' },

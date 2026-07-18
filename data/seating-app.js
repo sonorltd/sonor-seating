@@ -286,7 +286,7 @@
     if ($('totalSeats')) $('totalSeats').textContent = total;
     var usable = L.widthMm - 300;
     if ($('fitHint')) $('fitHint').innerHTML = 'Usable width ≈ <b>' + (usable / 1000).toFixed(1) + 'm</b> (allowing 150mm each side).';
-    if ($('roomView')) $('roomView').innerHTML = roomSVG(L);
+    if ($('roomView')) $('roomView').innerHTML = roomSVG(L, false, true);
   }
 
   // ── Step 2 · Choose Range ────────────────────────────────────────────────────
@@ -750,8 +750,20 @@
     if (f.tight) return '<div class="fitwarn tight">⚠ Tight fit — only ' + f.side + 'mm free each side (we recommend at least ' + (((CFG.clearance || {}).sideWallMm) || 150) + 'mm). You can continue, but please double-check the room.</div>';
     return '';
   }
-  function roomSVG(L, big) {
-    var S = planSpec();
+  // v0.19.0 — step-1 room designer draws a GENERIC layout (average chairs, shared
+  // armrest modules between/around seats, muted reclined outline) regardless of any
+  // restored range; real manufacturer dims take over from Choose Range onward.
+  function genericSpec() {
+    var C = CFG.clearance || {};
+    return {
+      seatW: C.genericSeatMm || 600, uprD: 1050, reclD: 1575,
+      armW: C.genericArmMm || 200, modularArms: true,
+      rowGap: C.rowGapMm || 50, wallClear: 100,
+      real: false, rangeName: null, generic: true
+    };
+  }
+  function roomSVG(L, big, generic) {
+    var S = generic ? genericSpec() : planSpec();
     var roomW = L.widthMm || 4000, roomL = L.lengthMm || 6000, rows = L.rows || 2, per = L.seatsPerRow || 3;
     var G = function (a) { return 'rgba(200,180,142,' + a + ')'; };
     var DIMC = 'rgba(173,153,120,0.9)', FONT = 'Gilroy,system-ui';
@@ -813,7 +825,8 @@
       s += dimH(sx0 + totalRowW * sc, rx + rw, syc, sideMm + '', true);
     }
     s += dimH(sx0, sx0 + totalRowW * sc, ry + rl + 12, Math.round(totalRowW) + '', false);
-    var capTxt = (S.rangeName ? S.rangeName + ' · ' : '') + (S.real ? 'manufacturer dimensions' : 'standard allowances') + ' · dims in mm';
+    var capTxt = S.generic ? 'average chair sizes · shared armrests · dims in mm'
+      : (S.rangeName ? S.rangeName + ' · ' : '') + (S.real ? 'manufacturer dimensions' : 'standard allowances') + ' · dims in mm';
     s += txt(capTxt, boxW / 2, boxH - 6, 8.5, 'rgba(143,133,116,0.9)', 'middle');
     if (sideMm < 0) s += txt('run exceeds room width by ' + Math.abs(sideMm * 2) + 'mm', boxW / 2, boxH - 18, 8.5, 'rgba(224,122,95,0.95)', 'middle');
     return '<svg viewBox="0 0 ' + boxW + ' ' + boxH + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' + s + '</svg>';
