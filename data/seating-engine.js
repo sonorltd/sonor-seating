@@ -79,7 +79,7 @@
       var ft = (type === 'seat' || isArm) ? 'Seating' : (row.item_type || 'accessory');
       var label = row.item_name || row.size_label || 'Item';
       if (isArm && !/armrest/i.test(label)) label += ' Armrest';
-      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
+      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, img: ((row.item_metadata || {}).img) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
     });
     var rs = [], cat = [];
     order.forEach(function (rid) {

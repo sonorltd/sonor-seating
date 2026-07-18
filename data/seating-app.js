@@ -171,11 +171,14 @@
     var motorHtml = motors.length > 1 ? '<div class="panel"><div class="ptt">Recline</div><div class="opts">' +
       motors.map(function (mt) { return '<button class="opt ' + (cfg.motor === mt ? 'on' : '') + '" onclick="SeatingApp.setMotor(\'' + mt + '\')">' + esc((CFG.motorLabels || {})[mt] || mt) + '</button>'; }).join('') + '</div></div>' : '';
     var accs = E.accessoryItems(cfg.rangeId);
-    var accHtml = accs.length ? '<div class="panel"><div class="ptt">Choose your accessories</div>' + accs.map(function (it) {
+    var accHtml = accs.length ? '<div class="panel"><div class="ptt">Choose your accessories <span class="opt-tag">' + accs.length + ' available</span></div>' + accs.map(function (it) {
       var q = cfg.accessories[it.id] || 0, s = E.itemSell(it);
-      return '<div class="acc"><div><div class="acc-n">' + esc(it.label) + '</div><div class="acc-p">' + (s != null ? money(s) + ' each' : 'POA') + '</div></div>' +
-        '<div class="qty"><button onclick="SeatingApp.acc(\'' + it.id + '\',-1)">−</button><span id="q_' + it.id + '">' + q + '</span><button onclick="SeatingApp.acc(\'' + it.id + '\',1)">+</button></div></div>';
-    }).join('') + '</div>'
+      var img = it.img || null;   // library item_metadata.img — shown as soon as the library files one
+      return '<div class="acc' + (q ? ' has-qty' : '') + '">' +
+        (img ? '<span class="acc-img" style="background-image:url(\'' + esc(img) + '\')"></span>' : '') +
+        '<div class="acc-body"><div class="acc-n">' + esc(it.label) + '</div><div class="acc-p">' + (s != null ? money(s) + ' each' : 'Priced at quotation') + '</div></div>' +
+        '<div class="qty"><button aria-label="fewer" onclick="SeatingApp.acc(\'' + it.id + '\',-1)">−</button><span id="q_' + it.id + '">' + q + '</span><button aria-label="more" onclick="SeatingApp.acc(\'' + it.id + '\',1)">+</button></div></div>';
+    }).join('') + '<div class="hint">Quantities carry through to the summary, estimate and PDF proposal.</div></div>'
       : '<div class="panel"><div class="ptt">Choose your accessories</div><div class="hint">Wine trays, ottomans and other extras for this range are specified and priced at quotation — ask us what\'s available.</div></div>';
     var arm = E.armrestItems(cfg.rangeId).length ? '<div class="panel"><div class="ptt">Armrests</div><label class="toggle"><input type="checkbox" ' + (cfg.includeArmrests ? 'checked' : '') + ' onchange="SeatingApp.toggleArm(this.checked)"> Include separate armrests (1 per seat + row ends)</label></div>' : '';
 
@@ -192,7 +195,50 @@
           '<div id="liveTotal" class="live"></div></div></div>' +
       '</div>';
     updateLive();
+    scheduleTint();
   }
+
+  // ── v0.14.0 · digital colour visualisation ──────────────────────────────────
+  // When the chosen colourway has NO real swatch photo, tint the range hero to the
+  // selected colour (canvas: grayscale-preserving 'color' blend) so the client still
+  // sees the model in something like their colour. Clearly labelled as indicative.
+  var _tintCache = {};
+  function scheduleTint() { setTimeout(renderTint, 0); }
+  function renderTint() {
+    var wrap = $('tintWrap'); if (!wrap) return;
+    var r = E.range(cfg.rangeId); if (!r || !cfg.colour) { wrap.innerHTML = ''; return; }
+    var m = (r.materials || []).find(function (x) { return x.id === cfg.material; });
+    var c = m && (m.colours || []).find(function (x) { return x.name === cfg.colour; });
+    if (!c || c.img || !r.hero_img) { wrap.innerHTML = ''; return; }   // real swatch photo exists → no tint needed
+    var hx = c.hex || guessHex(c.name);
+    var key = r.id + '|' + hx;
+    if (_tintCache[key]) { wrap.innerHTML = tintHtml(_tintCache[key], c.name); return; }
+    wrap.innerHTML = '<div class="hint" style="margin-top:8px">Rendering colour preview…</div>';
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      try {
+        var cv = document.createElement('canvas');
+        var sc2 = Math.min(1, 520 / img.naturalWidth);
+        cv.width = Math.round(img.naturalWidth * sc2); cv.height = Math.round(img.naturalHeight * sc2);
+        var g = cv.getContext('2d');
+        g.drawImage(img, 0, 0, cv.width, cv.height);
+        g.globalCompositeOperation = 'saturation'; g.fillStyle = '#000'; g.fillRect(0, 0, cv.width, cv.height);
+        g.globalCompositeOperation = 'color'; g.fillStyle = hx; g.fillRect(0, 0, cv.width, cv.height);
+        g.globalCompositeOperation = 'source-over';
+        var url = cv.toDataURL('image/jpeg', 0.85);
+        _tintCache[key] = url;
+        var w2 = $('tintWrap'); if (w2 && cfg.colour === c.name) w2.innerHTML = tintHtml(url, c.name);
+      } catch (e) { var w3 = $('tintWrap'); if (w3) w3.innerHTML = ''; }   // tainted canvas / CORS → skip quietly
+    };
+    img.onerror = function () { var w4 = $('tintWrap'); if (w4) w4.innerHTML = ''; };
+    img.src = r.hero_img;
+  }
+  function tintHtml(url, name) {
+    return '<div class="tint-prev"><img src="' + url + '" alt="Colour visualisation">' +
+      '<div class="tint-cap">Digital colour visualisation — <b>' + esc(name) + '</b>. Indicative only; actual upholstery will differ. Fabric samples on request.</div></div>';
+  }
+
   // ── Cineca-style upholstery: grouped leather/fabric with tier, availability, upcharge ──
   var GROUP_ORDER = ['leather', 'fabric', 'velvet', 'alcantara'];
   function groupLabel(k) { return { leather: 'Leather', fabric: 'Fabric', velvet: 'Velvet', alcantara: 'Alcantara' }[k] || (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Fabric'); }
@@ -259,7 +305,7 @@
       var hx = c.hex || guessHex(c.name);
       var st = '--c:' + esc(hx) + (c.img ? ';background-image:url(\'' + esc(c.img) + '\');background-size:cover;background-position:center' : '');
       return '<button class="col ' + (cfg.colour === c.name ? 'on' : '') + (c.img ? ' has-img' : '') + '" title="' + esc(c.name) + '" aria-label="' + esc(c.name) + '" style="' + st + '" onclick="SeatingApp.setColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')"></button>';
-    }).join('') + '</div><div class="hint" id="colName">' + (cfg.colour ? 'Selected: <b style="color:var(--cream)">' + esc(cfg.colour) + '</b> · ' : '') + 'Hover a swatch for its name — samples on request.</div></div>';
+    }).join('') + '</div><div class="hint" id="colName">' + (cfg.colour ? 'Selected: <b style="color:var(--cream)">' + esc(cfg.colour) + '</b> · ' : '') + 'Hover a swatch for its name — samples on request.</div><div id="tintWrap"></div></div>';
   }
   function finishesHtml() {
     var fins = CFG.finishOptions || []; if (!fins.length) return '';
@@ -455,7 +501,7 @@
     return {
       seatW: seatW, uprD: uprD, reclD: reclD,
       rowGap: (CFG.clearance && CFG.clearance.rowGapMm) || 600,
-      wallClear: cap.wall_clearance_mm || 400,
+      wallClear: (cap.wall_clearance_mm != null && cap.wall_clearance_mm !== 0) ? cap.wall_clearance_mm : (cap.wall_clearance_mm === 0 ? 0 : 100),
       real: !!(cap.seat_width_mm || cap.seat_depth_mm || cap.reclined_depth_mm),
       rangeName: r ? r.name : null
     };
@@ -552,6 +598,15 @@
         return 'https://ysmvklstkzodlocttspy.supabase.co/storage/v1/object/public/seating-assets/' + r.id + '.jpg';
       })(),
       spec: {
+        // armrest width — first number in the armrest item's size label, cm → mm
+        armWidthMm: (function () {
+          var arms = E.armrestItems(r.id) || [];
+          for (var i = 0; i < arms.length; i++) {
+            var mt = /([0-9]+(?:\.[0-9]+)?)\s*cm/i.exec(arms[i].size || arms[i].sizeLabel || arms[i].size_label || '');
+            if (mt) return Math.round(parseFloat(mt[1]) * 10);
+          }
+          return null;
+        })(),
         seatWidthMm: cap.seat_width_mm || seatW, seatDepthMm: cap.seat_depth_mm || null,
         reclinedDepthMm: cap.reclined_depth_mm || null, wallClearanceMm: cap.wall_clearance_mm || null,
         planSeatWidthMm: seatW, planSeatDepthMm: seatD,

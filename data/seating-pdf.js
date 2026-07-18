@@ -130,9 +130,8 @@
   function pageHead(P, F, m, label, pageNo, total) {
     P.rect(0, 0, A4.w, 4, GOLD); P.rect(A4.w - 130, 0, 130, 4, PUR);
     P.tracked('LUXURY SEATING PROPOSAL', M, 42, 8, F.r, [150, 138, 116], 2.4);
-    // page number sits before the RHS page label
-    var lw = P.trackedRight(label, A4.w - M, 42, 8, F.r, MUT, 2.4);
-    if (pageNo) P.trackedRight(pageNo + ' / ' + total + '   ·', A4.w - M - lw - 10, 42, 8, F.r, [170, 160, 140], 1.6);
+    // RHS: page number only (v0.14.0 — section labels dropped per user)
+    if (pageNo) P.trackedRight(pageNo + ' / ' + total, A4.w - M, 42, 8, F.r, [170, 160, 140], 1.6);
     P.hline(M, A4.w - M, 68, LINE, 0.8);
   }
   function pageFoot(P, F, m) {
@@ -258,14 +257,12 @@
     var planX = M + colW + 22, planW = A4.w - M - planX;
     P.tracked('THE MODEL', planX, top - 22, 8, F.b, GOLD, 2.2);
     if (rangeImg) {
+      // contain-fit, frame drawn AT the image bounds — thin stroke, no dark matte
       var bh = 190, iw = rangeImg.width, ih = rangeImg.height;
-      var s = Math.max(planW / iw, bh / ih);           // cover-fit crop
-      var cw2 = planW / s, ch2 = bh / s;
-      P.rect(planX, top - 4, planW, bh, DARK2);
-      try {
-        P.page.drawImage(rangeImg, { x: planX + (planW - iw * Math.min(planW / iw, bh / ih)) / 2, y: A4.h - (top - 4) - bh + (bh - ih * Math.min(planW / iw, bh / ih)) / 2, width: iw * Math.min(planW / iw, bh / ih), height: ih * Math.min(planW / iw, bh / ih) });
-      } catch (e) {}
-      P.rectB(planX, top - 4, planW, bh, LINE, 0.8);
+      var fs = Math.min(planW / iw, bh / ih), dw2 = iw * fs, dh2 = ih * fs;
+      var ix = planX + (planW - dw2) / 2, iyTop = (top - 4) + (bh - dh2) / 2;
+      try { P.image(rangeImg, ix, iyTop, dw2, dh2, 1); } catch (e) {}
+      P.rectB(ix, iyTop, dw2, dh2, LINE, 0.8);
     } else {
       drawMiniPlan(P, F, m, planX, top - 4, planW, 168);
     }
@@ -359,7 +356,11 @@
     var uprD = S.seatDepthMm || 1050;                                   // upright footprint
     var reclD = S.reclinedDepthMm || Math.round(uprD * 1.5);            // reclined envelope
     if (reclD < uprD) reclD = uprD;
-    var rowGap = S.rowGapMm || 600, wallClear = S.wallClearanceMm || 400;
+    // v0.14.0 — rows sit almost touching the reclined envelope ahead (rowGap default
+    // 50mm) and the rear row runs close to the rear wall (manufacturer wall clearance
+    // wins when the library has it).
+    var rowGap = S.rowGapMm != null ? S.rowGapMm : 50;
+    var wallClear = S.wallClearanceMm != null ? S.wallClearanceMm : 100;
     var roomW = m.roomWidthMm || 4000, roomL = m.roomLengthMm || 6000;
     var rows = m.rows || 2, per = m.seatsPerRow || 3;
 
@@ -396,7 +397,9 @@
       var ryR = rRear - reclPX;                                         // reclined top
       for (var s = 0; s < per; s++) {
         var cx = sx0 + s * (seatPX + gapPX);
-        var aw = seatPX * 0.15;
+        // armrest glyph width — real manufacturer armrest width when the library
+        // has it, else the 15% allowance
+        var aw = (S.armWidthMm ? Math.min(S.armWidthMm * sc, seatPX * 0.3) : seatPX * 0.15);
         // reclined envelope — lighter, ahead of the seat
         if (reclPX > uprPX + 2) P.rrect(cx + 1.5, ryR, seatPX - 3, reclPX - uprPX + 3, 3, GHOST, 0.7, 0.55);
         // upright footprint — solid, backrest at the REAR (bottom, facing the screen)
@@ -422,6 +425,11 @@
     dimV(rx - 20, rTop, rTop + rl, roomL + '', true);
     // seat width (above the front row's reclined envelope, clear of the room lines)
     dimH(sx0, sx0 + seatPX, frontRowRear - reclPX - 12, Math.round(seatW) + '', true);
+    // armrest width — only when the library holds a real armrest dimension
+    if (S.armWidthMm) {
+      var awPX = Math.min(S.armWidthMm * sc, seatPX * 0.3);
+      dimH(sx0, sx0 + awPX, frontRowRear - reclPX - 34, 'arm ' + Math.round(S.armWidthMm), true);
+    }
     // side space either side of the run — at the rear row, inside the room
     var sideYc = rearY - uprPX / 2;
     dimH(rx, sx0, sideYc, sideSpace + '', true);
@@ -439,7 +447,7 @@
     var ny = bTop + bh + 34;
     P.hline(M, A4.w - M, ny - 14, LINE, 0.7);
     var src = S.dimsReal ? 'Seat dimensions from manufacturer data' : 'Seat dimensions are standard allowances (manufacturer data pending)';
-    var notes = src + ': width ' + Math.round(seatW) + 'mm · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter). Row spacing ' + rowGap + 'mm · ' + sideSpace + 'mm free each side · rear clearance ' + wallClear + 'mm. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
+    var notes = src + ': width ' + Math.round(seatW) + 'mm · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter)' + (S.armWidthMm ? ' · armrest ' + Math.round(S.armWidthMm) + 'mm' : '') + '. Rows sit ' + rowGap + 'mm behind the reclined envelope ahead · ' + sideSpace + 'mm free each side · rear clearance ' + wallClear + 'mm. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
     wrap(notes, F.r, 8.5, A4.w - M * 2).forEach(function (ln, li) { P.text(ln, M, ny + li * 11.5, 8.5, F.r, MUT); });
     pageFoot(P, F, m);
   }
@@ -452,17 +460,18 @@
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
     if (m.spec && m.spec.style) P.right(m.spec.style, A4.w - M, 108, 10, F.r, MUT);
 
-    // range photograph
+    // range photograph — as large as the page allows (grid + references + footer
+    // still need ~330pt below), contain-fit, thin frame at the image bounds
     var top = 158;
     if (rangeImg) {
       var iw = rangeImg.width, ih = rangeImg.height;
-      var boxW = A4.w - M * 2, boxH = 210;
+      var boxW = A4.w - M * 2, boxH = 320;
       var s = Math.min(boxW / iw, boxH / ih);
       var dw = iw * s, dh = ih * s;
-      P.rect(M, top, boxW, boxH, DARK2);
-      P.image(rangeImg, M + (boxW - dw) / 2, top + (boxH - dh) / 2, dw, dh, 1);
-      P.rectB(M, top, boxW, boxH, LINE, 0.8);
-      top += boxH + 26;
+      var ix2 = M + (boxW - dw) / 2;
+      P.image(rangeImg, ix2, top + (boxH - dh) / 2, dw, dh, 1);
+      P.rectB(ix2, top + (boxH - dh) / 2, dw, dh, LINE, 0.8);
+      top += boxH + 24;
     }
 
     var S = m.spec || {};
