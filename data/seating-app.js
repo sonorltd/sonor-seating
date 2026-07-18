@@ -43,9 +43,16 @@
   function initProjectBar() {
     if (global.__SEATING_CLIENT__) return;   // client build: no internal chrome
     try {
-      if (typeof SonorProjectBar === 'undefined' || !global.db || !global.db.client) return;
+      var c0 = dbc();
+      if (typeof SonorProjectBar === 'undefined' || !c0) {
+        console.warn('[seating] project bar waiting', { bar: typeof SonorProjectBar !== 'undefined', db: !!c0 });
+        // db client can arrive a beat after boot — retry a few times before giving up
+        initProjectBar._n = (initProjectBar._n || 0) + 1;
+        if (initProjectBar._n <= 5) setTimeout(initProjectBar, 1200);
+        return;
+      }
       SonorProjectBar.init({
-        supa: global.db.client,
+        supa: c0,
         appKey: 'seating',
         host: $('projectBarHost'),
         onChange: function (detail) {
@@ -55,16 +62,35 @@
           if ($('savedList')) loadSavedList();
           var pf = document.querySelector('.client-row input[placeholder^="Project"]');
           if (pf && p && p.name) pf.value = p.name;
+          pullRoomFromCinema();
         }
       });
     } catch (e) { console.warn('[seating] project bar init failed', e); }
+  }
+
+  // v0.17.2 — the two apps TALK: on project selection, pull the cinema room dims
+  // (cinema_designs.room_width/room_depth, mm — Cinema Takeoff-mastered, mirrored by
+  // the Cinema Designer) into the seating layout, live.
+  async function pullRoomFromCinema() {
+    var c = dbc(); if (!c || !cfg.projectId) return;
+    try {
+      var q = await c.from('cinema_designs').select('room_width,room_depth,seat_count').eq('project_id', cfg.projectId).limit(1);
+      if (q.error || !q.data || !q.data.length) return;
+      var d = q.data[0];
+      if (d.room_width > 1000 && d.room_depth > 1000) {
+        cfg.layout.widthMm = Math.round(d.room_width);
+        cfg.layout.lengthMm = Math.round(d.room_depth);
+        toast('Room ' + (d.room_width / 1000).toFixed(1) + 'm × ' + (d.room_depth / 1000).toFixed(1) + 'm pulled from Cinema Designer');
+        renderStep();
+      }
+    } catch (e) { console.warn('[seating] cinema room pull failed', e); }
   }
 
   // ── v0.15.0 · saved configurations per project (SSOT: seating_configs) ──────
   // Save/recall the whole cfg. Deep links: ?config=<id> opens a saved config,
   // ?project=<name> prefills the project and lists its configs — the URL contract
   // the Cinema Designer uses to link in.
-  function dbc() { try { return global.db && global.db.client; } catch (e) { return null; } }
+  function dbc() { try { return (global.__SEATING_DB__ && global.__SEATING_DB__.client) || (global.db && global.db.client) || null; } catch (e) { return null; } }
   async function saveConfig() {
     if (global.__SEATING_CLIENT__) return;
     var c = dbc(); if (!c) return toast('Offline — connect to save');

@@ -125,8 +125,11 @@
   async function load() {
     // Tier 1 — Supabase live (SSOT view v_seating_catalogue)
     try {
-      if (typeof global.SonorDB !== 'undefined') {
-        var db = new global.SonorDB();
+      var db = null;
+      if (typeof global.SonorDB !== 'undefined') db = new global.SonorDB();
+      else if (global.db && global.db.client) db = global.db;    // client build: plain supabase-js shim
+      if (db && db.client) {
+        global.__SEATING_DB__ = db;                              // v0.17.2 — expose for project bar / saved configs
         var v = await db.client.from('v_seating_catalogue').select('*');
         if (!v.error && (v.data || []).length) {
           try { var cq = await db.client.from('seating_material_colours').select('material_id,name,hex,sort_order,metadata').order('material_id').order('sort_order'); if (!cq.error) { COLOURS = {}; (cq.data || []).forEach(function (c) { (COLOURS[c.material_id] = COLOURS[c.material_id] || []).push({ name: c.name, hex: c.hex, img: (c.metadata && c.metadata.swatch_img) || null }); }); }
