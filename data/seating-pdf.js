@@ -156,14 +156,14 @@
   }
 
   // ── PAGE 1 · COVER ───────────────────────────────────────────────────────────
-  function cover(P, F, m, hero, fadeImg) {
+  function cover(P, F, m, hero, fadeImg, mfrLogoImg) {
     P.rect(0, 0, A4.w, A4.h, DARK);
     if (hero) {
       var iw = hero.width, ih = hero.height, s = Math.max(A4.w / iw, A4.h / ih);
       var dw = iw * s, dh = ih * s;
       P.image(hero, (A4.w - dw) / 2, 0, dw, dh, 1);
       // smooth fade to brand dark — starts lower, canvas-rendered so it never bands
-      var fTop = A4.h * 0.58, fH = A4.h * 0.26;
+      var fTop = A4.h * 0.62, fH = A4.h * 0.24;
       if (fadeImg) P.image(fadeImg, 0, fTop, A4.w, fH, 1);
       else P.fadeDown(0, fTop, A4.w, fH, DARK, 1, 56);
       P.rect(0, fTop + fH - 1, A4.w, A4.h - (fTop + fH) + 1, DARK, 1);
@@ -172,14 +172,14 @@
     P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
 
     // title block — range-led, sits on the fade
-    var ty = 598;
+    var ty = 612;
     P.hline(M, M + 26, ty - 20, GOLD, 1, 0.95);
     P.tracked('LUXURY SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
     P.text(m.range || 'Proposal', M - 2, ty, 54, F.b, CREAM);
     P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 62, 19, F.l, GOLDL);
 
     // client / project info (print-asset style)
-    var iy = 706, cw = (A4.w - M * 2) / 3;
+    var iy = 718, cw = (A4.w - M * 2) / 3;
     P.hline(M, A4.w - M, iy - 16, GOLD, 0.5, 0.45);
     var info = [
       ['PREPARED FOR', m.client || '—'],
@@ -195,9 +195,15 @@
 
     // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
     // CEDIA member logo bottom-right. Nothing else.
-    var fy = A4.h - 86;
+    var fy = A4.h - 66;
     P.logo(M, fy, 26, CREAM);
     P.tracked('SONOR', M + 36, fy + 6.5, 14, F.b, CREAM, 3.1);
+    if (mfrLogoImg) {
+      // manufacturer logo centred in the lockup row (Sonor left · manufacturer centre · CEDIA right)
+      var mlh = 15, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
+      if (mlw > 140) { mlw = 140; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
+      P.image(mfrLogoImg, (A4.w - mlw) / 2, fy + 6.5 + (13 - mlh) / 2, mlw, mlh, 0.92);
+    }
     if (m._cedia) {
       var ch = 13, cwd = ch * (m._cedia.width / m._cedia.height);
       P.image(m._cedia, A4.w - M - cwd, fy + 6.5, cwd, ch, 0.92);
@@ -642,7 +648,7 @@
     var TOTAL = 6 + (dsDoc ? dsDoc.getPageCount() : 0);
     var mfrLogoImg = null;
     try { if (m.manufacturerLogo) mfrLogoImg = await loadImage(doc, m.manufacturerLogo); } catch (e) {}
-    cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero, fadeImg);
+    cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero, fadeImg, mfrLogoImg);
     quote(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL, rangeImg, swatchImg);
     drawing(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     techspec(mk(doc.addPage([A4.w, A4.h]), doc), F, m, rangeImg, TOTAL, mfrLogoImg);

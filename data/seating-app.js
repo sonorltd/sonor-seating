@@ -887,7 +887,7 @@
       colourHex: (function () { if (!mat || !cfg.colour) return null; var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); return (c && c.hex) || guessHex(cfg.colour); })(),
       swatchImg: (function () { if (mat && cfg.colour) { var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); if (c && c.img) return c.img; } return mat ? (mat.swatchImg || null) : null; })(),
       installCost: inst, installLabel: (CFG.installation || {}).label || 'Installation',
-      manufacturerLogo: (r.metadata && r.metadata.manufacturer_logo) || null,
+      manufacturerLogo: (r.metadata && r.metadata.manufacturer_logo) || (r.manufacturer_meta && r.manufacturer_meta._logo_url) || null,
       countryOfOrigin: (r.manufacturer_meta && r.manufacturer_meta.country_of_origin) || null,
       // v0.18.0 — 'Additional options' page: everything available on this range that
       // wasn't picked, so nothing is missed in the config process

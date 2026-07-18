@@ -9,7 +9,7 @@ T="$(mktemp -d)"
 curl -s "$URL/v_seating_catalogue?select=*&order=range_sort,item_sort" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/v.json"
 curl -s "$URL/seating_material_colours?select=material_id,name,hex,sort_order,metadata&order=material_id,sort_order" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/c.json"
 curl -s "$URL/seating_materials?select=id,metadata" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/m.json"
-curl -s "$URL/seating_manufacturers?select=id,metadata" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/f.json"
+curl -s "$URL/seating_manufacturers?select=id,metadata,logo_url" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/f.json"
 curl -s "$URL/seating_finish_options?select=id,manufacturer_id,label,note,sort_order&order=sort_order" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/o.json"
 python3 - "$T" "$HERE/seating-catalogue.js" <<'PY'
 import json, sys, datetime
@@ -36,7 +36,11 @@ for c in cols:
     if img: e['i'] = img
     cm.setdefault(c['material_id'], []).append(e)
 mm = {m['id']: m['metadata'] for m in mats if m.get('metadata')}
-fm = {m['id']: m['metadata'] for m in mfrs if m.get('metadata')}
+fm = {}
+for m in mfrs:
+    e = dict(m.get('metadata') or {})
+    if m.get('logo_url'): e['_logo_url'] = m['logo_url']
+    if e: fm[m['id']] = e
 fo = {}
 for o in fops:
     fo.setdefault(o['manufacturer_id'], []).append({'id': o['id'], 'label': o['label'], 'note': o.get('note')})
