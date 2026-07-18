@@ -230,8 +230,9 @@
       ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null],
       ['Lead time', m.leadText || 'On request']
     ].filter(function (r) { return r[1]; });
-    var sy = top;
+    var sy = top, colourRowY = null;
     rows.forEach(function (r) {
+      if (r[0] === 'Colour') colourRowY = sy;
       P.tracked(String(r[0]).toUpperCase(), M, sy, 6.5, F.r, MUT, 1.5);
       var tx = M, swHex = r[2];
       if (swHex) {   // swatch symbol beside the chosen upholstery / colour
@@ -245,11 +246,12 @@
       sy += 11 + lines.length * 13.5 + 11;
       P.hline(M, M + colW, sy - 7, LINE, 0.5, 0.7);
     });
-    // photo of the actual swatch — when the Library files material.swatch_img
-    if (swatchImg) {
-      P.tracked('SWATCH', M + colW - 60, top - 22, 6.5, F.r, MUT, 1.5);
-      P.image(swatchImg, M + colW - 60, top - 14, 60, 44, 1);
-      P.rectB(M + colW - 60, top - 14, 60, 44, LINE, 0.7);
+    // photo of the actual swatch — right-aligned inside the Colour row, so it
+    // never collides with the header or other rows
+    if (swatchImg && colourRowY != null) {
+      var swW = 44, swH = 30, swX = M + colW - swW, swY = colourRowY - 2;
+      P.image(swatchImg, swX, swY, swW, swH, 1);
+      P.rectB(swX, swY, swW, swH, LINE, 0.7);
     }
 
     // the chosen model (right) — hero photograph, plan lives on page 3
@@ -378,7 +380,9 @@
     // seats — CENTRED across the room, anchored to the REAR wall (backs to the rear).
     // Solid = upright footprint; lighter ghost ahead = reclined envelope (footrest extends
     // toward the screen).
-    var seatGapMm = 40;
+    // Seats butt arm-to-arm (manufacturer width includes arms) — no invented gap,
+    // so the total run = per × seat width and the drawing reads truly to scale.
+    var seatGapMm = 0;
     var totalRowW = per * seatW + (per - 1) * seatGapMm;
     var sideSpace = Math.round((roomW - totalRowW) / 2);
     var sx0 = rx + (rw - totalRowW * sc) / 2;

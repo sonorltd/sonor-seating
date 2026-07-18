@@ -33,7 +33,7 @@
       var id = m.material_id || m.material_name; if (!id || seen[id]) return; seen[id] = 1;
       var g = (m.material_group || '').toLowerCase();
       var sw = m.swatch_hex || (g === 'leather' ? '#6b4f3a' : g === 'velvet' ? '#5b4a6b' : g === 'fabric' ? '#7a736a' : '#8a8078');
-      var cols = (coloursMap && coloursMap[id]) ? coloursMap[id].map(function (c) { return { name: c.n || c.name, hex: c.h || c.hex }; }) : [];
+      var cols = (coloursMap && coloursMap[id]) ? coloursMap[id].map(function (c) { return { name: c.n || c.name, hex: c.h || c.hex, img: c.i || c.img || null }; }) : [];
       out.push({
         id: id, name: m.material_name, swatch: sw,
         group: m.material_group || 'Fabric', groupKey: g || 'fabric',
@@ -103,7 +103,7 @@
         var db = new global.SonorDB();
         var v = await db.client.from('v_seating_catalogue').select('*');
         if (!v.error && (v.data || []).length) {
-          try { var cq = await db.client.from('seating_material_colours').select('material_id,name,hex,sort_order').order('material_id').order('sort_order'); if (!cq.error) { COLOURS = {}; (cq.data || []).forEach(function (c) { (COLOURS[c.material_id] = COLOURS[c.material_id] || []).push({ name: c.name, hex: c.hex }); }); } } catch (e) {}
+          try { var cq = await db.client.from('seating_material_colours').select('material_id,name,hex,sort_order,metadata').order('material_id').order('sort_order'); if (!cq.error) { COLOURS = {}; (cq.data || []).forEach(function (c) { (COLOURS[c.material_id] = COLOURS[c.material_id] || []).push({ name: c.name, hex: c.hex, img: (c.metadata && c.metadata.swatch_img) || null }); }); } } catch (e) {}
           var ad = adaptSSOT(v.data); ranges = ad.ranges; catalogue = ad.catalogue; source = 'supabase';
           try { localStorage.setItem(CACHE, JSON.stringify({ ranges: ranges, catalogue: catalogue })); } catch (e) {}
           _index(); return { source: source, db: db };

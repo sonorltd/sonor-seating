@@ -257,7 +257,8 @@
     if (!cols.length) return '';
     return '<div class="colsel"><div class="lbl">Colour — ' + esc(m.name) + ' <span class="opt-tag">' + cols.length + ' colourways</span></div><div class="cols">' + cols.map(function (c) {
       var hx = c.hex || guessHex(c.name);
-      return '<button class="col ' + (cfg.colour === c.name ? 'on' : '') + '" title="' + esc(c.name) + '" aria-label="' + esc(c.name) + '" style="--c:' + esc(hx) + '" onclick="SeatingApp.setColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')"></button>';
+      var st = '--c:' + esc(hx) + (c.img ? ';background-image:url(\'' + esc(c.img) + '\');background-size:cover;background-position:center' : '');
+      return '<button class="col ' + (cfg.colour === c.name ? 'on' : '') + (c.img ? ' has-img' : '') + '" title="' + esc(c.name) + '" aria-label="' + esc(c.name) + '" style="' + st + '" onclick="SeatingApp.setColour(' + JSON.stringify(c.name).replace(/"/g, '&quot;') + ')"></button>';
     }).join('') + '</div><div class="hint" id="colName">' + (cfg.colour ? 'Selected: <b style="color:var(--cream)">' + esc(cfg.colour) + '</b> · ' : '') + 'Hover a swatch for its name — samples on request.</div></div>';
   }
   function finishesHtml() {
@@ -438,38 +439,87 @@
       '<div class="hint">Rows are priced individually when varied — the quote below updates as you change them.</div></div>';
   }
 
-  // ── plans (SVG) ──────────────────────────────────────────────────────────────
-  function roomSVG(L, big) {
-    var W = big ? 640 : 420, scale = W / Math.max(L.widthMm, 3000), H = Math.max(140, Math.min(big ? 340 : 240, L.lengthMm * scale * 0.5));
-    var rw = L.widthMm * scale, id = big ? 'pb' : 'pr';
-    return '<svg viewBox="0 0 ' + (rw + 20) + ' ' + (H + 36) + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' +
-      '<defs>' +
-        '<linearGradient id="' + id + 'scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8b48e"/><stop offset="1" stop-color="#ad9978" stop-opacity="0.25"/></linearGradient>' +
-        '<radialGradient id="' + id + 'amb" cx="50%" cy="0%" r="85%"><stop offset="0" stop-color="rgba(173,153,120,0.16)"/><stop offset="55%" stop-color="rgba(128,88,161,0.12)"/><stop offset="100%" stop-color="rgba(128,88,161,0)"/></radialGradient>' +
-        '<linearGradient id="' + id + 'seat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a883cc"/><stop offset="1" stop-color="#66467f"/></linearGradient>' +
-      '</defs>' +
-      '<rect x="10" y="14" width="' + rw + '" height="' + H + '" rx="9" fill="#09070f" stroke="rgba(173,153,120,0.24)"/>' +
-      '<rect x="10" y="14" width="' + rw + '" height="' + H + '" rx="9" fill="url(#' + id + 'amb)"/>' +
-      '<rect x="14" y="8" width="' + (rw - 8) + '" height="7" rx="3.5" fill="url(#' + id + 'scr)"/>' +
-      '<text x="' + (10 + rw / 2) + '" y="5.5" text-anchor="middle" fill="rgba(200,180,142,0.92)" font-size="6.5" letter-spacing="3.5" font-family="Gilroy,system-ui">S C R E E N</text>' +
-      seatsSVG(L, 10, 26, rw, H - 16, scale, id) +
-      '<text x="' + (10 + rw / 2) + '" y="' + (H + 31) + '" text-anchor="middle" fill="rgba(143,133,116,0.85)" font-size="9" font-family="Gilroy,system-ui">' + (L.widthMm / 1000).toFixed(1) + 'm wide · ' + (L.rows * L.seatsPerRow) + ' seats</text></svg>';
+  // ── plans (SVG) ─────────────────────────────────────────────────────────────
+  // Live TO-SCALE plan (v0.13.0) — same geometry as the PDF drawing page: one
+  // uniform scale for both axes, seats butt arm-to-arm (no invented gap) and
+  // anchor to the rear wall (backs to the wall, footrests toward the screen),
+  // reclined envelope drawn lighter ahead of the upright footprint. Real
+  // manufacturer dims flow in live as soon as a range is chosen.
+  function planSpec() {
+    var r = (cfg.rangeId && E) ? E.range(cfg.rangeId) : null;
+    var cap = (r && r.capability) || {};
+    var seatW = cap.seat_width_mm || (r ? E.seatWidthMm(r) : null) || (CFG.clearance && CFG.clearance.seatFallbackWidthMm) || 650;
+    var uprD = cap.seat_depth_mm || (r && E.seatDepthMm ? E.seatDepthMm(r) : null) || 1050;
+    var reclD = cap.reclined_depth_mm || Math.round(uprD * 1.5);
+    if (reclD < uprD) reclD = uprD;
+    return {
+      seatW: seatW, uprD: uprD, reclD: reclD,
+      rowGap: (CFG.clearance && CFG.clearance.rowGapMm) || 600,
+      wallClear: cap.wall_clearance_mm || 400,
+      real: !!(cap.seat_width_mm || cap.seat_depth_mm || cap.reclined_depth_mm),
+      rangeName: r ? r.name : null
+    };
   }
-  function seatsSVG(L, x0, y0, rw, rh, scale, id) {
-    var sw = (CFG.clearance.seatFallbackWidthMm) * scale;
-    if (cfg.rangeId && E) sw = E.seatWidthMm(E.range(cfg.rangeId)) * scale;
-    var out = '', rows = L.rows, per = L.seatsPerRow;
-    var gap = 7, seatH = Math.max(15, (rh - (rows + 1) * gap) / rows);
+  function roomSVG(L, big) {
+    var S = planSpec();
+    var roomW = L.widthMm || 4000, roomL = L.lengthMm || 6000, rows = L.rows || 2, per = L.seatsPerRow || 3;
+    var G = function (a) { return 'rgba(200,180,142,' + a + ')'; };
+    var DIMC = 'rgba(173,153,120,0.9)', FONT = 'Gilroy,system-ui';
+    var boxW = big ? 620 : 420, boxH = big ? 470 : 330;
+    var padL = 42, padR = 46, padT = 30, padB = 40;
+    var sc = Math.min((boxW - padL - padR) / roomW, (boxH - padT - padB) / roomL);
+    var rw = roomW * sc, rl = roomL * sc;
+    var rx = padL + ((boxW - padL - padR) - rw) / 2, ry = padT + ((boxH - padT - padB) - rl) / 2;
+    var totalRowW = per * S.seatW, sideMm = Math.round((roomW - totalRowW) / 2);
+    var sx0 = rx + (rw - totalRowW * sc) / 2;
+    var seatPX = S.seatW * sc, uprPX = S.uprD * sc, reclPX = S.reclD * sc, rowGapPX = S.rowGap * sc;
+    var rearY = ry + rl - S.wallClear * sc, pitch = reclPX + rowGapPX;
+    function rr(x, y, w, h, r2, fill, stroke, sw2) {
+      return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + r2 + '" fill="' + (fill || 'none') + '"' + (stroke ? ' stroke="' + stroke + '" stroke-width="' + (sw2 || 1) + '"' : '') + '/>';
+    }
+    function txt(s2, x, y, size, fill, anchor, ls) {
+      return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" font-size="' + size + '" fill="' + fill + '" font-family="' + FONT + '"' + (anchor ? ' text-anchor="' + anchor + '"' : '') + (ls ? ' letter-spacing="' + ls + '"' : '') + '>' + s2 + '</text>';
+    }
+    function line(x1, y1, x2, y2, c2, w2) {
+      return '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="' + c2 + '" stroke-width="' + (w2 || 0.7) + '"/>';
+    }
+    function dimH(x1, x2, y, label, above) {
+      return line(x1, y, x2, y, DIMC) + line(x1, y - 3, x1, y + 3, DIMC) + line(x2, y - 3, x2, y + 3, DIMC) +
+        txt(label, (x1 + x2) / 2, above ? y - 4 : y + 10, 8, DIMC, 'middle');
+    }
+    function dimV(x, y1, y2, label) {
+      return line(x, y1, x, y2, DIMC) + line(x - 3, y1, x + 3, y1, DIMC) + line(x - 3, y2, x + 3, y2, DIMC) +
+        '<text x="' + (x - 5).toFixed(1) + '" y="' + ((y1 + y2) / 2).toFixed(1) + '" font-size="8" fill="' + DIMC + '" font-family="' + FONT + '" text-anchor="middle" transform="rotate(-90 ' + (x - 5).toFixed(1) + ' ' + ((y1 + y2) / 2).toFixed(1) + ')">' + label + '</text>';
+    }
+    var s = '';
+    s += rr(rx - 2.5, ry - 2.5, rw + 5, rl + 5, 3, 'none', G(0.55), 1.3);
+    s += rr(rx, ry, rw, rl, 2, 'rgba(9,7,15,0.55)', G(0.35), 0.7);
+    s += rr(rx + rw * 0.14, ry + 6, rw * 0.72, 4, 1.5, '#ad9978');
+    s += txt('S C R E E N', rx + rw / 2, ry + 20, 6, G(0.8), 'middle', 3);
     for (var r = 0; r < rows; r++) {
-      var totalW = per * sw + (per - 1) * 4;
-      var sx = x0 + (rw - totalW) / 2, sy = y0 + gap + r * (seatH + gap);
-      for (var s = 0; s < per; s++) {
-        var cx = sx + s * (sw + 4);
-        out += '<rect x="' + cx + '" y="' + sy + '" width="' + (sw - 3) + '" height="' + seatH + '" rx="4" fill="url(#' + id + 'seat)" stroke="rgba(180,143,214,0.55)"/>';
-        out += '<rect x="' + (cx + 2) + '" y="' + (sy + 2) + '" width="' + (sw - 7) + '" height="' + Math.max(3, seatH * 0.26) + '" rx="2" fill="rgba(200,180,142,0.18)"/>';
+      var rRear = rearY - (rows - 1 - r) * pitch, ryU = rRear - uprPX, ryR = rRear - reclPX;
+      for (var i = 0; i < per; i++) {
+        var cx = sx0 + i * seatPX, aw = seatPX * 0.15;
+        if (reclPX > uprPX + 2) s += rr(cx + 1, ryR, seatPX - 2, reclPX - uprPX + 2, 2, 'none', G(0.28), 0.7);
+        s += rr(cx, ryU, seatPX, uprPX, 3, 'rgba(128,88,161,0.14)', G(0.85), 1);
+        s += rr(cx + 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
+        s += rr(cx + seatPX - aw - 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
+        s += rr(cx + aw + 2, ryU + uprPX * 0.08, seatPX - 2 * aw - 4, uprPX * 0.52, 2, 'none', G(0.5), 0.7);
+        s += rr(cx + aw + 2, ryU + uprPX * 0.66, seatPX - 2 * aw - 4, uprPX * 0.26, 2, G(0.14), G(0.7), 0.9);
       }
     }
-    return out;
+    s += dimH(rx, rx + rw, ry - 12, roomW + '', true);
+    s += dimV(rx - 14, ry, ry + rl, roomL + '');
+    if (sideMm > 0) {
+      var syc = rearY - uprPX / 2;
+      s += dimH(rx, sx0, syc, sideMm + '', true);
+      s += dimH(sx0 + totalRowW * sc, rx + rw, syc, sideMm + '', true);
+    }
+    s += dimH(sx0, sx0 + totalRowW * sc, ry + rl + 12, Math.round(totalRowW) + '', false);
+    var capTxt = (S.rangeName ? S.rangeName + ' · ' : '') + (S.real ? 'manufacturer dimensions' : 'standard allowances') + ' · dims in mm';
+    s += txt(capTxt, boxW / 2, boxH - 6, 8.5, 'rgba(143,133,116,0.9)', 'middle');
+    if (sideMm < 0) s += txt('run exceeds room width by ' + Math.abs(sideMm * 2) + 'mm', boxW / 2, boxH - 18, 8.5, 'rgba(224,122,95,0.95)', 'middle');
+    return '<svg viewBox="0 0 ' + boxW + ' ' + boxH + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' + s + '</svg>';
   }
   function planSVG(large) { return roomSVG(cfg.layout, large); }
 
@@ -518,7 +568,7 @@
       materialTier: mat ? (mat.tierLabel || null) : null,
       materialSwatchHex: mat ? (mat.swatch || null) : null,
       colourHex: (function () { if (!mat || !cfg.colour) return null; var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); return (c && c.hex) || guessHex(cfg.colour); })(),
-      swatchImg: mat ? (mat.swatchImg || null) : null,
+      swatchImg: (function () { if (mat && cfg.colour) { var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); if (c && c.img) return c.img; } return mat ? (mat.swatchImg || null) : null; })(),
       installCost: inst, installLabel: (CFG.installation || {}).label || 'Installation',
       productUrl: meta.product_url || null,
       datasheetUrl: meta.datasheet_url || null,
