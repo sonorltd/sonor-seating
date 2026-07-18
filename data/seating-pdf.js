@@ -191,7 +191,8 @@
       P.tracked(c[0], x, iy, 7, F.r, [168, 156, 136], 1.8);
       P.text(c[1], x, iy + 13, 12.5, F.b, CREAM, { maxWidth: cw - 16 });
     });
-    P.hline(M, A4.w - M, iy + 40, GOLD, 0.5, 0.45);
+    // (no divider below the info band — the frame's bottom edge closes the block;
+    //  a second line here reads as a pointless double divider)
 
     // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
     // CEDIA member logo bottom-right. Nothing else.
@@ -201,8 +202,8 @@
     P.tracked('SONOR', M + 32, cyL - 6.5, 13, F.b, CREAM, 3.1);
     if (mfrLogoImg) {
       // manufacturer logo centred (Sonor left · manufacturer centre · CEDIA right)
-      var mlh = 16, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
-      if (mlw > 130) { mlw = 130; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
+      var mlh = 18, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
+      if (mlw > 150) { mlw = 150; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
       P.image(mfrLogoImg, (A4.w - mlw) / 2, cyL - mlh / 2, mlw, mlh, 0.92);
     }
     if (m._cedia) {
@@ -281,8 +282,7 @@
     }
 
     // quote table
-    var qy = Math.max(sy + 18, imgBottom + 28);
-    P.tracked('ESTIMATE', M, qy - 6, 8, F.b, GOLD, 2.2); qy += 12;
+    var qy = Math.max(sy + 18, imgBottom + 28) + 4;   // straight into the table — no heading
     var cQty = A4.w - M - 210, cUnit = A4.w - M - 110, cLine = A4.w - M;
     P.tracked('SEATS', M, qy, 6.5, F.r, MUT, 1.4);
     P.trackedRight('QTY', cQty + 20, qy, 6.5, F.r, MUT, 1.4);
@@ -564,15 +564,24 @@
       if (x.delta === 0) return 'no change';
       return (x.delta > 0 ? '+ ' : '- ') + money(Math.abs(x.delta));
     }
+    // price order: upgrades (+) above, the selected line in the middle, savings (−)
+    // below, unpriced last
+    function optSort(arr) {
+      return arr.slice().sort(function (a, b) {
+        var av = a.selected ? 0 : (a.delta == null ? -Infinity : a.delta);
+        var bv = b.selected ? 0 : (b.delta == null ? -Infinity : b.delta);
+        return bv - av;
+      });
+    }
     if ((om.materials || []).length) {
       section('UPHOLSTERY LINES');
-      om.materials.forEach(function (x) { row(x.name + (x.group ? '  ·  ' + x.group : ''), deltaText(x), x.selected); });
+      optSort(om.materials).forEach(function (x) { row(x.name + (x.group ? '  ·  ' + x.group : ''), deltaText(x), x.selected); });
       row("COM — customer's own material", 'at quotation', false);
       y += 8;
     }
     if ((om.recline || []).length) {
       section('RECLINE');
-      om.recline.forEach(function (x) { row(x.label, deltaText(x), x.selected); });
+      optSort(om.recline).forEach(function (x) { row(x.label, deltaText(x), x.selected); });
       y += 8;
     }
     if ((om.finishes || []).length) {
@@ -596,12 +605,9 @@
   function termsPage(P, F, m, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
     pageHead(P, F, m, 'TERMS & PAYMENT', 6, TOTAL_PAGES);
-    // v0.21.1 — PAYMENT leads, THE DETAIL follows; quote reference sits alone near the
-    // foot of the page; everything given more air.
+    // v0.22.0 — THE DETAIL leads, PAYMENT follows it; quote reference sits alone near
+    // the foot of the page; everything given air.
     var y = 100;
-    P.tracked('PAYMENT', M, y, 8.5, F.b, GOLD, 2.6); y += 20;
-    P.text(m.paymentTerms || '50% deposit on order · 50% balance prior to delivery', M, y, 12.5, F.b, INK); y += 26;
-    P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 26;
     P.tracked('THE DETAIL', M, y, 8.5, F.r, GOLD, 2.6); y += 24;
     var termAll = [
       'Proposal prepared ' + (m.dateText || '') + (m.client ? ' for ' + m.client : '') + (m.project ? ' — ' + m.project : '') + '.',
@@ -615,6 +621,9 @@
       lines.forEach(function (ln, li) { P.text(ln, M + 12, y + li * 14, 9.5, F.r, INK2); });
       y += lines.length * 14 + 12;
     });
+    y += 10; P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 26;
+    P.tracked('PAYMENT', M, y, 8.5, F.b, GOLD, 2.6); y += 20;
+    P.text(m.paymentTerms || '50% deposit on order · 50% balance prior to delivery', M, y, 12.5, F.b, INK);
     if (m.quoteRef) {
       var qy2 = A4.h - 158;
       P.hline(M, A4.w - M, qy2, GOLD, 0.8, 0.75); qy2 += 22;
@@ -623,6 +632,87 @@
       P.text('Please quote this reference in any correspondence about this proposal.', M, qy2, 8.5, F.r, MUT);
     }
     pageFoot(P, F, m);
+  }
+
+  // ── BOM — single-page internal bill of materials (v0.22.0) ───────────────────
+  // Utilitarian companion to the client proposal: spec block + full line table with
+  // ex-VAT unit/line values, delivery, installation, VAT and gross. INTERNAL USE.
+  async function generateBom(m) {
+    var PDFLib = global.PDFLib;
+    if (!PDFLib || !PDFLib.PDFDocument) return false;
+    var doc = await PDFLib.PDFDocument.create();
+    try { if (global.fontkit) doc.registerFontkit(global.fontkit); } catch (e) {}
+    var F;
+    try {
+      F = { b: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-extrabold.otf'), { subset: false }),
+            r: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-regular.otf'), { subset: false }) };
+    } catch (e) {
+      var hb = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold), hr = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      F = { b: hb, r: hr };
+    }
+    doc.setTitle('Sonor — ' + (m.range || 'Seating') + ' BOM (internal)');
+    doc.setAuthor('Sonor'); doc.setCreator('Sonor Seating Configurator');
+    var P = mk(doc.addPage([A4.w, A4.h]), doc);
+    P.rect(0, 0, A4.w, A4.h, CREAM);
+    // head
+    P.tracked('BILL OF MATERIALS', M, 56, 8.5, F.b, GOLD, 2.6);
+    P.trackedRight('INTERNAL USE ONLY', A4.w - M, 56, 8.5, F.b, [178, 88, 66], 2.2);
+    P.hline(M, A4.w - M, 68, GOLD, 0.8, 0.75);
+    P.tracked((m.manufacturer || '').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
+    P.text((m.range || '') + ' — ' + (m.layoutText || ''), M - 1, 106, 20, F.b, INK);
+    // spec block
+    var meta = [
+      ['PROJECT', m.project || '—'], ['CLIENT', m.client || '—'],
+      ['REFERENCE', m.quoteRef || '—'], ['DATE', m.dateText || '—'],
+      ['UPHOLSTERY', (m.materialName || m.upholsteryText || '—') + (m.colourName ? ' · ' + m.colourName : '')],
+      ['RECLINE', m.reclineText || '—'],
+      ['ROOM', m.roomText || '—'], ['LEAD TIME', m.leadText || '—']
+    ];
+    var by = 148, bw = (A4.w - M * 2 - 36) / 4;
+    meta.forEach(function (r2, i2) {
+      var bx = M + (i2 % 4) * (bw + 12), byy = by + Math.floor(i2 / 4) * 34;
+      P.tracked(r2[0], bx, byy, 6.5, F.r, MUT, 1.4);
+      P.text(String(r2[1]), bx, byy + 10, 9.5, F.b, INK, { maxWidth: bw });
+    });
+    var y = by + 2 * 34 + 16;
+    P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 18;
+    // line table
+    var cQty = A4.w - M - 210, cUnit = A4.w - M - 110, cLine = A4.w - M;
+    P.tracked('ITEM', M, y, 6.5, F.r, MUT, 1.4);
+    P.trackedRight('QTY', cQty + 20, y, 6.5, F.r, MUT, 1.4);
+    P.trackedRight('UNIT EX VAT', cUnit + 40, y, 6.5, F.r, MUT, 1.4);
+    P.trackedRight('LINE EX VAT', cLine, y, 6.5, F.r, MUT, 1.4);
+    P.hline(M, A4.w - M, y + 9, GOLD, 0.8, 0.75); y += 24;
+    (m.lines || []).forEach(function (l) {
+      if (y > A4.h - 210) return;
+      P.text(l.label, M, y - 8, 9.5, F.r, INK, { maxWidth: cQty - M - 12 });
+      P.right(String(l.qty), cQty + 20, y - 8, 9.5, F.r, INK2);
+      P.right(money(l.unit), cUnit + 40, y - 8, 9.5, F.r, INK2);
+      P.right(l.unit != null ? money(l.unit * l.qty) : 'POA', cLine, y - 8, 9.5, F.b, INK);
+      y += 17;
+    });
+    y += 2; P.hline(M, A4.w - M, y - 4, GOLD, 0.8, 0.75); y += 12;
+    var tot = [['Products subtotal', money(m.productTotal)],
+      [m.deliveryLabel || 'Delivery', m.deliveryCost != null ? money(m.deliveryCost) : 'On request']];
+    if (m.installCost != null) tot.push([m.installLabel || 'Installation', money(m.installCost)]);
+    tot.push(['Subtotal (ex VAT)', money(Math.round(m.exVat))]);
+    tot.push(['VAT @ ' + Math.round((m.vatRate || 0) * 100) + '%', money(Math.round(m.vat))]);
+    tot.push(['Total (inc VAT)', m.grossText || 'On request']);
+    tot.forEach(function (r3, i3) {
+      var last = i3 === tot.length - 1;
+      P.text(r3[0], M, y - 8, last ? 10.5 : 9.5, last ? F.b : F.r, last ? INK : MUT);
+      P.right(r3[1], cLine, y - 8, last ? 10.5 : 9.5, last ? F.b : F.r, last ? [140, 116, 60] : INK2);
+      y += last ? 20 : 16;
+    });
+    // finishes + accessories notes
+    if (m.finishes && m.finishes.length) { P.text('Options: ' + m.finishes.join(', '), M, y, 8.5, F.r, MUT, { maxWidth: A4.w - M * 2 }); y += 14; }
+    P.text('MSRP values ex VAT unless stated. Internal document — not for client issue; use the proposal PDF for clients.', M, A4.h - 64, 8, F.r, MUT);
+    P.hline(M, A4.w - M, A4.h - 50, GOLD, 0.5, 0.5);
+    P.tracked('SONOR', M, A4.h - 40, 9, F.b, [140, 116, 60], 2.6);
+    P.trackedRight((m.quoteRef || '') , A4.w - M, A4.h - 40, 9, F.b, MUT, 1.4);
+    var bytes = await doc.save();
+    download(bytes, m.filename || 'sonor-seating-bom.pdf');
+    return true;
   }
 
   function download(bytes, filename) {
@@ -694,5 +784,5 @@
     return true;
   }
 
-  global.SeatingPdf = { generate: generate, available: function () { return !!(global.PDFLib && global.PDFLib.PDFDocument); } };
+  global.SeatingPdf = { generate: generate, generateBom: generateBom, available: function () { return !!(global.PDFLib && global.PDFLib.PDFDocument); } };
 })(typeof window !== 'undefined' ? window : this);

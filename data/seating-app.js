@@ -711,7 +711,9 @@
           '<tr class="tot"><td colspan="3">Total (inc VAT)</td><td class="r">' + money(Math.round(vb.gross)) + '</td></tr>' +
         '</tbody></table>' +
         finNote +
-        '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button><button class="btn primary" onclick="SeatingApp.savePdf()">⬇ Download PDF proposal</button></div>' +
+        '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button>' +
+          (global.__SEATING_CLIENT__ ? '' : '<button class="btn ghost" onclick="SeatingApp.saveBom()" title="Single-page bill of materials — internal use only">⬇ BOM (internal)</button>') +
+          '<button class="btn primary" onclick="SeatingApp.savePdf()">⬇ Download PDF proposal</button></div>' +
         '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation. VAT at ' + Math.round(vatRate() * 100) + '%. <b style="color:var(--gold2)">' + esc(CFG.paymentTerms || '') + '</b>.</div>' +
       '</div>';
   }
@@ -1026,7 +1028,7 @@
       if (global.SeatingPdf && global.SeatingPdf.available()) {
         toast('Building PDF…');
         var _m = pdfModel();
-        _m.quoteRef = makeQuoteRef();
+        _m.quoteRef = cfg._lastQuoteRef = makeQuoteRef();
         _m.filename = 'sonor-' + String(cfg.rangeId || 'seating') + '-' + _m.quoteRef + '.pdf';
         logQuote(_m.quoteRef, _m);
         var ok = await global.SeatingPdf.generate(_m);
@@ -1034,6 +1036,21 @@
       }
     } catch (e) { console.warn('[SeatingPdf]', e && e.message); toast('PDF failed — using print'); }
     global.print();
+  }
+  // v0.22.0 — single-page internal BOM (never in the client build; no quote logging)
+  async function saveBom() {
+    if (global.__SEATING_CLIENT__) return;
+    try {
+      if (global.SeatingPdf && global.SeatingPdf.generateBom) {
+        toast('Building BOM…');
+        var _m = pdfModel();
+        _m.quoteRef = cfg._lastQuoteRef || makeQuoteRef();
+        _m.filename = 'sonor-bom-' + String(cfg.rangeId || 'seating') + '-' + _m.quoteRef + '.pdf';
+        var ok = await global.SeatingPdf.generateBom(_m);
+        if (ok) { toast('BOM downloaded'); return; }
+      }
+      toast('BOM unavailable');
+    } catch (e) { console.warn('[SeatingBom]', e && e.message); toast('BOM failed'); }
   }
 
   // ── export ───────────────────────────────────────────────────────────────────
@@ -1064,7 +1081,7 @@
     boot: boot, enter: enter, backToIntro: backToIntro, goBack: goBack, jumpTo: jumpTo, restart: restart,
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
-    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish, setClient: setClient,
+    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, saveBom: saveBom, toggleFinish: toggleFinish, setClient: setClient,
     rowSet: rowSet, rowsReset: rowsReset,
     saveConfig: saveConfig, openSaved: openSaved, copySavedLink: copySavedLink, renameSaved: renameSaved, deleteSaved: deleteSaved
   };
