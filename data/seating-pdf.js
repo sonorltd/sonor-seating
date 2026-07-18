@@ -172,14 +172,14 @@
     P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
 
     // title block — range-led, sits on the fade
-    var ty = 650;
+    var ty = 672;
     P.hline(M, M + 26, ty - 20, GOLD, 1, 0.95);
     P.tracked('LUXURY SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
     P.text(m.range || 'Proposal', M - 2, ty, 54, F.b, CREAM);
     P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 62, 19, F.l, GOLDL);
 
     // client / project info (print-asset style)
-    var iy = 756, cw = (A4.w - M * 2) / 3;
+    var iy = 772, cw = (A4.w - M * 2) / 3;
     P.hline(M, A4.w - M, iy - 16, GOLD, 0.5, 0.45);
     var info = [
       ['PREPARED FOR', m.client || '—'],
@@ -196,24 +196,26 @@
 
     // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
     // CEDIA member logo bottom-right. Nothing else.
-    // logo strip OUTSIDE (below) the frame, in the bottom margin band — all three
-    // resized to the band and sat on one centreline
-    var cyL = A4.h - 27;
-    P.logo(M, cyL - 7, 14, CREAM);
-    P.tracked('SONOR', M + 21, cyL - 4.5, 9, F.b, CREAM, 2.6);
+    // v0.22.5 — ANALYSIS: the strip centred at h-27 while the frame's bottom edge is
+    // at h - M*0.62 ≈ h-26, so the logos sat ON the border line. The strip now centres
+    // in the clear band BELOW the frame (h-14, heights ≤13) and the title/info stack
+    // came down with it (ty 672, iy 772).
+    var cyL = A4.h - 14;
+    P.logo(M, cyL - 6, 12, CREAM);
+    P.tracked('SONOR', M + 18, cyL - 4, 8, F.b, CREAM, 2.4);
     if (mfrLogoImg) {
       // manufacturer logo centred (Sonor left · manufacturer centre · CEDIA right)
-      var mlh = 12, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
-      if (mlw > 110) { mlw = 110; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
+      var mlh = 10, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
+      if (mlw > 95) { mlw = 95; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
       P.image(mfrLogoImg, (A4.w - mlw) / 2, cyL - mlh / 2, mlw, mlh, 0.92);
     }
     if (m._cedia) {
-      // stacked lockup (taller than wide) → size by aspect: 2-line ≈ h16, 1-line h10
-      var ch = (m._cedia.width / m._cedia.height) < 3 ? 16 : 10;
+      // stacked lockup (taller than wide) → size by aspect: 2-line ≈ h13, 1-line h9
+      var ch = (m._cedia.width / m._cedia.height) < 3 ? 13 : 9;
       var cwd = ch * (m._cedia.width / m._cedia.height);
       P.image(m._cedia, A4.w - M - cwd, cyL - ch / 2, cwd, ch, 0.92);
     } else {
-      P.trackedRight('CEDIA MEMBER', A4.w - M, cyL - 3, 6.5, F.r, [168, 156, 136], 1.2);
+      P.trackedRight('CEDIA MEMBER', A4.w - M, cyL - 3, 6, F.r, [168, 156, 136], 1.2);
     }
   }
 
