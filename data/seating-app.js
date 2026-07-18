@@ -215,6 +215,7 @@
   function setClient(k, v) { cfg.client[k] = v; if (k === 'project' && $('savedList')) { clearTimeout(setClient._t); setClient._t = setTimeout(loadSavedList, 500); } }
   function nextDisabled() {
     if (cfg.step === 2) return !cfg.rangeId;
+    if (cfg.step === 3) { try { if (fitCheck().over) return true; } catch (e) {} }
     return false;
   }
 
@@ -345,6 +346,7 @@
 
     $('stepBody').innerHTML =
       '<div class="lead"><h2>Configure your ' + esc(r.name) + '</h2><p>' + esc(r.manufacturer) + (r.style ? ' · ' + esc(r.style) : '') + '</p></div>' +
+      '<div id="fitBanner">' + fitBannerHtml() + '</div>' +
       '<div class="cfg-grid"><div class="cfg-left">' +
         '<div class="panel"><div class="ptt">Layout</div><div class="lbl">Seats per row</div><div class="opts">' +
           CFG.seatsPerRowOptions.map(function (n) { return '<button class="opt ' + (cfg.layout.seatsPerRow === n ? 'on' : '') + '" onclick="SeatingApp.setLayout2(\'seatsPerRow\',' + n + ')">' + n + '</button>'; }).join('') +
@@ -579,6 +581,8 @@
     var di = deliveryInfo(), total = grandTotal(lines, di);
     var poa = lines.some(function (l) { return l.unit == null; });
     $('planWrap').innerHTML = planSVG();
+    var fb = $('fitBanner'); if (fb) fb.innerHTML = fitBannerHtml();
+    var nx = $('btnNext'); if (nx && cfg.step === 3) nx.disabled = nextDisabled();
     var inst = installCost();
     var extra = di.cost != null
       ? '<div class="lt-sub">Incl. ' + esc((CFG.deliveryLabel || 'Delivery').toLowerCase()) + ' ' + money(di.cost) + (inst != null ? ' &amp; installation ' + money(inst) : '') + (leadText(di.lead) ? ' · lead time ' + leadText(di.lead) : '') + '</div>'
@@ -703,6 +707,31 @@
   }
   // row run in mm — arms as shared modules between/around seats when separate
   function rowRunMm(S, per) { return S.modularArms ? per * S.seatW + (per + 1) * S.armW : per * S.seatW; }
+  // v0.18.1 — room-width fit guard: widest row's run vs the room. over ⇒ BLOCKS Continue.
+  function fitCheck() {
+    var S = planSpec(), per = cfg.layout.seatsPerRow, roomW = cfg.layout.widthMm || 4000;
+    var maxRun = rowRunMm(S, per);
+    try {
+      for (var ri = 0; ri < cfg.layout.rows; ri++) {
+        var rc = rowConfig(ri);
+        var w = rc && rc.seat ? parseCm(rc.seat.size_label || rc.seat.size) : null;
+        if (w) {
+          var run = S.modularArms ? per * w + (per + 1) * S.armW : per * w;
+          if (run > maxRun) maxRun = run;
+        }
+      }
+    } catch (e) {}
+    var side = (roomW - maxRun) / 2;
+    var minSide = (CFG.clearance && CFG.clearance.sideWallMm) || 150;
+    return { run: Math.round(maxRun), roomW: roomW, side: Math.round(side), over: maxRun > roomW, tight: maxRun <= roomW && side < minSide };
+  }
+  function fitBannerHtml() {
+    if (!cfg.rangeId) return '';
+    var f = fitCheck();
+    if (f.over) return '<div class="fitwarn block">⚠ This configuration is ' + (f.run - f.roomW) + 'mm wider than the room (' + f.run + 'mm run in a ' + f.roomW + 'mm room). Reduce seats per row, choose a narrower seat, or adjust the room to continue.</div>';
+    if (f.tight) return '<div class="fitwarn tight">⚠ Tight fit — only ' + f.side + 'mm free each side (we recommend at least ' + (((CFG.clearance || {}).sideWallMm) || 150) + 'mm). You can continue, but please double-check the room.</div>';
+    return '';
+  }
   function roomSVG(L, big) {
     var S = planSpec();
     var roomW = L.widthMm || 4000, roomL = L.lengthMm || 6000, rows = L.rows || 2, per = L.seatsPerRow || 3;
