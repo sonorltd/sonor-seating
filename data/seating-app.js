@@ -41,6 +41,7 @@
   // recents → WQ tenders → trials → completed sink). Selecting a project binds
   // saved configurations to project_id and prefills the proposal project name.
   function initProjectBar() {
+    if (global.__SEATING_CLIENT__) return;   // client build: no internal chrome
     try {
       if (typeof SonorProjectBar === 'undefined' || !global.db || !global.db.client) return;
       SonorProjectBar.init({
@@ -65,6 +66,7 @@
   // the Cinema Designer uses to link in.
   function dbc() { try { return global.db && global.db.client; } catch (e) { return null; } }
   async function saveConfig() {
+    if (global.__SEATING_CLIENT__) return;
     var c = dbc(); if (!c) return toast('Offline — connect to save');
     var proj = (cfg.client.project || '').trim();
     if (!proj) { toast('Enter a project name first'); var pf = document.querySelector('.client-row input[placeholder^="Project"]'); if (pf) pf.focus(); return; }
@@ -82,6 +84,7 @@
     } catch (e) { toast('Save failed: ' + (e && e.message)); }
   }
   async function loadSavedList() {
+    if (global.__SEATING_CLIENT__) return;
     var el = $('savedList'); var c = dbc();
     var proj = (cfg.client.project || '').trim();
     if (!el || !c || !proj) { if (el) el.innerHTML = ''; return; }
@@ -564,10 +567,10 @@
           '<label class="cfld"><span>Project</span><input type="text" placeholder="Project / address" value="' + esc(cfg.client.project) + '" oninput="SeatingApp.setClient(\'project\', this.value)"></label>' +
           '<div class="cfld-hint">Shown on the proposal cover.</div>' +
         '</div>' +
-        '<div class="panel saved-panel"><div class="ptt">Saved configurations <span class="opt-tag">per project</span>' +
+        (global.__SEATING_CLIENT__ ? '' : '<div class="panel saved-panel"><div class="ptt">Saved configurations <span class="opt-tag">per project</span>' +
           '<button class="ghost sm" style="float:right" onclick="SeatingApp.saveConfig()">' + (cfg._savedId ? 'Update save' : 'Save this configuration') + '</button></div>' +
           '<div id="savedList"><div class="hint">Enter a project name above, then save — configurations can be reopened later or linked from the Cinema Designer.</div></div>' +
-        '</div>' +
+        '</div>') +
         '<div class="strip">' +
           cell('Room', (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm') +
           cell('Layout', (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats', cfg.layout.rows + ' rows × ' + cfg.layout.seatsPerRow) +
