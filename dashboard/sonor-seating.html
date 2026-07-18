@@ -203,22 +203,26 @@
       text-transform: uppercase; font-weight: 800 !important; font-family: inherit !important;
     }
     #projectBarHost .sonor-project-bar select {
-      background: var(--bg2, #191320) !important; color: var(--cream) !important;
-      border: 1px solid var(--brd) !important; border-radius: 9px !important;
+      background: #14100c !important; color: var(--cream) !important;
+      border: 1px solid rgba(201,168,92,.28) !important; border-radius: 9px !important;
       font-family: inherit !important; font-size: 12.5px !important; padding: 7px 30px 7px 12px !important;
+      accent-color: var(--gold) !important;
     }
-    #projectBarHost .sonor-project-bar select:focus { outline: 1px solid var(--gold) !important; }
-    #projectBarHost .sonor-project-bar select option { background: #191320 !important; color: var(--cream) !important; }
+    #projectBarHost .sonor-project-bar select:focus { outline: 1px solid var(--gold) !important; border-color: var(--gold) !important; }
+    #projectBarHost .sonor-project-bar select option { background: #14100c !important; color: var(--cream) !important; }
     #projectBarHost .sonor-project-bar .meta-cell,
     #projectBarHost .sonor-project-bar .note { font-family: inherit !important; font-size: 11.5px !important; color: var(--muted) !important; }
     #projectBarHost .sonor-project-bar .meta-cell .k { color: var(--gold) !important; font-size: 9px !important; letter-spacing: .14em !important; font-family: inherit !important; }
     #projectBarHost .sonor-project-bar .meta-cell span:not(.k) { color: var(--cream) !important; }
-    #projectBarHost .sonor-project-bar .status-pill { font-family: inherit !important; font-size: 10px !important; border-radius: 20px !important; }
+    #projectBarHost .sonor-project-bar .status-pill {
+      font-family: inherit !important; font-size: 10px !important; border-radius: 20px !important;
+      background: rgba(201,168,92,.14) !important; border: 1px solid rgba(201,168,92,.45) !important; color: var(--gold2) !important;
+    }
     #projectBarHost .sonor-project-bar .brief-link {
-      background: transparent !important; border: 1px solid var(--brdP) !important; color: var(--pur2) !important;
+      background: transparent !important; border: 1px solid rgba(201,168,92,.35) !important; color: var(--gold2) !important;
       border-radius: 8px !important; font-family: inherit !important; font-size: 11px !important;
     }
-    #projectBarHost .sonor-project-bar .brief-link:hover { border-color: var(--gold) !important; color: var(--gold2) !important; }
+    #projectBarHost .sonor-project-bar .brief-link:hover { border-color: var(--gold) !important; color: var(--gold) !important; }
     #projectBarHost .sonor-project-bar button,
     #projectBarHost .sonor-project-bar .primary {
       background: transparent !important; border: 1px solid var(--brd) !important; color: var(--gold2) !important;
@@ -450,7 +454,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.18.2';
+    const APP_VERSION = '0.18.3';
     document.addEventListener('DOMContentLoaded', function(){ var v = document.getElementById('hdrVer'); if (v) v.textContent = 'v' + APP_VERSION; });
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');

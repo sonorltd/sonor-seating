@@ -279,9 +279,10 @@
       if (l.acc && !accStarted) {
         // one gold divider + section label between seats and accessories
         accStarted = true;
+        y += 4;
         P.hline(M, A4.w - M, y - 6, GOLD, 0.8, 0.75);
-        P.tracked('ACCESSORIES', M, y - 2, 6.5, F.r, MUT, 1.4);
-        y += 14;
+        P.tracked('ACCESSORIES', M, y + 4, 6.5, F.r, MUT, 1.4);
+        y += 24;
       }
       P.text(l.label, M, y - 9, 10.5, F.r, INK, { maxWidth: cQty - M - 12 });
       P.right(String(l.qty), cQty + 20, y - 9, 10.5, F.r, INK2);
@@ -290,8 +291,9 @@
       if (li < nLines - 1) P.hline(M, A4.w - M, y + 5, LINE, 0.5, 0.6);
       y += 22;
     });
-    // ONE divider (gold) between items and totals
-    P.hline(M, A4.w - M, y - 4, GOLD, 0.8, 0.75); y += 6;
+    // ONE divider (gold) between items and totals — clear of the last row
+    y += 4;
+    P.hline(M, A4.w - M, y - 4, GOLD, 0.8, 0.75); y += 10;
     var totRows = [['Products subtotal', money(m.productTotal)],
      [m.deliveryLabel || 'Delivery', m.deliveryCost != null ? money(m.deliveryCost) : 'On request']];
     if (m.installCost != null) totRows.push([m.installLabel || 'Installation', money(m.installCost)]);
@@ -306,8 +308,8 @@
     P.right(m.grossText || 'On request', cLine, y - 12, 17, F.b, [140, 116, 60]); y += 24;
 
     // v0.18.0 — full terms live on the FINAL page; p2 carries one indicative note
-    P.text('Indicative pricing only — please refer to Terms & Payment on the final page for lead times, deposit and conditions.',
-      M, A4.h - 84, 8, F.r, MUT, { maxWidth: A4.w - M * 2 });
+    P.center('Indicative pricing only — please refer to Terms & Payment on the final page for lead times, deposit and conditions.',
+      A4.w / 2, A4.h - 84, 8, F.r, MUT);
     pageFoot(P, F, m);
   }
 
@@ -441,8 +443,8 @@
     dimV(rgx, rearY - uprPX, rearY, Math.round(uprD) + '');
 
     // notes — with the data source made explicit
-    var ny = bTop + bh + 34;
-    P.hline(M, A4.w - M, ny - 14, LINE, 0.7);
+    var ny = bTop + bh + 58;
+    P.hline(M, A4.w - M, ny - 20, LINE, 0.7);
     var src = S.dimsReal ? 'Seat dimensions from manufacturer data' : 'Seat dimensions are standard allowances (manufacturer data pending)';
     var notes = src + ': width ' + Math.round(seatW) + 'mm · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter)' + (S.armWidthMm ? ' · armrest ' + Math.round(S.armWidthMm) + 'mm' : '') + '. Rows sit ' + rowGap + 'mm behind the reclined envelope ahead · ' + sideSpace + 'mm free each side. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
     wrap(notes, F.r, 8.5, A4.w - M * 2).forEach(function (ln, li) { P.text(ln, M, ny + li * 11.5, 8.5, F.r, MUT); });
