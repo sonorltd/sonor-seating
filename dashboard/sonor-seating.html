@@ -191,6 +191,42 @@
     .sm-head::after { content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:linear-gradient(90deg, rgba(173,153,120,.5), rgba(128,88,161,.4), transparent); }
     .sm-mfr { font-size:10px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); } .sm-head h2 { font-family:'Gilroy','DM Sans',sans-serif; font-weight:800; letter-spacing:-.02em; font-size:30px; margin:4px 0 0; background:linear-gradient(90deg,var(--gold2),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; } .sm-date { font-size:12px; color:var(--muted); }
     .strip { display:flex; flex-wrap:wrap; background:var(--bg2); border:1px solid var(--brd); border-radius:14px; overflow:hidden; margin-bottom:22px; } .cellx { flex:1; min-width:150px; padding:15px 19px; border-right:1px solid var(--brd); } .cellx:last-child{ border:none; } .cl { font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); } .cv { font-family:'Gilroy','DM Sans',sans-serif; font-weight:800; font-size:16px; color:var(--cream); margin-top:4px; } .cn { font-size:10px; color:var(--muted); margin-top:2px; }
+    /* v0.18.2 — project bar restyled to the app's luxury theme (overrides the
+       shared bar's injected styles; canonical sonor-project-bar.js untouched) */
+    #projectBarHost .sonor-project-bar {
+      background: #0d0a10 !important; border-bottom: 1px solid var(--brd) !important;
+      font-family: 'Gilroy', system-ui, sans-serif !important;
+      padding: 10px 28px !important; gap: 14px !important;
+    }
+    #projectBarHost .sonor-project-bar .label {
+      color: var(--gold) !important; font-size: 10px !important; letter-spacing: .18em !important;
+      text-transform: uppercase; font-weight: 800 !important; font-family: inherit !important;
+    }
+    #projectBarHost .sonor-project-bar select {
+      background: var(--bg2, #191320) !important; color: var(--cream) !important;
+      border: 1px solid var(--brd) !important; border-radius: 9px !important;
+      font-family: inherit !important; font-size: 12.5px !important; padding: 7px 30px 7px 12px !important;
+    }
+    #projectBarHost .sonor-project-bar select:focus { outline: 1px solid var(--gold) !important; }
+    #projectBarHost .sonor-project-bar select option { background: #191320 !important; color: var(--cream) !important; }
+    #projectBarHost .sonor-project-bar .meta-cell,
+    #projectBarHost .sonor-project-bar .note { font-family: inherit !important; font-size: 11.5px !important; color: var(--muted) !important; }
+    #projectBarHost .sonor-project-bar .meta-cell .k { color: var(--gold) !important; font-size: 9px !important; letter-spacing: .14em !important; font-family: inherit !important; }
+    #projectBarHost .sonor-project-bar .meta-cell span:not(.k) { color: var(--cream) !important; }
+    #projectBarHost .sonor-project-bar .status-pill { font-family: inherit !important; font-size: 10px !important; border-radius: 20px !important; }
+    #projectBarHost .sonor-project-bar .brief-link {
+      background: transparent !important; border: 1px solid var(--brdP) !important; color: var(--pur2) !important;
+      border-radius: 8px !important; font-family: inherit !important; font-size: 11px !important;
+    }
+    #projectBarHost .sonor-project-bar .brief-link:hover { border-color: var(--gold) !important; color: var(--gold2) !important; }
+    #projectBarHost .sonor-project-bar button,
+    #projectBarHost .sonor-project-bar .primary {
+      background: transparent !important; border: 1px solid var(--brd) !important; color: var(--gold2) !important;
+      border-radius: 8px !important; font-family: inherit !important; font-size: 11px !important; cursor: pointer;
+    }
+    #projectBarHost .sonor-project-bar button:hover { border-color: var(--gold) !important; }
+    /* version chip in the top header */
+    .hdr-ver { margin-left: auto; font-size: 10px; letter-spacing: .16em; color: rgba(200,180,142,.55); font-weight: 700; }
     /* v0.18.1 — room-fit guard */
     .fitwarn { border-radius:11px; padding:13px 16px; font-size:12.5px; line-height:1.5; margin-bottom:16px; }
     .fitwarn.block { background:rgba(224,97,97,.12); border:1px solid rgba(224,97,97,.45); color:#f0a8a8; }
@@ -359,6 +395,7 @@
       <span class="wm-txt"><b>Sonor</b></span>
     </a>
     <span class="tag">Cinema Seating</span>
+    <span class="hdr-ver" id="hdrVer"></span>
   </header>
   <!-- v0.16.0 — internal build: site-wide project selector (SonorProjectBar, appKey 'seating') -->
   <div id="projectBarHost"></div>
@@ -413,7 +450,8 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.18.1';
+    const APP_VERSION = '0.18.2';
+    document.addEventListener('DOMContentLoaded', function(){ var v = document.getElementById('hdrVer'); if (v) v.textContent = 'v' + APP_VERSION; });
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();

@@ -26,7 +26,7 @@
     try {
       var res = await E.load();
       var note = $('sourceNote');
-      if (note) { note.textContent = ({ supabase: 'Live catalogue', cache: 'Offline (cached)', seed: 'Offline (bundled)', inline: 'No data' }[E.source] || E.source) + ' · v' + (CFG.version || '?'); note.className = 'src-note src-' + E.source; }
+      if (note) { note.textContent = ({ supabase: 'Live catalogue', cache: 'Offline (cached)', seed: 'Offline (bundled)', inline: 'No data' }[E.source] || E.source); note.className = 'src-note src-' + E.source; }
       renderStep();
       initProjectBar();
       bootDeepLink();
@@ -51,7 +51,7 @@
         if (initProjectBar._n <= 5) setTimeout(initProjectBar, 1200);
         return;
       }
-      SonorProjectBar.init({
+      var _barReady = SonorProjectBar.init({
         supa: c0,
         appKey: 'seating',
         host: $('projectBarHost'),
@@ -61,6 +61,21 @@
           if ($('savedList')) loadSavedList();
           pullRoomFromCinema();
         }
+      });
+      // v0.18.2 — RESTORED selection (per-app memory) doesn't fire onChange:
+      // after init resolves, adopt the bar's active project and pull identity +
+      // cinema room dims exactly as a manual selection would.
+      Promise.resolve(_barReady).then(function () {
+        try {
+          var id = SonorProjectBar.getActiveId && SonorProjectBar.getActiveId();
+          if (id && id !== cfg.projectId) {
+            cfg.projectId = id;
+            var p = SonorProjectBar.getProject ? SonorProjectBar.getProject(id) : null;
+            applyProjectIdentity(p);
+            pullRoomFromCinema();
+            if ($('savedList')) loadSavedList();
+          }
+        } catch (e) { console.warn('[seating] bar restore adopt', e); }
       });
     } catch (e) { console.warn('[seating] project bar init failed', e); }
   }
