@@ -226,8 +226,7 @@
       ['Colour', m.colourName],
       ['Row configuration', (m.rowDetails && m.rowDetails.length) ? m.rowDetails.join('  —  ') : null],
       ['Recline', m.reclineText],
-      ['Options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
-      ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null]
+      ['Options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null]
     ].filter(function (r) { return r[1]; });
     var sy = top, colourRowY = null;
     rows.forEach(function (r) {
@@ -240,7 +239,7 @@
     });
     // swatch square — right of the Colour row: photo, else colour fill
     if (colourRowY != null && (swatchImg || (m.colourHex && !m.colourIsOpenChoice))) {
-      var swW = 44, swH = 30, swX = M + colW - swW, swY = colourRowY - 2;
+      var swW = 42, swH = 26, swX = M + colW - swW, swY = colourRowY + 1;   // clear of the row divider
       if (swatchImg) {
         P.image(swatchImg, swX, swY, swW, swH, 1);
       } else {
@@ -252,39 +251,47 @@
     }
 
     // the chosen model (right) — hero photograph, plan lives on page 3
-    var planX = M + colW + 22, planW = A4.w - M - planX;
+    var planX = M + colW + 22, planW = A4.w - M - planX, imgBottom = top + 170;
     if (rangeImg) {
-      // contain-fit, frame drawn AT the image bounds — thin stroke, no dark matte
-      var bh = 190, iw = rangeImg.width, ih = rangeImg.height;
-      var fs = Math.min(planW / iw, bh / ih), dw2 = iw * fs, dh2 = ih * fs;
-      // right edge locked to the quote-table right edge (A4.w - M)
-      var ix = A4.w - M - dw2, iyTop = (top - 4) + (bh - dh2) / 2;
+      // width-fit to the column (height-capped), right edge on the table edge
+      var bhMax = 230, iw = rangeImg.width, ih = rangeImg.height;
+      var dw2 = planW, dh2 = ih * (planW / iw);
+      if (dh2 > bhMax) { dh2 = bhMax; dw2 = iw * (bhMax / ih); }
+      var ix = A4.w - M - dw2, iyTop = (top - 4);
       try { P.image(rangeImg, ix, iyTop, dw2, dh2, 1); } catch (e) {}
       P.rectB(ix, iyTop, dw2, dh2, LINE, 0.8);
+      imgBottom = iyTop + dh2;
     } else {
       drawMiniPlan(P, F, m, planX, top - 4, planW, 168);
     }
 
     // quote table
-    var qy = Math.max(sy + 18, top + 190);
+    var qy = Math.max(sy + 18, imgBottom + 28);
     P.tracked('ESTIMATED QUOTE', M, qy - 6, 8, F.b, GOLD, 2.2); qy += 12;
     var cQty = A4.w - M - 210, cUnit = A4.w - M - 110, cLine = A4.w - M;
-    P.tracked('ITEM', M, qy, 6.5, F.r, MUT, 1.4);
+    P.tracked('SEATS', M, qy, 6.5, F.r, MUT, 1.4);
     P.trackedRight('QTY', cQty + 20, qy, 6.5, F.r, MUT, 1.4);
     P.trackedRight('UNIT MSRP', cUnit + 40, qy, 6.5, F.r, MUT, 1.4);
     P.trackedRight('LINE MSRP', cLine, qy, 6.5, F.r, MUT, 1.4);
-    P.hline(M, A4.w - M, qy + 11, INK, 0.8, 0.5);
-    var y = qy + 27;
-    (m.lines || []).forEach(function (l) {
+    P.hline(M, A4.w - M, qy + 11, GOLD, 0.8, 0.75);
+    var y = qy + 27, accStarted = false, nLines = (m.lines || []).length;
+    (m.lines || []).forEach(function (l, li) {
+      if (l.acc && !accStarted) {
+        // one gold divider + section label between seats and accessories
+        accStarted = true;
+        P.hline(M, A4.w - M, y - 6, GOLD, 0.8, 0.75);
+        P.tracked('ACCESSORIES', M, y - 2, 6.5, F.r, MUT, 1.4);
+        y += 14;
+      }
       P.text(l.label, M, y - 9, 10.5, F.r, INK, { maxWidth: cQty - M - 12 });
       P.right(String(l.qty), cQty + 20, y - 9, 10.5, F.r, INK2);
       P.right(money(l.unit), cUnit + 40, y - 9, 10.5, F.r, INK2);
       P.right(l.unit != null ? money(l.unit * l.qty) : 'POA', cLine, y - 9, 10.5, F.b, INK);
-      P.hline(M, A4.w - M, y + 5, LINE, 0.5, 0.7);
+      if (li < nLines - 1) P.hline(M, A4.w - M, y + 5, LINE, 0.5, 0.6);
       y += 22;
     });
-    // divider below products
-    P.hline(M, A4.w - M, y - 4, INK, 1.1, 0.55); y += 6;
+    // ONE divider (gold) between items and totals
+    P.hline(M, A4.w - M, y - 4, GOLD, 0.8, 0.75); y += 6;
     var totRows = [['Products subtotal', money(m.productTotal)],
      [m.deliveryLabel || 'Delivery', m.deliveryCost != null ? money(m.deliveryCost) : 'On request']];
     if (m.installCost != null) totRows.push([m.installLabel || 'Installation', money(m.installCost)]);
@@ -293,26 +300,14 @@
     totRows.forEach(function (r) {
       P.text(r[0], M, y - 9, 10, F.r, MUT); P.right(r[1], cLine, y - 9, 10, F.r, INK2); y += 17;
     });
-    P.hline(cQty, A4.w - M, y - 2, INK, 0.8, 0.6); y += 16;
-    P.text('Total', M, y - 10, 13, F.b, INK);
-    P.tracked('INC VAT', M + F.b.widthOfTextAtSize('Total', 13) + 10, y - 4, 7, F.r, MUT, 1.4);
+    P.hline(cQty, A4.w - M, y - 2, GOLD, 0.8, 0.75); y += 16;
+    P.text('Total', M, y - 10, 13, F.b, [140, 116, 60]);
+    P.tracked('INC VAT', M + F.b.widthOfTextAtSize('Total', 13) + 10, y - 4, 7, F.r, [160, 140, 96], 1.4);
     P.right(m.grossText || 'On request', cLine, y - 12, 17, F.b, [140, 116, 60]); y += 24;
 
-    // terms & deposit
-    P.hline(M, A4.w - M, y, LINE, 0.7); y += 12;
-    P.tracked('TERMS & PAYMENT', M, y, 7.5, F.b, GOLD, 2); y += 14;
-    var termAll = [
-      'Proposal prepared ' + (m.dateText || '') + (m.client ? ' for ' + m.client : '') + (m.project ? ' — ' + m.project : '') + '.',
-      'Estimate only — a formal quotation will be prepared for your final choices and accessories once all information and latest pricing have been verified.',
-      'Lead time: ' + (m.leadText || 'confirmed at quotation') + ' from order confirmation and fabric approval.',
-      'Made to order: each seat is manufactured to your exact specification. Once production begins the specification (model, size, upholstery, colour and options) cannot be altered, and bespoke items are non-returnable.'
-    ].concat(m.termsLines || []);
-    termAll.forEach(function (t) {
-      var lines = wrap(t, F.r, 8, A4.w - M * 2 - 12);
-      P.text('·', M, y - 1, 8, F.b, GOLD);
-      lines.forEach(function (ln, li) { P.text(ln, M + 10, y + li * 10.5, 8, F.r, MUT); });
-      y += lines.length * 10.5 + 5;
-    });
+    // v0.18.0 — full terms live on the FINAL page; p2 carries one indicative note
+    P.text('Indicative pricing only — please refer to Terms & Payment on the final page for lead times, deposit and conditions.',
+      M, A4.h - 84, 8, F.r, MUT, { maxWidth: A4.w - M * 2 });
     pageFoot(P, F, m);
   }
 
@@ -356,7 +351,8 @@
     P.right('All dimensions in mm', A4.w - M, 108, 9, F.r, MUT);
 
     var S = m.spec || {};
-    var seatW = S.planSeatWidthMm || 650;
+    var seatW = S.planSeatWidthSel || S.planSeatWidthMm || 650;
+    var armW = S.modularArms ? (S.armWidthMm || 150) : 0;
     var uprD = S.seatDepthMm || 1050;                                   // upright footprint
     var reclD = S.reclinedDepthMm || Math.round(uprD * 1.5);            // reclined envelope
     if (reclD < uprD) reclD = uprD;
@@ -387,11 +383,11 @@
     // toward the screen).
     // Seats butt arm-to-arm (manufacturer width includes arms) — no invented gap,
     // so the total run = per × seat width and the drawing reads truly to scale.
-    var seatGapMm = 0;
-    var totalRowW = per * seatW + (per - 1) * seatGapMm;
+    // seats butt together; separate armrest MODULES sit between and at row ends
+    var totalRowW = S.rowRunMm || (S.modularArms ? per * seatW + (per + 1) * armW : per * seatW);
     var sideSpace = Math.round((roomW - totalRowW) / 2);
     var sx0 = rx + (rw - totalRowW * sc) / 2;
-    var seatPX = seatW * sc, uprPX = uprD * sc, reclPX = reclD * sc, gapPX = seatGapMm * sc, rowGapPX = rowGap * sc;
+    var seatPX = seatW * sc, uprPX = uprD * sc, reclPX = reclD * sc, armPX = armW * sc, rowGapPX = rowGap * sc;
     var rearY = rTop + rl - wallClear * sc;                             // back of rearmost row
     var pitchPX = reclPX + rowGapPX;
     var frontRowRear = rearY - (rows - 1) * pitchPX;                    // back of front row
@@ -399,20 +395,21 @@
       var rRear = rearY - (rows - 1 - r) * pitchPX;                     // r=0 front … r=rows-1 rear
       var ryU = rRear - uprPX;                                          // upright top (front edge)
       var ryR = rRear - reclPX;                                         // reclined top
+      var cx = sx0;
       for (var s = 0; s < per; s++) {
-        var cx = sx0 + s * (seatPX + gapPX);
-        // armrest glyph width — real manufacturer armrest width when the library
-        // has it, else the 15% allowance
-        var aw = (S.armWidthMm ? Math.min(S.armWidthMm * sc, seatPX * 0.3) : seatPX * 0.15);
-        // reclined envelope — lighter, ahead of the seat
+        if (armW) { P.rrect(cx, ryU, armPX, uprPX, 2.5, INK2, 0.7, 0.6); cx += armPX; }   // armrest module (shared / row end)
+        var aw = armW ? 0 : seatPX * 0.15;
         if (reclPX > uprPX + 2) P.rrect(cx + 1.5, ryR, seatPX - 3, reclPX - uprPX + 3, 3, GHOST, 0.7, 0.55);
-        // upright footprint — solid, backrest at the REAR (bottom, facing the screen)
         P.rrect(cx, ryU, seatPX, uprPX, 4, INK2, 1, 0.9);
-        P.rrect(cx + 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);               // left arm
-        P.rrect(cx + seatPX - aw - 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);  // right arm
-        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.08, seatPX - 2 * aw - 5, uprPX * 0.52, 3, INK2, 0.7, 0.75); // cushion (front)
-        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.66, seatPX - 2 * aw - 5, uprPX * 0.26, 3, INK2, 0.9, 0.9);  // backrest (rear)
+        if (!armW) {
+          P.rrect(cx + 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);
+          P.rrect(cx + seatPX - aw - 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);
+        }
+        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.08, seatPX - 2 * aw - 5, uprPX * 0.52, 3, INK2, 0.7, 0.75);
+        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.66, seatPX - 2 * aw - 5, uprPX * 0.26, 3, INK2, 0.9, 0.9);
+        cx += seatPX;
       }
+      if (armW) P.rrect(cx, ryU, armPX, uprPX, 2.5, INK2, 0.7, 0.6);                        // closing end armrest
     }
 
     // ── dimension helpers ──
@@ -428,12 +425,9 @@
     dimH(rx, rx + rw, rTop - 18, roomW + '', true);
     dimV(rx - 20, rTop, rTop + rl, roomL + '', true);
     // seat width (above the front row's reclined envelope, clear of the room lines)
-    dimH(sx0, sx0 + seatPX, frontRowRear - reclPX - 12, Math.round(seatW) + '', true);
+    dimH(sx0 + armPX, sx0 + armPX + seatPX, frontRowRear - reclPX - 12, Math.round(seatW) + '', true);
     // armrest width — only when the library holds a real armrest dimension
-    if (S.armWidthMm) {
-      var awPX = Math.min(S.armWidthMm * sc, seatPX * 0.3);
-      dimH(sx0, sx0 + awPX, frontRowRear - reclPX - 34, 'arm ' + Math.round(S.armWidthMm), true);
-    }
+    if (armW) dimH(sx0, sx0 + armPX, frontRowRear - reclPX - 34, 'arm ' + Math.round(armW), true);
     // side space either side of the run — at the rear row, inside the room
     var sideYc = rearY - uprPX / 2;
     dimH(rx, sx0, sideYc, sideSpace + '', true);
@@ -445,37 +439,45 @@
     dimV(rgx, frontRowRear - reclPX, frontRowRear, Math.round(reclD) + '');
     if (rows > 1) dimV(rgx, frontRowRear, frontRowRear + rowGapPX, Math.round(rowGap) + '');
     dimV(rgx, rearY - uprPX, rearY, Math.round(uprD) + '');
-    dimV(rgx, rearY, rTop + rl, Math.round(wallClear) + '');
 
     // notes — with the data source made explicit
     var ny = bTop + bh + 34;
     P.hline(M, A4.w - M, ny - 14, LINE, 0.7);
     var src = S.dimsReal ? 'Seat dimensions from manufacturer data' : 'Seat dimensions are standard allowances (manufacturer data pending)';
-    var notes = src + ': width ' + Math.round(seatW) + 'mm · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter)' + (S.armWidthMm ? ' · armrest ' + Math.round(S.armWidthMm) + 'mm' : '') + '. Rows sit ' + rowGap + 'mm behind the reclined envelope ahead · ' + sideSpace + 'mm free each side · rear clearance ' + wallClear + 'mm. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
+    var notes = src + ': width ' + Math.round(seatW) + 'mm · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter)' + (S.armWidthMm ? ' · armrest ' + Math.round(S.armWidthMm) + 'mm' : '') + '. Rows sit ' + rowGap + 'mm behind the reclined envelope ahead · ' + sideSpace + 'mm free each side. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
     wrap(notes, F.r, 8.5, A4.w - M * 2).forEach(function (ln, li) { P.text(ln, M, ny + li * 11.5, 8.5, F.r, MUT); });
     pageFoot(P, F, m);
   }
 
   // ── PAGE 4 · TECHNICAL SPECIFICATION ─────────────────────────────────────────
-  function techspec(P, F, m, rangeImg, TOTAL_PAGES) {
+  function techspec(P, F, m, rangeImg, TOTAL_PAGES, mfrLogoImg) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
     pageHead(P, F, m, 'TECHNICAL SPECIFICATION', 4, TOTAL_PAGES);
     P.tracked((m.manufacturer || '').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
-    if (m.spec && m.spec.style) P.right(m.spec.style, A4.w - M, 108, 10, F.r, MUT);
+    if (mfrLogoImg) {
+      // manufacturer logo (white-on-transparent assets) on a dark chip, top right
+      var lw0 = mfrLogoImg.width, lh0 = mfrLogoImg.height;
+      var lh = 20, lw = lw0 * (lh / lh0); if (lw > 120) { lw = 120; lh = lh0 * (lw / lw0); }
+      var chW = lw + 20, chH = lh + 12, chX = A4.w - M - chW, chTop = 92;
+      P.rect(chX, chTop, chW, chH, DARK2);
+      P.image(mfrLogoImg, chX + 10, chTop + 6, lw, lh, 1);
+    } else if (m.spec && m.spec.style) {
+      P.right(m.spec.style, A4.w - M, 108, 10, F.r, MUT);
+    }
 
     // range photograph — as large as the page allows (grid + references + footer
     // still need ~330pt below), contain-fit, thin frame at the image bounds
     var top = 158;
     if (rangeImg) {
+      // fit to the content width where the aspect allows (height-capped contain otherwise)
       var iw = rangeImg.width, ih = rangeImg.height;
-      var boxW = A4.w - M * 2, boxH = 320;
-      var s = Math.min(boxW / iw, boxH / ih);
-      var dw = iw * s, dh = ih * s;
-      var ix2 = M + (boxW - dw) / 2;
-      P.image(rangeImg, ix2, top + (boxH - dh) / 2, dw, dh, 1);
-      P.rectB(ix2, top + (boxH - dh) / 2, dw, dh, LINE, 0.8);
-      top += boxH + 24;
+      var boxW = A4.w - M * 2, boxH = 330;
+      var dw = boxW, dh = ih * (boxW / iw), ix2 = M;
+      if (dh > boxH) { dh = boxH; dw = iw * (boxH / ih); ix2 = M + (boxW - dw) / 2; }
+      P.image(rangeImg, ix2, top, dw, dh, 1);
+      P.rectB(ix2, top, dw, dh, LINE, 0.8);
+      top += dh + 24;
     }
 
     var S = m.spec || {};
@@ -483,11 +485,9 @@
       ['Seat width', mm(S.seatWidthMm)],
       ['Seat depth', mm(S.seatDepthMm)],
       ['Reclined depth', mm(S.reclinedDepthMm)],
-      ['Wall clearance', mm(S.wallClearanceMm)],
       ['Recline', m.reclineText],
       ['Upholstery', m.materialName ? (m.materialName + (m.colourName ? ' · ' + m.colourName : '')) : null],
       ['Options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
-      ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null],
       ['Lead time', m.leadText]
     ].filter(function (r) { return r[1]; });
     P.tracked('MODEL DATA', M, top - 4, 8, F.b, GOLD, 2.2); top += 12;
@@ -505,10 +505,84 @@
 
     // links
     P.tracked('REFERENCES', M, top, 8, F.b, GOLD, 2.2); top += 16;
-    if (m.productUrl) { P.text('Product page:', M, top, 9.5, F.r, MUT); P.link(m.productUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.productUrl); top += 18; }
-    if (m.manufacturerUrl) { P.text('Manufacturer:', M, top, 9.5, F.r, MUT); P.link(m.manufacturerUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.manufacturerUrl); top += 18; }
-    if (m.datasheetUrl) { P.text('Datasheet:', M, top, 9.5, F.r, MUT); P.link(m.datasheetUrl, M + 70, top, 9.5, F.r, [120, 90, 140], m.datasheetUrl); top += 18; }
+    // display text is trimmed to the content width so nothing overspills; the
+    // link annotation still carries the FULL url
+    function fitUrl(u) {
+      var maxW = A4.w - M - (M + 78), t = String(u).replace(/^https?:\/\//, '');
+      while (t.length > 8 && F.r.widthOfTextAtSize(t, 9.5) > maxW) t = t.slice(0, -8) + '…';
+      return t;
+    }
+    if (m.productUrl) { P.text('Product page:', M, top, 9.5, F.r, MUT); P.link(m.productUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.productUrl)); top += 18; }
+    if (m.manufacturerUrl) { P.text('Manufacturer:', M, top, 9.5, F.r, MUT); P.link(m.manufacturerUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.manufacturerUrl)); top += 18; }
+    if (m.datasheetUrl) { P.text('Datasheet:', M, top, 9.5, F.r, MUT); P.link(m.datasheetUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.datasheetUrl)); top += 18; }
     P.text(m._dsAppended ? 'The manufacturer datasheet is appended to this document.' : 'Manufacturer datasheet available via the link above or on request.', M, top, 9, F.r, MUT);
+    pageFoot(P, F, m);
+  }
+
+
+  // ── PAGE 5 · ADDITIONAL OPTIONS — everything available that wasn't picked ─────
+  function optionsPage(P, F, m, TOTAL_PAGES) {
+    P.rect(0, 0, A4.w, A4.h, CREAM);
+    pageHead(P, F, m, '', 5, TOTAL_PAGES);
+    P.tracked('AVAILABLE ON THIS RANGE', M, 92, 8.5, F.r, GOLD, 2.6);
+    P.text('Additional options', M - 1, 106, 22, F.b, INK);
+    var introLines = wrap('A menu of everything offered on the ' + (m.range || '') + ' — in case anything was missed during configuration. Ask us to add any of these to your formal quotation.', F.r, 9, A4.w - M * 2);
+    introLines.forEach(function (ln, li) { P.text(ln, M, 132 + li * 12, 9, F.r, MUT); });
+    var om = m.optionsMenu || {};
+    var y = 132 + introLines.length * 12 + 26, colR = A4.w - M;
+    function section(title) { P.tracked(title, M, y, 8, F.b, GOLD, 2.2); y += 6; P.hline(M, A4.w - M, y + 4, GOLD, 0.8, 0.75); y += 16; }
+    function fitLine(t, font, size, maxW) { t = String(t); while (t.length > 6 && font.widthOfTextAtSize(t, size) > maxW) t = t.slice(0, -4) + '…'; return t; }
+    function row(label, right, sel) {
+      if (sel) P.dot(M + 3, y + 1, 3, [173, 153, 120], [173, 153, 120]);
+      P.text(fitLine(label, sel ? F.b : F.r, 9.5, A4.w - M * 2 - 120), M + (sel ? 12 : 12), y - 4, 9.5, sel ? F.b : F.r, sel ? INK : INK2);
+      if (right) P.right(right, colR, y - 4, 9.5, F.r, MUT);
+      y += 16;
+    }
+    if ((om.materials || []).length) {
+      section('UPHOLSTERY LINES');
+      om.materials.forEach(function (x) { row(x.name + (x.group ? '  ·  ' + x.group : ''), x.price != null ? 'chair from ' + money(x.price) : '', x.selected); });
+      row("COM — customer's own material", 'priced at quotation', false);
+      y += 8;
+    }
+    if ((om.finishes || []).length) {
+      section('FINISH UPGRADES');
+      om.finishes.forEach(function (x) { row(x.label + (x.note ? '  —  ' + x.note : ''), '', x.selected); });
+      y += 8;
+    }
+    if ((om.accessories || []).length) {
+      section('ACCESSORIES');
+      om.accessories.forEach(function (x) {
+        if (y > A4.h - 110) return;
+        row(x.label + (x.qty ? '  (× ' + x.qty + ' selected)' : ''), x.price != null ? money(x.price) + ' each' : 'POA', !!x.qty);
+      });
+    }
+    P.dot(M + 3, A4.h - 79, 3, [173, 153, 120], [173, 153, 120]);
+    P.text('marks selections already in this proposal.', M + 12, A4.h - 84, 8, F.r, MUT);
+    pageFoot(P, F, m);
+  }
+
+  // ── PAGE 6 · TERMS & PAYMENT — the full terms, on their own closing page ─────
+  function termsPage(P, F, m, TOTAL_PAGES) {
+    P.rect(0, 0, A4.w, A4.h, CREAM);
+    pageHead(P, F, m, '', 6, TOTAL_PAGES);
+    P.tracked('THE DETAIL', M, 92, 8.5, F.r, GOLD, 2.6);
+    P.text('Terms & payment', M - 1, 106, 22, F.b, INK);
+    var y = 148;
+    var termAll = [
+      'Proposal prepared ' + (m.dateText || '') + (m.client ? ' for ' + m.client : '') + (m.project ? ' — ' + m.project : '') + '.',
+      'Estimate only — a formal quotation will be prepared for your final choices and accessories once all information and latest pricing have been verified.',
+      'Lead time: ' + (m.leadText || 'confirmed at quotation') + ' from order confirmation and fabric approval.',
+      'Made to order: each seat is manufactured to your exact specification. Once production begins the specification (model, size, upholstery, colour and options) cannot be altered, and bespoke items are non-returnable.'
+    ].concat(m.termsLines || []);
+    termAll.forEach(function (t) {
+      var lines = wrap(t, F.r, 9.5, A4.w - M * 2 - 14);
+      P.text('·', M, y - 1, 9.5, F.b, GOLD);
+      lines.forEach(function (ln, li) { P.text(ln, M + 12, y + li * 13, 9.5, F.r, INK2); });
+      y += lines.length * 13 + 9;
+    });
+    y += 8; P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 18;
+    P.tracked('PAYMENT', M, y, 8, F.b, GOLD, 2.2); y += 16;
+    P.text(m.paymentTerms || '50% deposit on order · 50% balance prior to delivery', M, y, 11.5, F.b, INK);
     pageFoot(P, F, m);
   }
 
@@ -559,11 +633,15 @@
     var swatchImg = null;
     try { if (m.swatchImg) swatchImg = await loadImage(doc, m.swatchImg); } catch (e) {}
 
-    var TOTAL = 4 + (dsDoc ? dsDoc.getPageCount() : 0);
+    var TOTAL = 6 + (dsDoc ? dsDoc.getPageCount() : 0);
+    var mfrLogoImg = null;
+    try { if (m.manufacturerLogo) mfrLogoImg = await loadImage(doc, m.manufacturerLogo); } catch (e) {}
     cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero, fadeImg);
     quote(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL, rangeImg, swatchImg);
     drawing(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
-    techspec(mk(doc.addPage([A4.w, A4.h]), doc), F, m, rangeImg, TOTAL);
+    techspec(mk(doc.addPage([A4.w, A4.h]), doc), F, m, rangeImg, TOTAL, mfrLogoImg);
+    optionsPage(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
+    termsPage(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     if (dsDoc) {
       try { (await doc.copyPages(dsDoc, dsDoc.getPageIndices())).forEach(function (p) { doc.addPage(p); }); }
       catch (e) { console.warn('[SeatingPdf] datasheet append failed:', e && e.message); }

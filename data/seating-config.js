@@ -4,14 +4,16 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.17.3',
+    version: '0.18.0',
     buildDate: '2026-07-17',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
       'Moovia': 'https://moovia.de',
       'Fortress Seating': 'https://fortresseating.com',
       'Cinema Deco': 'https://cinemadeco.com',
-      'Cineca': 'https://sonor.co.uk'
+      'Cineca': 'https://www.cinecacs.com',
+      'Cinelux': 'https://cineluxseating.co.uk',
+      'FrontRow': 'https://www.homecinemaseating.co.uk'
     },
     // Payment terms shown on the proposal + summary
     paymentTerms: '50% deposit on order · 50% balance prior to delivery',

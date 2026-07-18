@@ -57,15 +57,32 @@
         host: $('projectBarHost'),
         onChange: function (detail) {
           cfg.projectId = (detail && detail.currentId) || null;
-          var p = detail && detail.project;
-          if (p && p.name) cfg.client.project = p.name;
+          applyProjectIdentity(detail && detail.project);
           if ($('savedList')) loadSavedList();
-          var pf = document.querySelector('.client-row input[placeholder^="Project"]');
-          if (pf && p && p.name) pf.value = p.name;
           pullRoomFromCinema();
         }
       });
     } catch (e) { console.warn('[seating] project bar init failed', e); }
+  }
+
+  // v0.18.0 — proposal identity from the projects table:
+  // PREPARED FOR = projects.client_name · PROJECT = first line of projects.address.
+  async function applyProjectIdentity(p) {
+    try {
+      if ((!p || p.client_name === undefined || p.address === undefined) && cfg.projectId) {
+        var c = dbc();
+        if (c) { var q = await c.from('projects').select('name,client_name,address').eq('id', cfg.projectId).single(); if (!q.error) p = q.data; }
+      }
+      if (!p) return;
+      var client = (p.client_name || '').trim() || String(p.name || '').replace(/^\s*\d+\s*/, '').trim();
+      var addr1 = String(p.address || '').split(/[\n,]/)[0].trim();
+      if (client) cfg.client.name = client;
+      cfg.client.project = addr1 || p.name || cfg.client.project;
+      var nf = document.querySelector('.client-row input[placeholder^="Client"]');
+      var pf = document.querySelector('.client-row input[placeholder^="Project"]');
+      if (nf && cfg.client.name) nf.value = cfg.client.name;
+      if (pf && cfg.client.project) pf.value = cfg.client.project;
+    } catch (e) { console.warn('[seating] project identity', e); }
   }
 
   // v0.17.2 — the two apps TALK: on project selection, pull the cinema room dims
@@ -535,7 +552,7 @@
     }
     var arms = E.armrestItems(cfg.rangeId);
     if (cfg.includeArmrests && arms.length) { var a = arms[0]; var au = E.itemSell(a, cfg.material); var ga = E.hasExactPrice(a, cfg.material) ? 1 : globalUp; lines.push({ label: a.label, qty: total + cfg.layout.rows, unit: au != null ? Math.round(au * ga) : null }); }
-    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it, cfg.material) }); });
+    Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it, cfg.material), acc: true }); });
     return lines;
   }
   // ── VAT ──
@@ -659,21 +676,33 @@
   // anchor to the rear wall (backs to the wall, footrests toward the screen),
   // reclined envelope drawn lighter ahead of the upright footprint. Real
   // manufacturer dims flow in live as soon as a range is chosen.
+  function parseCm(s) { var m = /([0-9]+(?:\.[0-9]+)?)\s*cm/i.exec(String(s || '')); return m ? Math.round(parseFloat(m[1]) * 10) : null; }
   function planSpec() {
     var r = (cfg.rangeId && E) ? E.range(cfg.rangeId) : null;
     var cap = (r && r.capability) || {};
-    var seatW = cap.seat_width_mm || (r ? E.seatWidthMm(r) : null) || (CFG.clearance && CFG.clearance.seatFallbackWidthMm) || 650;
+    // v0.18.0 — the CHOSEN seat item's real width wins (e.g. Modena Fixed S = 57cm,
+    // not the range's 67cm default); separate armrest modules add to the row run.
+    var chosenW = null;
+    try { var rc0 = rowConfig(0); chosenW = rc0 && rc0.seat ? parseCm(rc0.seat.size_label || rc0.seat.size) : null; } catch (e) {}
+    var seatW = chosenW || cap.seat_width_mm || (r ? E.seatWidthMm(r) : null) || (CFG.clearance && CFG.clearance.seatFallbackWidthMm) || 650;
     var uprD = cap.seat_depth_mm || (r && E.seatDepthMm ? E.seatDepthMm(r) : null) || 1050;
     var reclD = cap.reclined_depth_mm || Math.round(uprD * 1.5);
     if (reclD < uprD) reclD = uprD;
+    var arms = r ? (E.armrestItems(r.id) || []) : [];
+    var armW0 = null;
+    for (var ai = 0; ai < arms.length && !armW0; ai++) armW0 = parseCm(arms[ai].size_label || arms[ai].size);
+    var modularArms = !!(arms.length && cfg.includeArmrests);
     return {
       seatW: seatW, uprD: uprD, reclD: reclD,
-      rowGap: (CFG.clearance && CFG.clearance.rowGapMm) || 600,
+      armW: modularArms ? (armW0 || 150) : null, modularArms: modularArms,
+      rowGap: (CFG.clearance && CFG.clearance.rowGapMm) || 50,
       wallClear: (cap.wall_clearance_mm != null && cap.wall_clearance_mm !== 0) ? cap.wall_clearance_mm : (cap.wall_clearance_mm === 0 ? 0 : 100),
       real: !!(cap.seat_width_mm || cap.seat_depth_mm || cap.reclined_depth_mm),
       rangeName: r ? r.name : null
     };
   }
+  // row run in mm — arms as shared modules between/around seats when separate
+  function rowRunMm(S, per) { return S.modularArms ? per * S.seatW + (per + 1) * S.armW : per * S.seatW; }
   function roomSVG(L, big) {
     var S = planSpec();
     var roomW = L.widthMm || 4000, roomL = L.lengthMm || 6000, rows = L.rows || 2, per = L.seatsPerRow || 3;
@@ -684,9 +713,10 @@
     var sc = Math.min((boxW - padL - padR) / roomW, (boxH - padT - padB) / roomL);
     var rw = roomW * sc, rl = roomL * sc;
     var rx = padL + ((boxW - padL - padR) - rw) / 2, ry = padT + ((boxH - padT - padB) - rl) / 2;
-    var totalRowW = per * S.seatW, sideMm = Math.round((roomW - totalRowW) / 2);
+    var totalRowW = rowRunMm(S, per), sideMm = Math.round((roomW - totalRowW) / 2);
     var sx0 = rx + (rw - totalRowW * sc) / 2;
     var seatPX = S.seatW * sc, uprPX = S.uprD * sc, reclPX = S.reclD * sc, rowGapPX = S.rowGap * sc;
+    var armPX = S.modularArms ? S.armW * sc : 0;
     var rearY = ry + rl - S.wallClear * sc, pitch = reclPX + rowGapPX;
     function rr(x, y, w, h, r2, fill, stroke, sw2) {
       return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + r2 + '" fill="' + (fill || 'none') + '"' + (stroke ? ' stroke="' + stroke + '" stroke-width="' + (sw2 || 1) + '"' : '') + '/>';
@@ -712,15 +742,21 @@
     s += txt('S C R E E N', rx + rw / 2, ry + 20, 6, G(0.8), 'middle', 3);
     for (var r = 0; r < rows; r++) {
       var rRear = rearY - (rows - 1 - r) * pitch, ryU = rRear - uprPX, ryR = rRear - reclPX;
+      var cx = sx0;
       for (var i = 0; i < per; i++) {
-        var cx = sx0 + i * seatPX, aw = seatPX * 0.15;
+        if (S.modularArms) { s += rr(cx, ryU, armPX, uprPX, 2, G(0.1), G(0.55), 0.8); cx += armPX; }   // shared/end armrest module
+        var aw = S.modularArms ? 0 : seatPX * 0.15;
         if (reclPX > uprPX + 2) s += rr(cx + 1, ryR, seatPX - 2, reclPX - uprPX + 2, 2, 'none', G(0.28), 0.7);
         s += rr(cx, ryU, seatPX, uprPX, 3, 'rgba(128,88,161,0.14)', G(0.85), 1);
-        s += rr(cx + 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
-        s += rr(cx + seatPX - aw - 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
+        if (!S.modularArms) {
+          s += rr(cx + 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
+          s += rr(cx + seatPX - aw - 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
+        }
         s += rr(cx + aw + 2, ryU + uprPX * 0.08, seatPX - 2 * aw - 4, uprPX * 0.52, 2, 'none', G(0.5), 0.7);
         s += rr(cx + aw + 2, ryU + uprPX * 0.66, seatPX - 2 * aw - 4, uprPX * 0.26, 2, G(0.14), G(0.7), 0.9);
+        cx += seatPX;
       }
+      if (S.modularArms) s += rr(cx, ryU, armPX, uprPX, 2, G(0.1), G(0.55), 0.8);
     }
     s += dimH(rx, rx + rw, ry - 12, roomW + '', true);
     s += dimV(rx - 14, ry, ry + rl, roomL + '');
@@ -767,15 +803,10 @@
         return 'https://ysmvklstkzodlocttspy.supabase.co/storage/v1/object/public/seating-assets/' + r.id + '.jpg';
       })(),
       spec: {
-        // armrest width — first number in the armrest item's size label, cm → mm
-        armWidthMm: (function () {
-          var arms = E.armrestItems(r.id) || [];
-          for (var i = 0; i < arms.length; i++) {
-            var mt = /([0-9]+(?:\.[0-9]+)?)\s*cm/i.exec(arms[i].size || arms[i].sizeLabel || arms[i].size_label || '');
-            if (mt) return Math.round(parseFloat(mt[1]) * 10);
-          }
-          return null;
-        })(),
+        armWidthMm: (function () { var S0 = planSpec(); return S0.modularArms ? S0.armW : null; })(),
+        modularArms: planSpec().modularArms,
+        planSeatWidthSel: planSpec().seatW,
+        rowRunMm: rowRunMm(planSpec(), cfg.layout.seatsPerRow),
         seatWidthMm: cap.seat_width_mm || seatW, seatDepthMm: cap.seat_depth_mm || null,
         reclinedDepthMm: cap.reclined_depth_mm || null, wallClearanceMm: cap.wall_clearance_mm || null,
         planSeatWidthMm: seatW, planSeatDepthMm: seatD,
@@ -796,6 +827,24 @@
       colourHex: (function () { if (!mat || !cfg.colour) return null; var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); return (c && c.hex) || guessHex(cfg.colour); })(),
       swatchImg: (function () { if (mat && cfg.colour) { var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); if (c && c.img) return c.img; } return mat ? (mat.swatchImg || null) : null; })(),
       installCost: inst, installLabel: (CFG.installation || {}).label || 'Installation',
+      manufacturerLogo: (r.metadata && r.metadata.manufacturer_logo) || null,
+      // v0.18.0 — 'Additional options' page: everything available on this range that
+      // wasn't picked, so nothing is missed in the config process
+      optionsMenu: {
+        accessories: E.accessoryItems(r.id).map(function (it) {
+          var p = E.itemSell(it, cfg.material);
+          return { label: it.label, price: p != null ? Math.round(p) : null, qty: cfg.accessories[it.id] || 0, generic: !!it.is_universal };
+        }),
+        finishes: (CFG.finishOptions || []).map(function (f) { return { label: f.label, note: f.note, selected: !!cfg.finishes[f.id] }; }),
+        materials: (r.materials || []).filter(function (m) { return m.available !== false; }).map(function (m) {
+          var p = E.chairFrom(r, m.id);
+          return { name: m.name, group: m.group || '', price: p != null ? Math.round(p) : null, selected: cfg.material === m.id };
+        }),
+        seats: E.seatItems(r.id).slice(0, 14).map(function (s2) {
+          var p = E.itemSell(s2, cfg.material);
+          return { label: s2.label, price: p != null ? Math.round(p) : null };
+        })
+      },
       productUrl: meta.product_url || null,
       datasheetUrl: meta.datasheet_url || null,
       manufacturerUrl: (CFG.manufacturerSites || {})[r.manufacturer] || null,
