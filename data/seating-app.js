@@ -28,11 +28,36 @@
       var note = $('sourceNote');
       if (note) { note.textContent = ({ supabase: 'Live catalogue', cache: 'Offline (cached)', seed: 'Offline (bundled)', inline: 'No data' }[E.source] || E.source) + ' · v' + (CFG.version || '?'); note.className = 'src-note src-' + E.source; }
       renderStep();
+      initProjectBar();
       bootDeepLink();
       try { if (global.SonorShell && res.db) global.SonorShell.selfTest(res.db); } catch (e) {}
     } catch (err) { var m = $('stepBody'); if (m) m.innerHTML = '<div class="empty">Failed to load catalogue: ' + esc(err && err.message) + '</div>'; }
   }
 
+
+
+  // ── v0.16.0 · site-wide project selector (shared SonorProjectBar) ───────────
+  // Internal build: the same picker as Takeoffs (SonorProjectList filtering —
+  // recents → WQ tenders → trials → completed sink). Selecting a project binds
+  // saved configurations to project_id and prefills the proposal project name.
+  function initProjectBar() {
+    try {
+      if (typeof SonorProjectBar === 'undefined' || !global.db || !global.db.client) return;
+      SonorProjectBar.init({
+        supa: global.db.client,
+        appKey: 'seating',
+        host: $('projectBarHost'),
+        onChange: function (detail) {
+          cfg.projectId = (detail && detail.currentId) || null;
+          var p = detail && detail.project;
+          if (p && p.name) cfg.client.project = p.name;
+          if ($('savedList')) loadSavedList();
+          var pf = document.querySelector('.client-row input[placeholder^="Project"]');
+          if (pf && p && p.name) pf.value = p.name;
+        }
+      });
+    } catch (e) { console.warn('[seating] project bar init failed', e); }
+  }
 
   // ── v0.15.0 · saved configurations per project (SSOT: seating_configs) ──────
   // Save/recall the whole cfg. Deep links: ?config=<id> opens a saved config,
@@ -45,7 +70,7 @@
     if (!proj) { toast('Enter a project name first'); var pf = document.querySelector('.client-row input[placeholder^="Project"]'); if (pf) pf.focus(); return; }
     var r = E.range(cfg.rangeId);
     var label = ((r && r.name) || 'Config') + ' · ' + cfg.layout.rows + '×' + cfg.layout.seatsPerRow + (cfg.colour ? ' · ' + cfg.colour : '');
-    var body = { project_name: proj, label: label, range_id: cfg.rangeId, config: cfg, app_version: CFG.version, updated_at: new Date().toISOString() };
+    var body = { project_name: proj, project_id: cfg.projectId || null, label: label, range_id: cfg.rangeId, config: cfg, app_version: CFG.version, updated_at: new Date().toISOString() };
     try {
       var q;
       if (cfg._savedId) q = await c.from('seating_configs').update(body).eq('id', cfg._savedId).select('id').single();
@@ -61,7 +86,8 @@
     var proj = (cfg.client.project || '').trim();
     if (!el || !c || !proj) { if (el) el.innerHTML = ''; return; }
     try {
-      var q = await c.from('seating_configs').select('id,label,range_id,app_version,updated_at').eq('project_name', proj).eq('archived', false).order('updated_at', { ascending: false }).limit(20);
+      var qb = c.from('seating_configs').select('id,label,range_id,app_version,updated_at').eq('archived', false).order('updated_at', { ascending: false }).limit(20);
+      var q = await (cfg.projectId ? qb.eq('project_id', cfg.projectId) : qb.eq('project_name', proj));
       if (q.error) throw q.error;
       if (!q.data.length) { el.innerHTML = '<div class="hint">No saved configurations for this project yet.</div>'; return; }
       el.innerHTML = q.data.map(function (row) {
@@ -69,7 +95,9 @@
         return '<div class="saved-row' + (row.id === cfg._savedId ? ' cur' : '') + '">' +
           '<div class="saved-b"><div class="saved-n">' + esc(row.label) + '</div><div class="saved-d">' + d + ' · v' + esc(row.app_version || '?') + '</div></div>' +
           '<button class="ghost sm" onclick="SeatingApp.openSaved(\'' + row.id + '\')">Open</button>' +
-          '<button class="ghost sm" onclick="SeatingApp.copySavedLink(\'' + row.id + '\')">Link</button></div>';
+          '<button class="ghost sm" onclick="SeatingApp.renameSaved(\'' + row.id + '\')" title="Rename">✎</button>' +
+          '<button class="ghost sm" onclick="SeatingApp.copySavedLink(\'' + row.id + '\')">Link</button>' +
+          '<button class="ghost sm" onclick="SeatingApp.deleteSaved(\'' + row.id + '\')" title="Delete">🗑</button></div>';
       }).join('');
     } catch (e) { el.innerHTML = '<div class="hint">Saved list unavailable: ' + esc(e && e.message) + '</div>'; }
   }
@@ -88,6 +116,21 @@
     if (!E.range(cfg.rangeId)) { toast('Saved range no longer in the catalogue'); cfg.step = 2; }
     enter(); cfg.step = Math.min(saved.step || 4, 4); renderStep();
     toast('Configuration loaded');
+  }
+  async function renameSaved(id) {
+    var c = dbc(); if (!c) return toast('Offline');
+    var n = global.prompt('New name for this configuration:'); if (!n) return;
+    var q = await c.from('seating_configs').update({ label: n, updated_at: new Date().toISOString() }).eq('id', id);
+    if (q.error) return toast('Rename failed: ' + q.error.message);
+    toast('Renamed'); loadSavedList();
+  }
+  async function deleteSaved(id) {
+    var c = dbc(); if (!c) return toast('Offline');
+    if (!global.confirm('Delete this saved configuration?')) return;
+    var q = await c.from('seating_configs').update({ archived: true, updated_at: new Date().toISOString() }).eq('id', id);
+    if (q.error) return toast('Delete failed: ' + q.error.message);
+    if (cfg._savedId === id) cfg._savedId = null;
+    toast('Deleted'); loadSavedList();
   }
   function copySavedLink(id) {
     var u = location.origin + location.pathname + '?config=' + id;
@@ -322,6 +365,15 @@
     var groups = {}, order = [];
     mats.forEach(function (m) { var g = m.groupKey || 'fabric'; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(m); });
     order.sort(function (a, b) { var ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    // v0.16.0 — COM (Customer's Own Material) — always offered as a third option
+    // v0.16.0 — COM (Customer's Own Material) — always offered as a third option
+    var comCard = '<div class="mgrp"><div class="lbl">Customer\'s Own</div><div class="mat-grid">' +
+      '<button class="mcard ' + (cfg.material === '_com' ? 'on' : '') + '" onclick="SeatingApp.setMaterial(\'_com\')">' +
+      '<div class="mc-top"><span class="mc-sw" style="--c:#9a8f7f"></span><div class="mc-name">COM — Customer\'s Own Material</div></div>' +
+      '<div class="mc-meta">Supply your own fabric or leather</div>' +
+      '<div class="mc-price">Priced at quotation</div>' +
+      '<div class="mc-col">Subject to manufacturer approval</div></button>' +
+      '</div></div>';
     var secs = order.map(function (g) {
       var cards = groups[g].map(function (m) {
         var sel = cfg.material === m.id, avail = m.available !== false;
@@ -338,7 +390,7 @@
       }).join('');
       return '<div class="mgrp"><div class="lbl">' + groupLabel(g) + '</div><div class="mat-grid">' + cards + '</div></div>';
     }).join('');
-    return '<div class="panel"><div class="ptt">Upholstery</div>' + secs + colourHtml(r) + '</div>';
+    return '<div class="panel"><div class="ptt">Upholstery</div>' + secs + comCard + colourHtml(r) + '</div>';
   }
   // colour-name → hex fallback (many library colourways have no hex filed yet)
   var COLOUR_WORDS = [
@@ -369,9 +421,15 @@
     return 'hsl(' + h + ',22%,38%)';
   }
   function colourHtml(r) {
+    if (cfg.material === '_com') return '<div class="colsel"><div class="lbl">Colour — COM</div><div class="hint" style="margin-top:4px">Customer\'s own material: you supply the fabric/leather. Quantity, suitability and fire rating are confirmed with the manufacturer before order.</div></div>';
     var m = (r.materials || []).find(function (x) { return x.id === cfg.material; });
     var cols = (m && m.colours) || [];
-    if (!cols.length) return '';
+    // v0.15.1 — no colour card published (e.g. Cinelux: open choice, samples at order)
+    if (!cols.length) {
+      if (m && m.colourNote) return '<div class="colsel"><div class="lbl">Colour — ' + esc(m.name) + '</div><div class="hint" style="margin-top:4px">' + esc(m.colourNote) + '</div></div>';
+      if (m) return '<div class="colsel"><div class="lbl">Colour — ' + esc(m.name) + '</div><div class="hint" style="margin-top:4px">Colourways for this range are agreed with the supplier — samples provided at quotation.</div></div>';
+      return '';
+    }
     return '<div class="colsel"><div class="lbl">Colour — ' + esc(m.name) + ' <span class="opt-tag">' + cols.length + ' colourways</span></div><div class="cols">' + cols.map(function (c) {
       var hx = c.hex || guessHex(c.name);
       var st = '--c:' + esc(hx) + (c.img ? ';background-image:url(\'' + esc(c.img) + '\');background-size:cover;background-position:center' : '');
@@ -387,7 +445,7 @@
   }
   function catFinish(r) { var it = E.seatItems(r.id)[0]; return it && it.finish; }
   function materialUpcharge() { var r = E.range(cfg.rangeId); var m = ((r && r.materials) || []).find(function (x) { return x.id === cfg.material; }); return m ? (m.upcharge || 0) : 0; }
-  function setMaterial(id) { cfg.material = id; var r = E.range(cfg.rangeId); var m = (r.materials || []).find(function (x) { return x.id === id; }); cfg.colour = m && (m.colours || [])[0] ? m.colours[0].name : null; renderConfigure(); }
+  function setMaterial(id) { cfg.material = id; if (id === '_com') { cfg.colour = null; renderConfigure(); return; } var r = E.range(cfg.rangeId); var m = (r.materials || []).find(function (x) { return x.id === id; }); cfg.colour = m && (m.colours || [])[0] ? m.colours[0].name : null; renderConfigure(); }
   function setColour(n) { cfg.colour = n; renderConfigure(); }
   function toggleFinish(id, v) { cfg.finishes[id] = v; updateLive(); }
   function selectedFinishes() { return (CFG.finishOptions || []).filter(function (f) { return cfg.finishes[f.id]; }); }
@@ -650,8 +708,9 @@
     var r = E.range(cfg.rangeId); if (!r) return null;
     var lines = quoteLines(), prod = productTotal(lines), di = deliveryInfo(), inst = installCost(), total = prod + (di.cost || 0) + (inst || 0);
     var anyPriced = lines.some(function (l) { return l.unit != null; });
+    var isCom = cfg.material === '_com';
     var mat = (r.materials || []).find(function (m) { return m.id === cfg.material; });
-    var uph = mat ? mat.name : (catFinish(r) || 'Confirmed at quotation');
+    var uph = isCom ? "Customer's Own Material (COM)" : (mat ? mat.name : (catFinish(r) || 'Confirmed at quotation'));
     if (mat && cfg.colour) uph += ' · ' + cfg.colour;
     var recline = cfg.motor ? ((CFG.motorLabels || {})[cfg.motor] || cfg.motor) : null;
     var vb = vatBreakdown(total);
@@ -694,7 +753,9 @@
       roomWidthMm: cfg.layout.widthMm, roomLengthMm: cfg.layout.lengthMm,
       accessories: accLines, includeArmrests: cfg.includeArmrests,
       rowDetails: (function () { if (!hasRowOverrides()) return null; var out = []; for (var ri = 0; ri < cfg.layout.rows; ri++) { var rc = rowConfig(ri); out.push('Row ' + (ri + 1) + ': ' + ((rc.seat && rc.seat.label) || '—') + (rc.mat ? ' · ' + rc.mat.name + (rc.colour ? ' (' + rc.colour + ')' : '') : '')); } return out; })(),
-      materialName: mat ? mat.name : null, colourName: cfg.colour || null,
+      materialName: isCom ? "Customer's Own Material (COM)" : (mat ? mat.name : null),
+      colourName: isCom ? 'Supplied by client — subject to manufacturer approval' : (cfg.colour || (mat && mat.colourNote ? 'Free choice of colour — samples supplied at order' : null)),
+      colourIsOpenChoice: !!(isCom || (!cfg.colour && mat && mat.colourNote)),
       materialGroup: mat ? (mat.group || null) : null,
       materialTier: mat ? (mat.tierLabel || null) : null,
       materialSwatchHex: mat ? (mat.swatch || null) : null,
@@ -762,6 +823,6 @@
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
     toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish, setClient: setClient,
     rowSet: rowSet, rowsReset: rowsReset,
-    saveConfig: saveConfig, openSaved: openSaved, copySavedLink: copySavedLink
+    saveConfig: saveConfig, openSaved: openSaved, copySavedLink: copySavedLink, renameSaved: renameSaved, deleteSaved: deleteSaved
   };
 })(typeof window !== 'undefined' ? window : this);

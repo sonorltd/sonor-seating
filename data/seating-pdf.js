@@ -128,7 +128,6 @@
 
   // shared page furniture (content pages)
   function pageHead(P, F, m, label, pageNo, total) {
-    P.rect(0, 0, A4.w, 4, GOLD); P.rect(A4.w - 130, 0, 130, 4, PUR);
     P.tracked('LUXURY SEATING PROPOSAL', M, 42, 8, F.r, [150, 138, 116], 2.4);
     // RHS: page number only (v0.14.0 — section labels dropped per user)
     if (pageNo) P.trackedRight(pageNo + ' / ' + total, A4.w - M, 42, 8, F.r, [170, 160, 140], 1.6);
@@ -222,12 +221,12 @@
     // otherwise the same framed square filled with the colour.
     var rows = [
       ['Layout', m.layoutText],
-      ['Upholstery type', grpLabel ? (grpLabel + (m.materialTier ? ' · ' + m.materialTier : '')) : null],
-      ['Material', m.materialName || (m.upholsteryText || 'Confirmed at quotation')],
+      // v0.16.0 — single Upholstery type row (was Upholstery type + Material duplicate)
+      ['Upholstery type', m.materialName || (m.upholsteryText || 'Confirmed at quotation')],
       ['Colour', m.colourName],
       ['Row configuration', (m.rowDetails && m.rowDetails.length) ? m.rowDetails.join('  —  ') : null],
       ['Recline', m.reclineText],
-      ['Finish options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
+      ['Options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
       ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null]
     ].filter(function (r) { return r[1]; });
     var sy = top, colourRowY = null;
@@ -240,7 +239,7 @@
       P.hline(M, M + colW, sy - 7, LINE, 0.5, 0.7);
     });
     // swatch square — right of the Colour row: photo, else colour fill
-    if (colourRowY != null) {
+    if (colourRowY != null && (swatchImg || (m.colourHex && !m.colourIsOpenChoice))) {
       var swW = 44, swH = 30, swX = M + colW - swW, swY = colourRowY - 2;
       if (swatchImg) {
         P.image(swatchImg, swX, swY, swW, swH, 1);
@@ -258,7 +257,8 @@
       // contain-fit, frame drawn AT the image bounds — thin stroke, no dark matte
       var bh = 190, iw = rangeImg.width, ih = rangeImg.height;
       var fs = Math.min(planW / iw, bh / ih), dw2 = iw * fs, dh2 = ih * fs;
-      var ix = planX + (planW - dw2) / 2, iyTop = (top - 4) + (bh - dh2) / 2;
+      // right edge locked to the quote-table right edge (A4.w - M)
+      var ix = A4.w - M - dw2, iyTop = (top - 4) + (bh - dh2) / 2;
       try { P.image(rangeImg, ix, iyTop, dw2, dh2, 1); } catch (e) {}
       P.rectB(ix, iyTop, dw2, dh2, LINE, 0.8);
     } else {
@@ -303,6 +303,7 @@
     P.tracked('TERMS & PAYMENT', M, y, 7.5, F.b, GOLD, 2); y += 14;
     var termAll = [
       'Proposal prepared ' + (m.dateText || '') + (m.client ? ' for ' + m.client : '') + (m.project ? ' — ' + m.project : '') + '.',
+      'Estimate only — a formal quotation will be prepared for your final choices and accessories once all information and latest pricing have been verified.',
       'Lead time: ' + (m.leadText || 'confirmed at quotation') + ' from order confirmation and fabric approval.',
       'Made to order: each seat is manufactured to your exact specification. Once production begins the specification (model, size, upholstery, colour and options) cannot be altered, and bespoke items are non-returnable.'
     ].concat(m.termsLines || []);
@@ -485,7 +486,7 @@
       ['Wall clearance', mm(S.wallClearanceMm)],
       ['Recline', m.reclineText],
       ['Upholstery', m.materialName ? (m.materialName + (m.colourName ? ' · ' + m.colourName : '')) : null],
-      ['Finish options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
+      ['Options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
       ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null],
       ['Lead time', m.leadText]
     ].filter(function (r) { return r[1]; });

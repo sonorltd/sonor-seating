@@ -11,6 +11,9 @@
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
   <script src="../sonor-db.js"></script>
+  <script src="../data/sonor-project-bus.js"></script>
+  <script src="../data/sonor-project-list.js"></script>
+  <script src="../data/sonor-project-bar.js"></script>
   <script src="../data/sonor-app.js"></script>
   <script src="../data/sonor-brand.js"></script>
   <script src="../data/sonor-header.js"></script>
@@ -352,6 +355,8 @@
     </a>
     <span class="tag">Cinema Seating</span>
   </header>
+  <!-- v0.16.0 — internal build: site-wide project selector (SonorProjectBar, appKey 'seating') -->
+  <div id="projectBarHost"></div>
 
   <!-- ── INTRO / LANDING ── -->
   <main id="intro">
@@ -403,7 +408,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.15.0';
+    const APP_VERSION = '0.16.0';
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();

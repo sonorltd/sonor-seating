@@ -5,6 +5,7 @@
 */
 (function (global) {
   'use strict';
+  var MATMETA = {};
   var CFG = global.__SEATING_CONFIG__ || {};
   var ACC = CFG.accessoryTypes || [];
   var CACHE = CFG.cacheKey || 'sonor_seating_ssot_v2';
@@ -40,6 +41,7 @@
         tier: m.tier || null, tierLabel: TIER_LABEL[m.tier] || null,
         available: m.available !== false, upcharge: Number(m.upcharge_pct || 0),
         swatchImg: m.swatch_img || null,     // photo of the actual swatch — when the Library files one
+        colourNote: ((typeof MATMETA !== 'undefined' && MATMETA[id]) || {}).colour_note || null,
         colours: cols
       });
     });
@@ -103,7 +105,8 @@
         var db = new global.SonorDB();
         var v = await db.client.from('v_seating_catalogue').select('*');
         if (!v.error && (v.data || []).length) {
-          try { var cq = await db.client.from('seating_material_colours').select('material_id,name,hex,sort_order,metadata').order('material_id').order('sort_order'); if (!cq.error) { COLOURS = {}; (cq.data || []).forEach(function (c) { (COLOURS[c.material_id] = COLOURS[c.material_id] || []).push({ name: c.name, hex: c.hex, img: (c.metadata && c.metadata.swatch_img) || null }); }); } } catch (e) {}
+          try { var cq = await db.client.from('seating_material_colours').select('material_id,name,hex,sort_order,metadata').order('material_id').order('sort_order'); if (!cq.error) { COLOURS = {}; (cq.data || []).forEach(function (c) { (COLOURS[c.material_id] = COLOURS[c.material_id] || []).push({ name: c.name, hex: c.hex, img: (c.metadata && c.metadata.swatch_img) || null }); }); }
+          try { var mq = await db.client.from('seating_materials').select('id,metadata').neq('metadata', '{}'); if (!mq.error) { MATMETA = {}; (mq.data || []).forEach(function (m2) { MATMETA[m2.id] = m2.metadata || {}; }); } } catch (e2) {} } catch (e) {}
           var ad = adaptSSOT(v.data); ranges = ad.ranges; catalogue = ad.catalogue; source = 'supabase';
           try { localStorage.setItem(CACHE, JSON.stringify({ ranges: ranges, catalogue: catalogue })); } catch (e) {}
           _index(); return { source: source, db: db };
@@ -127,6 +130,7 @@
     var seed = global.__SEATING_SEED__;
     if (seed) {
       if (seed.colours) COLOURS = seed.colours;
+      if (seed.matmeta) MATMETA = seed.matmeta;
       if ((seed.ssot_slim || []).length) { var a2 = adaptSSOT(unslim(seed.ssot_slim)); ranges = a2.ranges; catalogue = a2.catalogue; source = 'seed'; _index(); return { source: source, db: null }; }
       if ((seed.ssot || []).length) { var a3 = adaptSSOT(seed.ssot); ranges = a3.ranges; catalogue = a3.catalogue; source = 'seed'; _index(); return { source: source, db: null }; }
       if ((seed.ranges || []).length) { ranges = seed.ranges; catalogue = seed.catalogue; source = 'seed'; _index(); return { source: source, db: null }; }
