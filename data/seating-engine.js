@@ -5,7 +5,7 @@
 */
 (function (global) {
   'use strict';
-  var MATMETA = {};
+  var MATMETA = {}, MFRMETA = {}, FINOPTS = {};
   var CFG = global.__SEATING_CONFIG__ || {};
   var ACC = CFG.accessoryTypes || [];
   var CACHE = CFG.cacheKey || 'sonor_seating_ssot_v2';
@@ -73,7 +73,8 @@
         order.push(rid);
         var meta = row.range_metadata || {}, cfg = row.range_config || {};
         rmap[rid] = {
-          id: rid, manufacturer: row.manufacturer_name, manufacturer_slug: row.manufacturer_slug || null, name: row.range_name,
+          id: rid, manufacturer: row.manufacturer_name, manufacturer_slug: row.manufacturer_slug || null,
+          manufacturer_meta: (typeof MFRMETA !== 'undefined' && MFRMETA[row.manufacturer_slug]) || {}, name: row.range_name,
           style: row.range_tagline || meta.range_style || '',
           // Library is SSOT for imagery: absolute hero_img from the view wins;
           // the app-side map remains only as a fallback for unfiled ranges.
@@ -88,7 +89,8 @@
             wall_clearance_mm: row.wall_clearance_mm || null,
             max_seats: cfg.max_seats || null, features: {}
           },
-          materials: adaptMaterials(row.materials, COLOURS), finishes: [],
+          materials: adaptMaterials(row.materials, COLOURS),
+          finishes: (typeof FINOPTS !== 'undefined' && FINOPTS[row.manufacturer_slug]) || [],
           metadata: { seating_range: true, needs_review: !!meta._needs_review, is_cineca: row.manufacturer_slug === 'cineca', manufacturer_logo: MFR_LOGO[row.manufacturer_slug] || null, range_style: meta.range_style || null, product_url: meta.product_url || null, datasheet_url: meta.datasheet_url || null },
           _items: []
         };
@@ -133,7 +135,9 @@
         var v = await db.client.from('v_seating_catalogue').select('*');
         if (!v.error && (v.data || []).length) {
           try { var cq = await db.client.from('seating_material_colours').select('material_id,name,hex,sort_order,metadata').order('material_id').order('sort_order'); if (!cq.error) { COLOURS = {}; (cq.data || []).forEach(function (c) { (COLOURS[c.material_id] = COLOURS[c.material_id] || []).push({ name: c.name, hex: c.hex, img: (c.metadata && c.metadata.swatch_img) || null }); }); }
-          try { var mq = await db.client.from('seating_materials').select('id,metadata').neq('metadata', '{}'); if (!mq.error) { MATMETA = {}; (mq.data || []).forEach(function (m2) { MATMETA[m2.id] = m2.metadata || {}; }); } } catch (e2) {} } catch (e) {}
+          try { var mq = await db.client.from('seating_materials').select('id,metadata').neq('metadata', '{}'); if (!mq.error) { MATMETA = {}; (mq.data || []).forEach(function (m2) { MATMETA[m2.id] = m2.metadata || {}; }); } } catch (e2) {}
+          try { var fq = await db.client.from('seating_manufacturers').select('id,metadata'); if (!fq.error) { MFRMETA = {}; (fq.data || []).forEach(function (f2) { MFRMETA[f2.id] = f2.metadata || {}; }); } } catch (e3) {}
+          try { var oq = await db.client.from('seating_finish_options').select('id,manufacturer_id,label,note,sort_order').order('sort_order'); if (!oq.error) { FINOPTS = {}; (oq.data || []).forEach(function (o2) { (FINOPTS[o2.manufacturer_id] = FINOPTS[o2.manufacturer_id] || []).push({ id: o2.id, label: o2.label, note: o2.note }); }); } } catch (e4) {} } catch (e) {}
           var ad = adaptSSOT(v.data); ranges = ad.ranges; catalogue = ad.catalogue; UNIVERSAL = ad.universal || []; source = 'supabase';
           try { localStorage.setItem(CACHE, JSON.stringify({ ranges: ranges, catalogue: catalogue, universal: UNIVERSAL })); } catch (e) {}
           _index(); return { source: source, db: db };
@@ -158,6 +162,8 @@
     if (seed) {
       if (seed.colours) COLOURS = seed.colours;
       if (seed.matmeta) MATMETA = seed.matmeta;
+      if (seed.mfrmeta) MFRMETA = seed.mfrmeta;
+      if (seed.finopts) FINOPTS = seed.finopts;
       if ((seed.ssot_slim || []).length) { var a2 = adaptSSOT(unslim(seed.ssot_slim)); ranges = a2.ranges; catalogue = a2.catalogue; UNIVERSAL = a2.universal || []; source = 'seed'; _index(); return { source: source, db: null }; }
       if ((seed.ssot || []).length) { var a3 = adaptSSOT(seed.ssot); ranges = a3.ranges; catalogue = a3.catalogue; UNIVERSAL = a3.universal || []; source = 'seed'; _index(); return { source: source, db: null }; }
       if ((seed.ranges || []).length) { ranges = seed.ranges; catalogue = seed.catalogue; source = 'seed'; _index(); return { source: source, db: null }; }

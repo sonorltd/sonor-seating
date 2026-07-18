@@ -9,11 +9,15 @@ T="$(mktemp -d)"
 curl -s "$URL/v_seating_catalogue?select=*&order=range_sort,item_sort" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/v.json"
 curl -s "$URL/seating_material_colours?select=material_id,name,hex,sort_order,metadata&order=material_id,sort_order" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/c.json"
 curl -s "$URL/seating_materials?select=id,metadata" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/m.json"
+curl -s "$URL/seating_manufacturers?select=id,metadata" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/f.json"
+curl -s "$URL/seating_finish_options?select=id,manufacturer_id,label,note,sort_order&order=sort_order" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o "$T/o.json"
 python3 - "$T" "$HERE/seating-catalogue.js" <<'PY'
 import json, sys, datetime
 T, out = sys.argv[1], sys.argv[2]
 rows = json.load(open(T + '/v.json')); cols = json.load(open(T + '/c.json'))
 mats = json.load(open(T + '/m.json'))
+mfrs = json.load(open(T + '/f.json'))
+fops = json.load(open(T + '/o.json'))
 def slim(r):
     d = {'ii': r.get('item_id'), 'it': r.get('item_type'), 'nm': r.get('item_name'), 'sz': r.get('size_label'),
          'mo': r.get('motor_type'), 'is': r.get('item_sort'), 'im': r.get('item_metadata') or {},
@@ -32,7 +36,11 @@ for c in cols:
     if img: e['i'] = img
     cm.setdefault(c['material_id'], []).append(e)
 mm = {m['id']: m['metadata'] for m in mats if m.get('metadata')}
-seed = {'ssot_slim': [slim(r) for r in rows], 'colours': cm, 'matmeta': mm}
+fm = {m['id']: m['metadata'] for m in mfrs if m.get('metadata')}
+fo = {}
+for o in fops:
+    fo.setdefault(o['manufacturer_id'], []).append({'id': o['id'], 'label': o['label'], 'note': o.get('note')})
+seed = {'ssot_slim': [slim(r) for r in rows], 'colours': cm, 'matmeta': mm, 'mfrmeta': fm, 'finopts': fo}
 body = json.dumps(seed, separators=(',', ':'), ensure_ascii=False)
 today = datetime.date.today().isoformat()
 open(out, 'w').write("/* Sonor Seating Configurator — Tier-2 offline seed (Library SSOT snapshot). Source: v_seating_catalogue " + today + ". Regenerate: data/build-seed.sh */\n(function(){ window.__SEATING_SEED__ = " + body + "; })();\n")

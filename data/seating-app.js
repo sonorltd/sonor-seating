@@ -502,7 +502,10 @@
     }).join('') + '</div><div class="hint" id="colName">' + (cfg.colour ? 'Selected: <b style="color:var(--cream)">' + esc(cfg.colour) + '</b> · ' : '') + 'Hover a swatch for its name — samples on request.</div><div id="tintWrap"></div></div>';
   }
   function finishesHtml() {
-    var fins = CFG.finishOptions || []; if (!fins.length) return '';
+    // v0.19.0 — PER-RANGE finish options from the library (seating_finish_options
+    // per manufacturer). No library options → no generic fallback, panel hidden.
+    var r0 = E.range(cfg.rangeId);
+    var fins = (r0 && r0.finishes) || []; if (!fins.length) return '';
     return '<div class="panel"><div class="ptt">Finish options <span class="opt-tag">optional</span></div>' + fins.map(function (f) {
       var on = !!cfg.finishes[f.id];
       return '<label class="fin"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="SeatingApp.toggleFinish(\'' + f.id + '\',this.checked)"><span class="fin-b"><span class="fin-n">' + esc(f.label) + '</span><span class="fin-d">' + esc(f.note) + '</span></span></label>';
@@ -513,7 +516,7 @@
   function setMaterial(id) { cfg.material = id; if (id === '_com') { cfg.colour = null; renderConfigure(); return; } var r = E.range(cfg.rangeId); var m = (r.materials || []).find(function (x) { return x.id === id; }); cfg.colour = m && (m.colours || [])[0] ? m.colours[0].name : null; renderConfigure(); }
   function setColour(n) { cfg.colour = n; renderConfigure(); }
   function toggleFinish(id, v) { cfg.finishes[id] = v; updateLive(); }
-  function selectedFinishes() { return (CFG.finishOptions || []).filter(function (f) { return cfg.finishes[f.id]; }); }
+  function selectedFinishes() { var r0 = E.range(cfg.rangeId); var fins = (r0 && r0.finishes) || []; return fins.filter(function (f) { return cfg.finishes[f.id]; }); }
   function setMotor(mt) { cfg.motor = mt; updateLive(); document.querySelectorAll('.cfg-left .opt').forEach(function () {}); renderConfigure(); }
   function setLayout2(k, v) { cfg.layout[k] = v; renderConfigure(); }
   function toggleArm(v) { cfg.includeArmrests = v; updateLive(); }
@@ -872,6 +875,7 @@
       swatchImg: (function () { if (mat && cfg.colour) { var c = (mat.colours || []).find(function (x) { return x.name === cfg.colour; }); if (c && c.img) return c.img; } return mat ? (mat.swatchImg || null) : null; })(),
       installCost: inst, installLabel: (CFG.installation || {}).label || 'Installation',
       manufacturerLogo: (r.metadata && r.metadata.manufacturer_logo) || null,
+      countryOfOrigin: (r.manufacturer_meta && r.manufacturer_meta.country_of_origin) || null,
       // v0.18.0 — 'Additional options' page: everything available on this range that
       // wasn't picked, so nothing is missed in the config process
       optionsMenu: {
@@ -879,7 +883,7 @@
           var p = E.itemSell(it, cfg.material);
           return { label: it.label, price: p != null ? Math.round(p) : null, qty: cfg.accessories[it.id] || 0, generic: !!it.is_universal };
         }),
-        finishes: (CFG.finishOptions || []).map(function (f) { return { label: f.label, note: f.note, selected: !!cfg.finishes[f.id] }; }),
+        finishes: ((r.finishes) || []).map(function (f) { return { label: f.label, note: f.note, selected: !!cfg.finishes[f.id] }; }),
         materials: (r.materials || []).filter(function (m) { return m.available !== false; }).map(function (m) {
           var p = E.chairFrom(r, m.id);
           return { name: m.name, group: m.group || '', price: p != null ? Math.round(p) : null, selected: cfg.material === m.id };
@@ -893,6 +897,7 @@
       datasheetUrl: meta.datasheet_url || null,
       manufacturerUrl: (CFG.manufacturerSites || {})[r.manufacturer] || null,
       paymentTerms: CFG.paymentTerms || '', termsLines: CFG.termsLines || [],
+      grossValue: Math.round(vb.gross),
       roomText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm',
       roomWidthText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm wide',
       layoutText: (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats · ' + cfg.layout.rows + ' × ' + cfg.layout.seatsPerRow,
@@ -909,11 +914,33 @@
       filename: 'sonor-' + slug(r.manufacturer) + '-' + slug(r.name) + '-proposal.pdf'
     };
   }
+  function makeQuoteRef() {
+    var d = new Date(), pad = function (n) { return String(n).padStart(2, '0'); };
+    var rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return 'SNR-ST-' + String(d.getFullYear()).slice(2) + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + rand;
+  }
+  async function logQuote(ref, m) {
+    if (global.__SEATING_CLIENT__) return;                       // client build: no persistence
+    var c = dbc(); if (!c) return;
+    try {
+      await c.from('seating_quotes').insert({
+        quote_ref: ref, project_id: cfg.projectId || null,
+        project_name: (cfg.client.project || '').trim() || null,
+        client_name: (cfg.client.name || '').trim() || null,
+        range_id: cfg.rangeId, total_inc_vat: m.grossValue != null ? m.grossValue : null,
+        config: cfg, app_version: CFG.version
+      });
+    } catch (e) { console.warn('[seating] quote log failed', e); }
+  }
   async function savePdf() {
     try {
       if (global.SeatingPdf && global.SeatingPdf.available()) {
         toast('Building PDF…');
-        var ok = await global.SeatingPdf.generate(pdfModel());
+        var _m = pdfModel();
+        _m.quoteRef = makeQuoteRef();
+        _m.filename = 'sonor-' + String(cfg.rangeId || 'seating') + '-' + _m.quoteRef + '.pdf';
+        logQuote(_m.quoteRef, _m);
+        var ok = await global.SeatingPdf.generate(_m);
         if (ok) { toast('PDF downloaded'); return; }
       }
     } catch (e) { console.warn('[SeatingPdf]', e && e.message); toast('PDF failed — using print'); }

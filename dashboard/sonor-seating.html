@@ -291,8 +291,7 @@
     .site-hdr .wm b { font-weight:800; font-size:15px; letter-spacing:.22em; text-transform:uppercase; color:var(--w-txt); line-height:1; }
     .site-hdr .wm i { font-style:normal; font-size:9px; letter-spacing:.24em; text-transform:uppercase; color:var(--w-txt2); }
     @media(max-width:520px){ .site-hdr .wm i { display:none; } }
-    .site-hdr .tag { display:none; padding-left:16px; margin-left:2px; border-left:1px solid var(--w-brd2);
-      font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--w-muted); }
+    .site-hdr .tag { font-size:.92rem; letter-spacing:.34em; color:rgba(244,241,236,.5); text-transform:uppercase; font-weight:600; margin-left:14px; padding-left:16px; border-left:1px solid rgba(255,255,255,.14); }
     @media(min-width:760px){ .site-hdr .tag { display:inline-block; } }
     .site-hdr nav { margin-left:auto; display:flex; align-items:center; gap:28px; }
     .site-hdr nav a.lnk { display:none; font-size:11px; font-weight:400; letter-spacing:.12em; text-transform:uppercase; color:var(--w-txt2); text-decoration:none; transition:color .3s; }
@@ -454,7 +453,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.18.3';
+    const APP_VERSION = '0.19.0';
     document.addEventListener('DOMContentLoaded', function(){ var v = document.getElementById('hdrVer'); if (v) v.textContent = 'v' + APP_VERSION; });
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');

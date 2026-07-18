@@ -128,8 +128,9 @@
 
   // shared page furniture (content pages)
   function pageHead(P, F, m, label, pageNo, total) {
-    P.tracked('LUXURY SEATING PROPOSAL', M, 42, 8, F.r, [150, 138, 116], 2.4);
-    // RHS: page number only (v0.14.0 — section labels dropped per user)
+    // v0.19.0 — p2 keeps the proposal masthead; pages 3+ carry their own title
+    var lhs = (pageNo >= 3 && label) ? label : 'LUXURY SEATING PROPOSAL';
+    P.tracked(lhs, M, 42, 8, F.r, [150, 138, 116], 2.4);
     if (pageNo) P.trackedRight(pageNo + ' / ' + total, A4.w - M, 42, 8, F.r, [170, 160, 140], 1.6);
     P.hline(M, A4.w - M, 68, LINE, 0.8);
   }
@@ -162,7 +163,7 @@
       var dw = iw * s, dh = ih * s;
       P.image(hero, (A4.w - dw) / 2, 0, dw, dh, 1);
       // smooth fade to brand dark — starts lower, canvas-rendered so it never bands
-      var fTop = A4.h * 0.52, fH = A4.h * 0.28;
+      var fTop = A4.h * 0.58, fH = A4.h * 0.26;
       if (fadeImg) P.image(fadeImg, 0, fTop, A4.w, fH, 1);
       else P.fadeDown(0, fTop, A4.w, fH, DARK, 1, 56);
       P.rect(0, fTop + fH - 1, A4.w, A4.h - (fTop + fH) + 1, DARK, 1);
@@ -171,15 +172,15 @@
     P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
 
     // title block — range-led, sits on the fade
-    var ty = 596;
+    var ty = 598;
     P.hline(M, M + 26, ty - 20, GOLD, 1, 0.95);
     P.tracked('LUXURY SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
     P.text(m.range || 'Proposal', M - 2, ty, 54, F.b, CREAM);
-    P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 64, 20, F.l, GOLDL);
+    P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 62, 19, F.l, GOLDL);
 
     // client / project info (print-asset style)
-    var iy = 698, cw = (A4.w - M * 2) / 3;
-    P.hline(M, A4.w - M, iy - 14, GOLD, 0.5, 0.45);
+    var iy = 706, cw = (A4.w - M * 2) / 3;
+    P.hline(M, A4.w - M, iy - 16, GOLD, 0.5, 0.45);
     var info = [
       ['PREPARED FOR', m.client || '—'],
       ['PROJECT', m.project || '—'],
@@ -190,7 +191,7 @@
       P.tracked(c[0], x, iy, 7, F.r, [168, 156, 136], 1.8);
       P.text(c[1], x, iy + 13, 12.5, F.b, CREAM, { maxWidth: cw - 16 });
     });
-    P.hline(M, A4.w - M, iy + 42, GOLD, 0.5, 0.45);
+    P.hline(M, A4.w - M, iy + 40, GOLD, 0.5, 0.45);
 
     // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
     // CEDIA member logo bottom-right. Nothing else.
@@ -222,7 +223,7 @@
     var rows = [
       ['Layout', m.layoutText],
       // v0.16.0 — single Upholstery type row (was Upholstery type + Material duplicate)
-      ['Upholstery type', m.materialName || (m.upholsteryText || 'Confirmed at quotation')],
+      ['Upholstery', m.materialName || (m.upholsteryText || 'Confirmed at quotation')],
       ['Colour', m.colourName],
       ['Row configuration', (m.rowDetails && m.rowDetails.length) ? m.rowDetails.join('  —  ') : null],
       ['Recline', m.reclineText],
@@ -267,7 +268,7 @@
 
     // quote table
     var qy = Math.max(sy + 18, imgBottom + 28);
-    P.tracked('ESTIMATED QUOTE', M, qy - 6, 8, F.b, GOLD, 2.2); qy += 12;
+    P.tracked('ESTIMATE', M, qy - 6, 8, F.b, GOLD, 2.2); qy += 12;
     var cQty = A4.w - M - 210, cUnit = A4.w - M - 110, cLine = A4.w - M;
     P.tracked('SEATS', M, qy, 6.5, F.r, MUT, 1.4);
     P.trackedRight('QTY', cQty + 20, qy, 6.5, F.r, MUT, 1.4);
@@ -347,8 +348,7 @@
   // ── PAGE 3 · DIMENSIONED SEATING PLAN (CAD-style) ────────────────────────────
   function drawing(P, F, m, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, 'SEATING PLAN', 3, TOTAL_PAGES);
-    P.tracked('DIMENSIONED LAYOUT', M, 92, 8.5, F.r, GOLD, 2.6);
+    pageHead(P, F, m, 'DIMENSIONED LAYOUT', 3, TOTAL_PAGES);
     P.text(m.range + ' — ' + (m.rows || 2) + ' rows × ' + (m.seatsPerRow || 3), M - 1, 106, 22, F.b, INK);
     P.right('All dimensions in mm', A4.w - M, 108, 9, F.r, MUT);
 
@@ -454,7 +454,7 @@
   // ── PAGE 4 · TECHNICAL SPECIFICATION ─────────────────────────────────────────
   function techspec(P, F, m, rangeImg, TOTAL_PAGES, mfrLogoImg) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, 'TECHNICAL SPECIFICATION', 4, TOTAL_PAGES);
+    pageHead(P, F, m, 'MODEL DATA', 4, TOTAL_PAGES);
     P.tracked((m.manufacturer || '').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
     if (mfrLogoImg) {
@@ -487,12 +487,13 @@
       ['Seat width', mm(S.seatWidthMm)],
       ['Seat depth', mm(S.seatDepthMm)],
       ['Reclined depth', mm(S.reclinedDepthMm)],
+      ['Country of origin', m.countryOfOrigin || null],
       ['Recline', m.reclineText],
       ['Upholstery', m.materialName ? (m.materialName + (m.colourName ? ' · ' + m.colourName : '')) : null],
       ['Options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
       ['Lead time', m.leadText]
     ].filter(function (r) { return r[1]; });
-    P.tracked('MODEL DATA', M, top - 4, 8, F.b, GOLD, 2.2); top += 12;
+    top += 6;
     var half = Math.ceil(specs.length / 2), colW2 = (A4.w - M * 2 - 24) / 2;
     // two-column layout
     for (var i = 0; i < specs.length; i++) {
@@ -515,7 +516,6 @@
       return t;
     }
     if (m.productUrl) { P.text('Product page:', M, top, 9.5, F.r, MUT); P.link(m.productUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.productUrl)); top += 18; }
-    if (m.manufacturerUrl) { P.text('Manufacturer:', M, top, 9.5, F.r, MUT); P.link(m.manufacturerUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.manufacturerUrl)); top += 18; }
     if (m.datasheetUrl) { P.text('Datasheet:', M, top, 9.5, F.r, MUT); P.link(m.datasheetUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.datasheetUrl)); top += 18; }
     P.text(m._dsAppended ? 'The manufacturer datasheet is appended to this document.' : 'Manufacturer datasheet available via the link above or on request.', M, top, 9, F.r, MUT);
     pageFoot(P, F, m);
@@ -525,13 +525,12 @@
   // ── PAGE 5 · ADDITIONAL OPTIONS — everything available that wasn't picked ─────
   function optionsPage(P, F, m, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, '', 5, TOTAL_PAGES);
-    P.tracked('AVAILABLE ON THIS RANGE', M, 92, 8.5, F.r, GOLD, 2.6);
-    P.text('Additional options', M - 1, 106, 22, F.b, INK);
-    var introLines = wrap('A menu of everything offered on the ' + (m.range || '') + ' — in case anything was missed during configuration. Ask us to add any of these to your formal quotation.', F.r, 9, A4.w - M * 2);
-    introLines.forEach(function (ln, li) { P.text(ln, M, 132 + li * 12, 9, F.r, MUT); });
+    pageHead(P, F, m, 'ADDITIONAL OPTIONS', 5, TOTAL_PAGES);
+    P.tracked('AVAILABLE ON THIS RANGE', M, 96, 8.5, F.r, GOLD, 2.6);
+    var introLines = wrap('A menu of everything available on the ' + (m.range || '') + ' — in case anything was missed during configuration. Ask us to add any of these to your formal quotation.', F.r, 9, A4.w - M * 2);
+    introLines.forEach(function (ln, li) { P.text(ln, M, 118 + li * 12, 9, F.r, MUT); });
     var om = m.optionsMenu || {};
-    var y = 132 + introLines.length * 12 + 26, colR = A4.w - M;
+    var y = 118 + introLines.length * 12 + 26, colR = A4.w - M;
     function section(title) { P.tracked(title, M, y, 8, F.b, GOLD, 2.2); y += 6; P.hline(M, A4.w - M, y + 4, GOLD, 0.8, 0.75); y += 16; }
     function fitLine(t, font, size, maxW) { t = String(t); while (t.length > 6 && font.widthOfTextAtSize(t, size) > maxW) t = t.slice(0, -4) + '…'; return t; }
     function row(label, right, sel) {
@@ -566,10 +565,9 @@
   // ── PAGE 6 · TERMS & PAYMENT — the full terms, on their own closing page ─────
   function termsPage(P, F, m, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
-    pageHead(P, F, m, '', 6, TOTAL_PAGES);
-    P.tracked('THE DETAIL', M, 92, 8.5, F.r, GOLD, 2.6);
-    P.text('Terms & payment', M - 1, 106, 22, F.b, INK);
-    var y = 148;
+    pageHead(P, F, m, 'TERMS & PAYMENT', 6, TOTAL_PAGES);
+    P.tracked('THE DETAIL', M, 96, 8.5, F.r, GOLD, 2.6);
+    var y = 128;
     var termAll = [
       'Proposal prepared ' + (m.dateText || '') + (m.client ? ' for ' + m.client : '') + (m.project ? ' — ' + m.project : '') + '.',
       'Estimate only — a formal quotation will be prepared for your final choices and accessories once all information and latest pricing have been verified.',
@@ -584,7 +582,13 @@
     });
     y += 8; P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 18;
     P.tracked('PAYMENT', M, y, 8, F.b, GOLD, 2.2); y += 16;
-    P.text(m.paymentTerms || '50% deposit on order · 50% balance prior to delivery', M, y, 11.5, F.b, INK);
+    P.text(m.paymentTerms || '50% deposit on order · 50% balance prior to delivery', M, y, 11.5, F.b, INK); y += 34;
+    if (m.quoteRef) {
+      P.hline(M, A4.w - M, y - 12, GOLD, 0.8, 0.75); y += 6;
+      P.tracked('QUOTE REFERENCE', M, y, 8, F.b, GOLD, 2.2);
+      P.right(m.quoteRef, A4.w - M, y - 2, 13, F.b, INK); y += 20;
+      P.text('Please quote this reference in any correspondence about this proposal.', M, y, 8.5, F.r, MUT);
+    }
     pageFoot(P, F, m);
   }
 

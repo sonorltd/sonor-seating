@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.18.3',
+    version: '0.19.0',
     buildDate: '2026-07-17',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
@@ -53,7 +53,7 @@
     steps: ['Layout', 'Choose Range', 'Configure', 'Summary'],
     // Step 1 generic setup — standard defaults per the brief
     rowOptions: [1, 2, 3, 4],
-    seatsPerRowOptions: [2, 3, 4, 5, 6],
+    seatsPerRowOptions: [2, 3, 4, 5, 6, 7, 8, 9, 10],
     // sensible default room (mm)
     defaultRoom: { widthMm: 4000, lengthMm: 6000, rows: 2, seatsPerRow: 3 },
     // clearance rules used by the recommender (mm)
