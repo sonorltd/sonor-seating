@@ -172,14 +172,14 @@
     P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
 
     // title block — range-led, sits on the fade
-    var ty = 632;
+    var ty = 650;
     P.hline(M, M + 26, ty - 20, GOLD, 1, 0.95);
     P.tracked('LUXURY SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
     P.text(m.range || 'Proposal', M - 2, ty, 54, F.b, CREAM);
     P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 62, 19, F.l, GOLDL);
 
     // client / project info (print-asset style)
-    var iy = 738, cw = (A4.w - M * 2) / 3;
+    var iy = 756, cw = (A4.w - M * 2) / 3;
     P.hline(M, A4.w - M, iy - 16, GOLD, 0.5, 0.45);
     var info = [
       ['PREPARED FOR', m.client || '—'],
@@ -196,23 +196,24 @@
 
     // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
     // CEDIA member logo bottom-right. Nothing else.
-    // logo strip — inside the frame's lower band, all three on one centreline
-    var cyL = A4.h - 50;
-    P.logo(M, cyL - 11, 22, CREAM);
-    P.tracked('SONOR', M + 32, cyL - 6.5, 13, F.b, CREAM, 3.1);
+    // logo strip OUTSIDE (below) the frame, in the bottom margin band — all three
+    // resized to the band and sat on one centreline
+    var cyL = A4.h - 27;
+    P.logo(M, cyL - 7, 14, CREAM);
+    P.tracked('SONOR', M + 21, cyL - 4.5, 9, F.b, CREAM, 2.6);
     if (mfrLogoImg) {
       // manufacturer logo centred (Sonor left · manufacturer centre · CEDIA right)
-      var mlh = 18, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
-      if (mlw > 150) { mlw = 150; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
+      var mlh = 12, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
+      if (mlw > 110) { mlw = 110; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
       P.image(mfrLogoImg, (A4.w - mlw) / 2, cyL - mlh / 2, mlw, mlh, 0.92);
     }
     if (m._cedia) {
-      // stacked lockup (taller than wide) → size by aspect: 2-line ≈ h26, 1-line h16
-      var ch = (m._cedia.width / m._cedia.height) < 3 ? 26 : 16;
+      // stacked lockup (taller than wide) → size by aspect: 2-line ≈ h16, 1-line h10
+      var ch = (m._cedia.width / m._cedia.height) < 3 ? 16 : 10;
       var cwd = ch * (m._cedia.width / m._cedia.height);
       P.image(m._cedia, A4.w - M - cwd, cyL - ch / 2, cwd, ch, 0.92);
     } else {
-      P.trackedRight('CEDIA MEMBER', A4.w - M, cyL - 4, 7, F.r, [168, 156, 136], 1.3);
+      P.trackedRight('CEDIA MEMBER', A4.w - M, cyL - 3, 6.5, F.r, [168, 156, 136], 1.2);
     }
   }
 
@@ -664,11 +665,14 @@
       ['RECLINE', m.reclineText || '—'],
       ['ROOM', m.roomText || '—'], ['LEAD TIME', m.leadText || '—']
     ];
+    // v0.22.4 — single-line values TRUNCATED to the cell: wrapping here collided
+    // with the divider below and the neighbouring rows
+    function fit1(t, font, size, maxW) { t = String(t); while (t.length > 4 && font.widthOfTextAtSize(t, size) > maxW) t = t.slice(0, -4) + '…'; return t; }
     var by = 148, bw = (A4.w - M * 2 - 36) / 4;
     meta.forEach(function (r2, i2) {
       var bx = M + (i2 % 4) * (bw + 12), byy = by + Math.floor(i2 / 4) * 34;
       P.tracked(r2[0], bx, byy, 6.5, F.r, MUT, 1.4);
-      P.text(String(r2[1]), bx, byy + 10, 9.5, F.b, INK, { maxWidth: bw });
+      P.text(fit1(r2[1], F.b, 9.5, bw), bx, byy + 10, 9.5, F.b, INK);
     });
     var y = by + 2 * 34 + 16;
     P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 18;
@@ -682,9 +686,11 @@
     P.trackedRight(hasTrade ? 'TRADE LINE' : 'LINE EX VAT', cT2 + 30, y, 6.5, F.r, MUT, 1.4);
     P.trackedRight(hasTrade ? 'MSRP LINE' : '', cLine, y, 6.5, F.r, MUT, 1.4);
     P.hline(M, A4.w - M, y + 9, GOLD, 0.8, 0.75); y += 24;
+    // v0.22.4 — item name truncated to its column on ONE line; SKU gets its own
+    // small second line with a proper row-height advance (no more overlap)
     rowsSrc.forEach(function (l) {
       if (y > A4.h - 240) return;
-      P.text(l.label + (l.sku ? '   ·   ' + l.sku : ''), M, y - 8, 9, F.r, INK, { maxWidth: cQty - M - 10 });
+      P.text(fit1(l.label, F.r, 9, cQty - M - 10), M, y - 8, 9, F.r, INK);
       P.right(String(l.qty), cQty + 18, y - 8, 9.5, F.r, INK2);
       if (hasTrade) {
         P.right(l.trade != null ? money(l.trade) : '—', cT1 + 30, y - 8, 9.5, F.r, INK2);
@@ -694,7 +700,8 @@
         P.right(money(l.unit), cT1 + 30, y - 8, 9.5, F.r, INK2);
         P.right(l.unit != null ? money(l.unit * l.qty) : 'POA', cT2 + 30, y - 8, 9.5, F.b, INK);
       }
-      y += 17;
+      if (l.sku) { P.text(fit1(l.sku, F.r, 7, cQty - M - 10), M, y + 3, 7, F.r, MUT); y += 24; }
+      else y += 17;
     });
     y += 2; P.hline(M, A4.w - M, y - 4, GOLD, 0.8, 0.75); y += 14;
     // ── COMMERCIAL SUMMARY — trade cost vs MSRP with margin ──
