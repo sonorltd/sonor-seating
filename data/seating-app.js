@@ -282,7 +282,8 @@
   }
   function rangeCard(x) {
     var r = x.range, sel = cfg.rangeId === r.id;
-    var from = E.fromPrice(r);
+    // v0.17.3 — complete-chair from-price (seat + 2 armrests where modular)
+    var from = E.chairFrom(r) != null ? E.chairFrom(r) : E.fromPrice(r);
     var badge = r.id === _bestId && x.fits ? '<span class="rec">Best fit</span>' : (x.fits ? '<span class="fit">Fits</span>' : '<span class="nofit">Tight fit</span>');
     var flags = x.flags.map(function (f) { return '<span class="flag ' + f.kind + '">' + (f.kind === 'warn' ? '⚠ ' : '') + esc(f.text) + '</span>'; }).join('');
     var plus = x.plus.slice(0, 3).map(function (p) { return '<span class="plus">✓ ' + esc(p) + '</span>'; }).join('');

@@ -105,7 +105,7 @@
         row.prices.forEach(function (p) { if (p && p.available !== false && p.srp != null) pmap[p.material_id || '_'] = Number(p.srp); });
         if (!Object.keys(pmap).length) pmap = null;
       }
-      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, img: ((row.item_metadata || {}).img) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, prices: pmap, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
+      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, complete_chair: !!((row.item_metadata || {}).complete_chair), img: ((row.item_metadata || {}).img) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, prices: pmap, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
     });
     var rs = [], cat = [];
     order.forEach(function (rid) {
@@ -251,6 +251,16 @@
   function chairFrom(r, materialId) {
     if (!r) return null;
     var seats = seatItems(r.id), arms = armrestItems(r.id);
+    // Module-built ranges with no separate armrests (FrontRow): a bare module
+    // understates the chair — use items the library flags as complete chairs,
+    // else exclude raw modules from the from-price.
+    if (!arms.length) {
+      var complete = seats.filter(function (i) { return i.complete_chair; });
+      if (complete.length) seats = complete;
+      else if (seats.some(function (i) { return i.kind === 'module'; }) && seats.some(function (i) { return i.kind !== 'module'; })) {
+        seats = seats.filter(function (i) { return i.kind !== 'module'; });
+      }
+    }
     var sMin = null, aMin = null;
     seats.forEach(function (i) { var p = itemSell(i, materialId); if (p != null && (sMin == null || p < sMin)) sMin = p; });
     arms.forEach(function (i) { var p = itemSell(i, materialId); if (p != null && (aMin == null || p < aMin)) aMin = p; });
