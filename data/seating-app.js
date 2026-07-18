@@ -28,8 +28,79 @@
       var note = $('sourceNote');
       if (note) { note.textContent = ({ supabase: 'Live catalogue', cache: 'Offline (cached)', seed: 'Offline (bundled)', inline: 'No data' }[E.source] || E.source) + ' · v' + (CFG.version || '?'); note.className = 'src-note src-' + E.source; }
       renderStep();
+      bootDeepLink();
       try { if (global.SonorShell && res.db) global.SonorShell.selfTest(res.db); } catch (e) {}
     } catch (err) { var m = $('stepBody'); if (m) m.innerHTML = '<div class="empty">Failed to load catalogue: ' + esc(err && err.message) + '</div>'; }
+  }
+
+
+  // ── v0.15.0 · saved configurations per project (SSOT: seating_configs) ──────
+  // Save/recall the whole cfg. Deep links: ?config=<id> opens a saved config,
+  // ?project=<name> prefills the project and lists its configs — the URL contract
+  // the Cinema Designer uses to link in.
+  function dbc() { try { return global.db && global.db.client; } catch (e) { return null; } }
+  async function saveConfig() {
+    var c = dbc(); if (!c) return toast('Offline — connect to save');
+    var proj = (cfg.client.project || '').trim();
+    if (!proj) { toast('Enter a project name first'); var pf = document.querySelector('.client-row input[placeholder^="Project"]'); if (pf) pf.focus(); return; }
+    var r = E.range(cfg.rangeId);
+    var label = ((r && r.name) || 'Config') + ' · ' + cfg.layout.rows + '×' + cfg.layout.seatsPerRow + (cfg.colour ? ' · ' + cfg.colour : '');
+    var body = { project_name: proj, label: label, range_id: cfg.rangeId, config: cfg, app_version: CFG.version, updated_at: new Date().toISOString() };
+    try {
+      var q;
+      if (cfg._savedId) q = await c.from('seating_configs').update(body).eq('id', cfg._savedId).select('id').single();
+      else q = await c.from('seating_configs').insert(body).select('id').single();
+      if (q.error) throw q.error;
+      cfg._savedId = q.data.id;
+      toast('Saved to ' + proj);
+      loadSavedList();
+    } catch (e) { toast('Save failed: ' + (e && e.message)); }
+  }
+  async function loadSavedList() {
+    var el = $('savedList'); var c = dbc();
+    var proj = (cfg.client.project || '').trim();
+    if (!el || !c || !proj) { if (el) el.innerHTML = ''; return; }
+    try {
+      var q = await c.from('seating_configs').select('id,label,range_id,app_version,updated_at').eq('project_name', proj).eq('archived', false).order('updated_at', { ascending: false }).limit(20);
+      if (q.error) throw q.error;
+      if (!q.data.length) { el.innerHTML = '<div class="hint">No saved configurations for this project yet.</div>'; return; }
+      el.innerHTML = q.data.map(function (row) {
+        var d = new Date(row.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return '<div class="saved-row' + (row.id === cfg._savedId ? ' cur' : '') + '">' +
+          '<div class="saved-b"><div class="saved-n">' + esc(row.label) + '</div><div class="saved-d">' + d + ' · v' + esc(row.app_version || '?') + '</div></div>' +
+          '<button class="ghost sm" onclick="SeatingApp.openSaved(\'' + row.id + '\')">Open</button>' +
+          '<button class="ghost sm" onclick="SeatingApp.copySavedLink(\'' + row.id + '\')">Link</button></div>';
+      }).join('');
+    } catch (e) { el.innerHTML = '<div class="hint">Saved list unavailable: ' + esc(e && e.message) + '</div>'; }
+  }
+  async function openSaved(id) {
+    var c = dbc(); if (!c) return toast('Offline');
+    try {
+      var q = await c.from('seating_configs').select('id,config').eq('id', id).single();
+      if (q.error) throw q.error;
+      applySaved(q.data);
+    } catch (e) { toast('Load failed: ' + (e && e.message)); }
+  }
+  function applySaved(row) {
+    var saved = row.config || {};
+    cfg = Object.assign({ step: 4, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: { name: '', project: '' }, rowOverrides: {} }, saved);
+    cfg._savedId = row.id;
+    if (!E.range(cfg.rangeId)) { toast('Saved range no longer in the catalogue'); cfg.step = 2; }
+    enter(); cfg.step = Math.min(saved.step || 4, 4); renderStep();
+    toast('Configuration loaded');
+  }
+  function copySavedLink(id) {
+    var u = location.origin + location.pathname + '?config=' + id;
+    try { navigator.clipboard.writeText(u); toast('Link copied'); } catch (e) { global.prompt('Copy link:', u); }
+  }
+  async function bootDeepLink() {
+    try {
+      var sp = new URLSearchParams(location.search);
+      var cid = sp.get('config'), proj = sp.get('project');
+      if (cid) { await openSaved(cid); return true; }
+      if (proj) { cfg.client.project = proj; enter(); cfg.step = 1; renderStep(); return false; }
+    } catch (e) {}
+    return false;
   }
 
   // ── intro / wizard toggle (client-facing landing) ────────────────────────────
@@ -52,7 +123,7 @@
   function goBack() { if (cfg.step > 1) { cfg.step--; renderStep(); } }
   function jumpTo(n) { if (n < cfg.step) { cfg.step = n; renderStep(); } }
   function restart() { var keepClient = cfg.client; cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: keepClient || { name: '', project: '' }, rowOverrides: {} }; renderStep(); }
-  function setClient(k, v) { cfg.client[k] = v; }
+  function setClient(k, v) { cfg.client[k] = v; if (k === 'project' && $('savedList')) { clearTimeout(setClient._t); setClient._t = setTimeout(loadSavedList, 500); } }
   function nextDisabled() {
     if (cfg.step === 2) return !cfg.rangeId;
     return false;
@@ -409,6 +480,7 @@
 
   // ── Step 4 · Summary ─────────────────────────────────────────────────────────
   function renderSummary() {
+    setTimeout(loadSavedList, 0);
     var r = E.range(cfg.rangeId); if (!r) { cfg.step = 2; return renderStep(); }
     var lines = quoteLines(), prod = productTotal(lines);
     var di = deliveryInfo(), inst = installCost(), total = prod + (di.cost || 0) + (inst || 0);
@@ -429,6 +501,10 @@
           '<label class="cfld"><span>Client</span><input type="text" placeholder="Client name" value="' + esc(cfg.client.name) + '" oninput="SeatingApp.setClient(\'name\', this.value)"></label>' +
           '<label class="cfld"><span>Project</span><input type="text" placeholder="Project / address" value="' + esc(cfg.client.project) + '" oninput="SeatingApp.setClient(\'project\', this.value)"></label>' +
           '<div class="cfld-hint">Shown on the proposal cover.</div>' +
+        '</div>' +
+        '<div class="panel saved-panel"><div class="ptt">Saved configurations <span class="opt-tag">per project</span>' +
+          '<button class="ghost sm" style="float:right" onclick="SeatingApp.saveConfig()">' + (cfg._savedId ? 'Update save' : 'Save this configuration') + '</button></div>' +
+          '<div id="savedList"><div class="hint">Enter a project name above, then save — configurations can be reopened later or linked from the Cinema Designer.</div></div>' +
         '</div>' +
         '<div class="strip">' +
           cell('Room', (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm') +
@@ -685,6 +761,7 @@
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
     toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, toggleFinish: toggleFinish, setClient: setClient,
-    rowSet: rowSet, rowsReset: rowsReset
+    rowSet: rowSet, rowsReset: rowsReset,
+    saveConfig: saveConfig, openSaved: openSaved, copySavedLink: copySavedLink
   };
 })(typeof window !== 'undefined' ? window : this);

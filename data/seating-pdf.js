@@ -138,7 +138,7 @@
     var GDEEP = [140, 116, 60];
     P.hline(M, A4.w - M, A4.h - 56, LINE, 0.8);
     // email LHS
-    P.tracked('PROJECTS@SONOR.CO.UK', M, A4.h - 44.2, 7.2, F.r, MUT, 1.4);
+    P.tracked('PROJECTS@SONOR.CO.UK', M, A4.h - 44.2, 7.2, F.r, GDEEP, 1.4);
     // centre: Sonor mark + wordmark only
     var s = 'SONOR', ss = 9.5, tr = 2.8, tw = 0;
     for (var i = 0; i < s.length; i++) tw += F.b.widthOfTextAtSize(s[i], ss) + tr;
@@ -151,8 +151,8 @@
     var phone = '07933 684 000', ps = 8;
     var phW = 0; for (var j = 0; j < phone.length; j++) phW += F.r.widthOfTextAtSize(phone[j], ps) + 1.2;
     var phX = A4.w - M - phW;
-    P.tracked(phone, phX, A4.h - 44.4, ps, F.r, INK2, 1.2);
-    P.page.drawSvgPath(WA, { x: phX - 14, y: 45.6, scale: 9.5 / 24, color: col([37, 165, 88]) });
+    P.tracked(phone, phX, A4.h - 44.4, ps, F.r, GDEEP, 1.2);
+    P.page.drawSvgPath(WA, { x: phX - 14, y: 45.6, scale: 9.5 / 24, color: col(GDEEP) });
   }
 
   // ── PAGE 1 · COVER ───────────────────────────────────────────────────────────
@@ -213,49 +213,47 @@
 
     P.tracked((m.manufacturer || 'SONOR').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
-    P.right(m.dateText || '', A4.w - M, 104, 10, F.r, MUT);
 
     var top = 158, colW = 250;
     var grpLabel = m.materialGroup ? (m.materialGroup.charAt(0).toUpperCase() + m.materialGroup.slice(1).toLowerCase()) : null;
+    // v0.15.0 — seats only: Room + Lead time rows removed (room lives on the plan
+    // page, lead time in Terms). No inline dots — the swatch presents as a framed
+    // square on the right of the Colour row: real photo when the library has one,
+    // otherwise the same framed square filled with the colour.
     var rows = [
-      ['Room', m.roomText],
       ['Layout', m.layoutText],
       ['Upholstery type', grpLabel ? (grpLabel + (m.materialTier ? ' · ' + m.materialTier : '')) : null],
-      ['Material', m.materialName || (m.upholsteryText || 'Confirmed at quotation'), m.materialSwatchHex || null],
-      ['Colour', m.colourName, m.colourHex || null],
+      ['Material', m.materialName || (m.upholsteryText || 'Confirmed at quotation')],
+      ['Colour', m.colourName],
       ['Row configuration', (m.rowDetails && m.rowDetails.length) ? m.rowDetails.join('  —  ') : null],
       ['Recline', m.reclineText],
       ['Finish options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null],
-      ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null],
-      ['Lead time', m.leadText || 'On request']
+      ['Accessories', (m.accessories && m.accessories.length) ? m.accessories.join(', ') : null]
     ].filter(function (r) { return r[1]; });
     var sy = top, colourRowY = null;
     rows.forEach(function (r) {
       if (r[0] === 'Colour') colourRowY = sy;
       P.tracked(String(r[0]).toUpperCase(), M, sy, 6.5, F.r, MUT, 1.5);
-      var tx = M, swHex = r[2];
-      if (swHex) {   // swatch symbol beside the chosen upholstery / colour
-        var hx = String(swHex).replace('#', '');
-        var rgb = /^[0-9a-f]{6}$/i.test(hx) ? [parseInt(hx.slice(0, 2), 16), parseInt(hx.slice(2, 4), 16), parseInt(hx.slice(4, 6), 16)] : [140, 130, 115];
-        P.dot(M + 5, sy + 16, 5, rgb, [160, 150, 130]);
-        tx = M + 15;
-      }
-      var lines = wrap(String(r[1]), F.b, 11.5, colW - (tx - M));
-      lines.forEach(function (ln, li) { P.text(ln, tx, sy + 11 + li * 13.5, 11.5, F.b, INK); });
+      var lines = wrap(String(r[1]), F.b, 11.5, colW - 54);
+      lines.forEach(function (ln, li) { P.text(ln, M, sy + 11 + li * 13.5, 11.5, F.b, INK); });
       sy += 11 + lines.length * 13.5 + 11;
       P.hline(M, M + colW, sy - 7, LINE, 0.5, 0.7);
     });
-    // photo of the actual swatch — right-aligned inside the Colour row, so it
-    // never collides with the header or other rows
-    if (swatchImg && colourRowY != null) {
+    // swatch square — right of the Colour row: photo, else colour fill
+    if (colourRowY != null) {
       var swW = 44, swH = 30, swX = M + colW - swW, swY = colourRowY - 2;
-      P.image(swatchImg, swX, swY, swW, swH, 1);
+      if (swatchImg) {
+        P.image(swatchImg, swX, swY, swW, swH, 1);
+      } else {
+        var hx2 = String(m.colourHex || m.materialSwatchHex || '#8c8273').replace('#', '');
+        var rgb2 = /^[0-9a-f]{6}$/i.test(hx2) ? [parseInt(hx2.slice(0, 2), 16), parseInt(hx2.slice(2, 4), 16), parseInt(hx2.slice(4, 6), 16)] : [140, 130, 115];
+        P.rect(swX, swY, swW, swH, rgb2);
+      }
       P.rectB(swX, swY, swW, swH, LINE, 0.7);
     }
 
     // the chosen model (right) — hero photograph, plan lives on page 3
     var planX = M + colW + 22, planW = A4.w - M - planX;
-    P.tracked('THE MODEL', planX, top - 22, 8, F.b, GOLD, 2.2);
     if (rangeImg) {
       // contain-fit, frame drawn AT the image bounds — thin stroke, no dark matte
       var bh = 190, iw = rangeImg.width, ih = rangeImg.height;
@@ -303,7 +301,12 @@
     // terms & deposit
     P.hline(M, A4.w - M, y, LINE, 0.7); y += 12;
     P.tracked('TERMS & PAYMENT', M, y, 7.5, F.b, GOLD, 2); y += 14;
-    (m.termsLines || []).forEach(function (t) {
+    var termAll = [
+      'Proposal prepared ' + (m.dateText || '') + (m.client ? ' for ' + m.client : '') + (m.project ? ' — ' + m.project : '') + '.',
+      'Lead time: ' + (m.leadText || 'confirmed at quotation') + ' from order confirmation and fabric approval.',
+      'Made to order: each seat is manufactured to your exact specification. Once production begins the specification (model, size, upholstery, colour and options) cannot be altered, and bespoke items are non-returnable.'
+    ].concat(m.termsLines || []);
+    termAll.forEach(function (t) {
       var lines = wrap(t, F.r, 8, A4.w - M * 2 - 12);
       P.text('·', M, y - 1, 8, F.b, GOLD);
       lines.forEach(function (ln, li) { P.text(ln, M + 10, y + li * 10.5, 8, F.r, MUT); });

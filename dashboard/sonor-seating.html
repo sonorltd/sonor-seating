@@ -188,6 +188,15 @@
     .sm-head::after { content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:linear-gradient(90deg, rgba(173,153,120,.5), rgba(128,88,161,.4), transparent); }
     .sm-mfr { font-size:10px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); } .sm-head h2 { font-family:'Gilroy','DM Sans',sans-serif; font-weight:800; letter-spacing:-.02em; font-size:30px; margin:4px 0 0; background:linear-gradient(90deg,var(--gold2),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent; } .sm-date { font-size:12px; color:var(--muted); }
     .strip { display:flex; flex-wrap:wrap; background:var(--bg2); border:1px solid var(--brd); border-radius:14px; overflow:hidden; margin-bottom:22px; } .cellx { flex:1; min-width:150px; padding:15px 19px; border-right:1px solid var(--brd); } .cellx:last-child{ border:none; } .cl { font-size:9px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); } .cv { font-family:'Gilroy','DM Sans',sans-serif; font-weight:800; font-size:16px; color:var(--cream); margin-top:4px; } .cn { font-size:10px; color:var(--muted); margin-top:2px; }
+    /* v0.15.0 — saved configurations */
+    .saved-panel .ptt { display:block; }
+    .saved-row { display:flex; align-items:center; gap:9px; padding:9px 4px; border-bottom:1px solid var(--brd2); }
+    .saved-row.cur { background:rgba(173,153,120,.06); border-radius:8px; }
+    .saved-b { flex:1; min-width:0; }
+    .saved-n { font-size:12.5px; color:var(--cream); font-weight:600; }
+    .saved-d { font-size:10.5px; color:var(--muted); margin-top:2px; }
+    .ghost.sm { padding:5px 11px; font-size:10.5px; border-radius:7px; border:1px solid var(--brd); background:transparent; color:var(--gold2); cursor:pointer; }
+    .ghost.sm:hover { border-color:var(--gold); }
     /* v0.14.0 — accessory cards (image hook) + digital tint preview */
     .acc { display:flex; align-items:center; gap:12px; }
     .acc.has-qty { border-color:var(--gold); }
@@ -394,7 +403,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.14.0';
+    const APP_VERSION = '0.15.0';
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
       if (el && cfg.heroImage) el.style.backgroundImage = "url('" + cfg.heroImage + "')"; })();
