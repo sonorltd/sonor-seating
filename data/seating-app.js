@@ -301,16 +301,34 @@
     updateLayoutDerived();
     if (!global.__SEATING_CLIENT__) setTimeout(loadSavedList, 0);
   }
-  // greyed-out options for counts the room physically can't take (generic dims)
-  function layoutOptsHtml(kind) {
+  // ── SHARED layout option module (v0.21.3) — the ONE builder for rows / seats-per-
+  // row pickers, used by Layout (step 1, generic dims) AND Options (step 3, the
+  // chosen range's real dims). Greys out counts the room can't take in both places.
+  function layoutFitOver(kind, n) {
+    var L = cfg.layout;
+    var useRange = !!(cfg.rangeId && cfg.step >= 3);
+    if (kind === 'rows') {
+      if (useRange) { var S = planSpec(); return (S.wallClear + n * S.reclD + (n - 1) * S.rowGap + 400) > (L.lengthMm || 0); }
+      return genericDepthMm(n) > (L.lengthMm || 0);
+    }
+    if (useRange) { try { return rowRunMm(planSpec(), n) > (L.widthMm || 0); } catch (e) {} }
+    return genericRunMm(n) > (L.widthMm || 0);
+  }
+  function layoutOptsHtml(kind, handler) {
     var L = cfg.layout;
     var list = kind === 'rows' ? CFG.rowOptions : CFG.seatsPerRowOptions;
     return list.map(function (n) {
-      var off = kind === 'rows' ? genericDepthMm(n) > (L.lengthMm || 0) : genericRunMm(n) > (L.widthMm || 0);
+      var off = layoutFitOver(kind, n);
       var on = (kind === 'rows' ? L.rows : L.seatsPerRow) === n;
       return '<button class="opt ' + (on ? 'on ' : '') + (off ? 'off' : '') + '"' + (off ? ' disabled title="Won’t fit this room"' : '') +
-        ' onclick="SeatingApp.setLayout(\'' + kind + '\',' + n + ')">' + n + '</button>';
+        ' onclick="SeatingApp.' + (handler || 'setLayout') + '(\'' + kind + '\',' + n + ')">' + n + '</button>';
     }).join('');
+  }
+  // full panel — same order everywhere: Rows, then Seats per row
+  function layoutPanelHtml(handler, title) {
+    return '<div class="panel"><div class="ptt">' + (title || 'Layout') + '</div>' +
+      '<div class="lbl">Rows</div><div class="opts" id="rowOpts">' + layoutOptsHtml('rows', handler) + '</div>' +
+      '<div class="lbl">Seats per row</div><div class="opts" id="sprOpts">' + layoutOptsHtml('seatsPerRow', handler) + '</div></div>';
   }
   function setLayout(k, v) { cfg.layout[k] = v; if (k === 'rows' || k === 'seatsPerRow') renderLayout(); else updateLayoutDerived(); }
   function togglePref(id) { cfg.layout.prefs[id] = !cfg.layout.prefs[id]; renderLayout(); }
@@ -403,11 +421,7 @@
       '<div class="lead"><h2>Configure your ' + esc(r.name) + '</h2><p>' + esc(r.manufacturer) + (r.style ? ' · ' + esc(r.style) : '') + '</p></div>' +
       '<div id="fitBanner">' + fitBannerHtml() + '</div>' +
       '<div class="cfg-grid"><div class="cfg-left">' +
-        '<div class="panel"><div class="ptt">Layout</div><div class="lbl">Seats per row</div><div class="opts">' +
-          CFG.seatsPerRowOptions.map(function (n) { return '<button class="opt ' + (cfg.layout.seatsPerRow === n ? 'on' : '') + '" onclick="SeatingApp.setLayout2(\'seatsPerRow\',' + n + ')">' + n + '</button>'; }).join('') +
-          '</div><div class="lbl">Rows</div><div class="opts">' +
-          CFG.rowOptions.map(function (n) { return '<button class="opt ' + (cfg.layout.rows === n ? 'on' : '') + '" onclick="SeatingApp.setLayout2(\'rows\',' + n + ')">' + n + '</button>'; }).join('') +
-          '</div></div>' + motorHtml + matHtml + finHtml + arm + accHtml +
+        layoutPanelHtml('setLayout2') + motorHtml + matHtml + finHtml + arm + accHtml +
         '</div>' +
         '<div class="cfg-right"><div class="panel sticky"><div class="ptt">Your cinema</div><div id="planWrap"></div>' +
           '<div id="liveTotal" class="live"></div></div></div>' +
