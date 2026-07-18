@@ -340,7 +340,7 @@
     ranked.forEach(function (x) { var m = x.range.manufacturer; if (!groups[m]) { groups[m] = []; order.push(m); } groups[m].push(x); });
     var sections = order.map(function (m) {
       var items = groups[m];
-      var logo = items.map(function (it) { return (it.range.metadata || {}).manufacturer_logo; }).find(Boolean) || null;
+      var logo = items.map(function (it) { return (it.range.metadata || {}).manufacturer_logo || (it.range.manufacturer_meta || {})._logo_url; }).find(Boolean) || null;
       var head = logo
         ? '<img class="mfr-logo" src="' + esc(logo) + '" alt="' + esc(m) + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'\'"><span class="mfr-word" style="display:none">' + esc(m) + '</span>'
         : '<span class="mfr-word">' + esc(m) + '</span>';
@@ -975,7 +975,7 @@
       grossValue: Math.round(vb.gross),
       roomText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm',
       roomWidthText: (cfg.layout.widthMm / 1000).toFixed(1) + 'm wide',
-      layoutText: (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats · ' + cfg.layout.rows + ' × ' + cfg.layout.seatsPerRow,
+      layoutText: (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats · ' + cfg.layout.rows + ' row' + (cfg.layout.rows !== 1 ? 's' : '') + ' × ' + cfg.layout.seatsPerRow,
       rows: cfg.layout.rows, seatsPerRow: cfg.layout.seatsPerRow,
       upholsteryText: uph, reclineText: recline,
       finishes: selectedFinishes().map(function (f) { return f.label; }),

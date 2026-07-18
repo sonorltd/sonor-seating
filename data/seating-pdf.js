@@ -163,28 +163,28 @@
       var dw = iw * s, dh = ih * s;
       P.image(hero, (A4.w - dw) / 2, 0, dw, dh, 1);
       // smooth fade to brand dark — starts lower, canvas-rendered so it never bands
-      var fTop = A4.h * 0.62, fH = A4.h * 0.24;
+      var fTop = A4.h * 0.64, fH = A4.h * 0.24;
       if (fadeImg) P.image(fadeImg, 0, fTop, A4.w, fH, 1);
       else P.fadeDown(0, fTop, A4.w, fH, DARK, 1, 56);
       P.rect(0, fTop + fH - 1, A4.w, A4.h - (fTop + fH) + 1, DARK, 1);
     }
-    // inset frame
-    P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, GOLD, 0.7, 0.34);
+    // inset frame — stops ABOVE the logo strip so the lockup sits outside it
+    P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 0.62 - 64, GOLD, 0.7, 0.34);
 
     // title block — range-led, sits on the fade
-    var ty = 612;
+    var ty = 628;
     P.hline(M, M + 26, ty - 20, GOLD, 1, 0.95);
     P.tracked('LUXURY SEATING PROPOSAL', M + 34, ty - 24, 8.5, F.r, GOLDL, 3.2);
     P.text(m.range || 'Proposal', M - 2, ty, 54, F.b, CREAM);
     P.text('by ' + (m.manufacturer || 'Sonor'), M, ty + 62, 19, F.l, GOLDL);
 
     // client / project info (print-asset style)
-    var iy = 718, cw = (A4.w - M * 2) / 3;
+    var iy = 732, cw = (A4.w - M * 2) / 3;
     P.hline(M, A4.w - M, iy - 16, GOLD, 0.5, 0.45);
     var info = [
       ['PREPARED FOR', m.client || '—'],
       ['PROJECT', m.project || '—'],
-      ['DATE', m.dateText || '—']
+      ['REFERENCE', m.quoteRef || '—']
     ];
     info.forEach(function (c, i) {
       var x = M + i * cw;
@@ -195,20 +195,23 @@
 
     // footer — Sonor lockup bottom-left (website style: mark + wordmark, same colour),
     // CEDIA member logo bottom-right. Nothing else.
-    var fy = A4.h - 66;
-    P.logo(M, fy, 26, CREAM);
-    P.tracked('SONOR', M + 36, fy + 6.5, 14, F.b, CREAM, 3.1);
+    // logo strip OUTSIDE the frame — all three at equal optical height, one centreline
+    var cyL = A4.h - 38;
+    P.logo(M, cyL - 11, 22, CREAM);
+    P.tracked('SONOR', M + 32, cyL - 6.5, 13, F.b, CREAM, 3.1);
     if (mfrLogoImg) {
-      // manufacturer logo centred in the lockup row (Sonor left · manufacturer centre · CEDIA right)
-      var mlh = 15, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
-      if (mlw > 140) { mlw = 140; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
-      P.image(mfrLogoImg, (A4.w - mlw) / 2, fy + 6.5 + (13 - mlh) / 2, mlw, mlh, 0.92);
+      // manufacturer logo centred (Sonor left · manufacturer centre · CEDIA right)
+      var mlh = 16, mlw = mfrLogoImg.width * (mlh / mfrLogoImg.height);
+      if (mlw > 130) { mlw = 130; mlh = mfrLogoImg.height * (mlw / mfrLogoImg.width); }
+      P.image(mfrLogoImg, (A4.w - mlw) / 2, cyL - mlh / 2, mlw, mlh, 0.92);
     }
     if (m._cedia) {
-      var ch = 13, cwd = ch * (m._cedia.width / m._cedia.height);
-      P.image(m._cedia, A4.w - M - cwd, fy + 6.5, cwd, ch, 0.92);
+      // stacked lockup (taller than wide) → size by aspect: 2-line ≈ h26, 1-line h16
+      var ch = (m._cedia.width / m._cedia.height) < 3 ? 26 : 16;
+      var cwd = ch * (m._cedia.width / m._cedia.height);
+      P.image(m._cedia, A4.w - M - cwd, cyL - ch / 2, cwd, ch, 0.92);
     } else {
-      P.trackedRight('CEDIA MEMBER', A4.w - M, fy + 9, 7, F.r, [168, 156, 136], 1.3);
+      P.trackedRight('CEDIA MEMBER', A4.w - M, cyL - 4, 7, F.r, [168, 156, 136], 1.3);
     }
   }
 
@@ -236,17 +239,22 @@
       ['Options', (m.finishes && m.finishes.length) ? m.finishes.join(', ') : null]
     ].filter(function (r) { return r[1]; });
     var sy = top, colourRowY = null;
-    rows.forEach(function (r) {
+    rows.forEach(function (r, ri) {
       if (r[0] === 'Colour') colourRowY = sy;
       P.tracked(String(r[0]).toUpperCase(), M, sy, 6.5, F.r, MUT, 1.5);
       var lines = wrap(String(r[1]), F.b, 11.5, colW - 54);
       lines.forEach(function (ln, li) { P.text(ln, M, sy + 11 + li * 13.5, 11.5, F.b, INK); });
       sy += 11 + lines.length * 13.5 + 11;
-      P.hline(M, M + colW, sy - 7, LINE, 0.5, 0.7);
+      if (ri < rows.length - 1) P.hline(M, M + colW, sy - 7, LINE, 0.5, 0.7);   // no dangling line after the last row
     });
     // swatch square — right of the Colour row: photo, else colour fill
     if (colourRowY != null && (swatchImg || (m.colourHex && !m.colourIsOpenChoice))) {
-      var swW = 42, swH = 26, swX = M + colW - swW, swY = colourRowY + 1;   // clear of the row divider
+      // swatch keeps the photo's TRUE aspect (height-fixed, width follows), right-aligned to the column
+      var swH = 26, swW = 42, swY = colourRowY + 1;
+      if (swatchImg) {
+        swW = Math.max(26, Math.min(60, swH * (swatchImg.width / swatchImg.height)));
+      }
+      var swX = M + colW - swW;
       if (swatchImg) {
         P.image(swatchImg, swX, swY, swW, swH, 1);
       } else {
@@ -295,7 +303,10 @@
       P.right(String(l.qty), cQty + 20, y - 9, 10.5, F.r, INK2);
       P.right(money(l.unit), cUnit + 40, y - 9, 10.5, F.r, INK2);
       P.right(l.unit != null ? money(l.unit * l.qty) : 'POA', cLine, y - 9, 10.5, F.b, INK);
-      if (li < nLines - 1) P.hline(M, A4.w - M, y + 5, LINE, 0.5, 0.6);
+      // thin divider between rows only — never after the last seat row (the gold
+      // ACCESSORIES/totals divider follows it, so a thin line there doubles up)
+      var nxt = (m.lines || [])[li + 1];
+      if (li < nLines - 1 && !(nxt && nxt.acc && !l.acc)) P.hline(M, A4.w - M, y + 5, LINE, 0.5, 0.6);
       y += 22;
     });
     // ONE divider (gold) between items and totals — clear of the last row
@@ -523,6 +534,7 @@
     }
     if (m.productUrl) { P.text('Product page:', M, top, 9.5, F.r, MUT); P.link(m.productUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.productUrl)); top += 18; }
     if (m.datasheetUrl) { P.text('Datasheet:', M, top, 9.5, F.r, MUT); P.link(m.datasheetUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.datasheetUrl)); top += 18; }
+    if (m.manufacturerUrl) { P.text('Manufacturer:', M, top, 9.5, F.r, MUT); P.link(m.manufacturerUrl, M + 78, top, 9.5, F.r, [120, 90, 140], fitUrl(m.manufacturerUrl)); top += 18; }
     P.text(m._dsAppended ? 'The manufacturer datasheet is appended to this document.' : 'Manufacturer datasheet available via the link above or on request.', M, top, 9, F.r, MUT);
     pageFoot(P, F, m);
   }
@@ -584,8 +596,13 @@
   function termsPage(P, F, m, TOTAL_PAGES) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
     pageHead(P, F, m, 'TERMS & PAYMENT', 6, TOTAL_PAGES);
-    P.tracked('THE DETAIL', M, 96, 8.5, F.r, GOLD, 2.6);
-    var y = 128;
+    // v0.21.1 — PAYMENT leads, THE DETAIL follows; quote reference sits alone near the
+    // foot of the page; everything given more air.
+    var y = 100;
+    P.tracked('PAYMENT', M, y, 8.5, F.b, GOLD, 2.6); y += 20;
+    P.text(m.paymentTerms || '50% deposit on order · 50% balance prior to delivery', M, y, 12.5, F.b, INK); y += 26;
+    P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 26;
+    P.tracked('THE DETAIL', M, y, 8.5, F.r, GOLD, 2.6); y += 24;
     var termAll = [
       'Proposal prepared ' + (m.dateText || '') + (m.client ? ' for ' + m.client : '') + (m.project ? ' — ' + m.project : '') + '.',
       'Estimate only — a formal quotation will be prepared for your final choices and accessories once all information and latest pricing have been verified.',
@@ -595,17 +612,15 @@
     termAll.forEach(function (t) {
       var lines = wrap(t, F.r, 9.5, A4.w - M * 2 - 14);
       P.text('·', M, y - 1, 9.5, F.b, GOLD);
-      lines.forEach(function (ln, li) { P.text(ln, M + 12, y + li * 13, 9.5, F.r, INK2); });
-      y += lines.length * 13 + 9;
+      lines.forEach(function (ln, li) { P.text(ln, M + 12, y + li * 14, 9.5, F.r, INK2); });
+      y += lines.length * 14 + 12;
     });
-    y += 8; P.hline(M, A4.w - M, y, GOLD, 0.8, 0.75); y += 18;
-    P.tracked('PAYMENT', M, y, 8, F.b, GOLD, 2.2); y += 16;
-    P.text(m.paymentTerms || '50% deposit on order · 50% balance prior to delivery', M, y, 11.5, F.b, INK); y += 34;
     if (m.quoteRef) {
-      P.hline(M, A4.w - M, y - 12, GOLD, 0.8, 0.75); y += 6;
-      P.tracked('QUOTE REFERENCE', M, y, 8, F.b, GOLD, 2.2);
-      P.right(m.quoteRef, A4.w - M, y - 2, 13, F.b, INK); y += 20;
-      P.text('Please quote this reference in any correspondence about this proposal.', M, y, 8.5, F.r, MUT);
+      var qy2 = A4.h - 158;
+      P.hline(M, A4.w - M, qy2, GOLD, 0.8, 0.75); qy2 += 22;
+      P.tracked('QUOTE REFERENCE', M, qy2, 8, F.b, GOLD, 2.2);
+      P.right(m.quoteRef, A4.w - M, qy2 - 4, 14, F.b, INK); qy2 += 22;
+      P.text('Please quote this reference in any correspondence about this proposal.', M, qy2, 8.5, F.r, MUT);
     }
     pageFoot(P, F, m);
   }
@@ -642,7 +657,10 @@
       try { rangeImg = await loadImage(doc, m.rangeImage); } catch (e2) {}
     }
     if (!hero && rangeImg) hero = rangeImg;
-    try { m._cedia = await doc.embedPng(await fetchBytes(BASE + 'cedia-member-wide.png')); } catch (e) { m._cedia = null; }
+    // v0.21.2 — stacked (two-line) CEDIA MEMBER lockup on the cover for better
+    // proportion beside the other logos; wide single-line kept as fallback.
+    try { m._cedia = await doc.embedPng(await fetchBytes(BASE + 'cedia-member-stacked.png')); } catch (e) { m._cedia = null; }
+    if (!m._cedia) { try { m._cedia = await doc.embedPng(await fetchBytes(BASE + 'cedia-member-wide.png')); } catch (e) { m._cedia = null; } }
 
     // pre-fetch the manufacturer datasheet (Library `datasheet_url`) so pages state it accurately
     var dsDoc = null;

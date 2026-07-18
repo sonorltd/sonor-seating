@@ -12,7 +12,9 @@
 
   var ranges = [], catalogue = [], idx = null, source = null, COLOURS = {};
 
-  var MFR_LOGO = { cineca: 'https://sonorltd.github.io/sonor-cineca/cineca-assets/cineca-logo.png' };
+  // v0.21.1 — manufacturer logos come from the SSOT (seating_manufacturers.logo_url →
+  // MFRMETA._logo_url); this map is a last-resort fallback only.
+  var MFR_LOGO = {};
 
   // slim seed keys → full v_seating_catalogue keys
   function unslim(a) {
@@ -91,7 +93,7 @@
           },
           materials: adaptMaterials(row.materials, COLOURS),
           finishes: (typeof FINOPTS !== 'undefined' && FINOPTS[row.manufacturer_slug]) || [],
-          metadata: { seating_range: true, needs_review: !!meta._needs_review, is_cineca: row.manufacturer_slug === 'cineca', manufacturer_logo: MFR_LOGO[row.manufacturer_slug] || null, range_style: meta.range_style || null, product_url: meta.product_url || null, datasheet_url: meta.datasheet_url || null },
+          metadata: { seating_range: true, needs_review: !!meta._needs_review, is_cineca: row.manufacturer_slug === 'cineca', manufacturer_logo: ((typeof MFRMETA !== 'undefined' && MFRMETA[row.manufacturer_slug]) || {})._logo_url || MFR_LOGO[row.manufacturer_slug] || null, range_style: meta.range_style || null, product_url: meta.product_url || null, datasheet_url: meta.datasheet_url || null },
           _items: []
         };
       }

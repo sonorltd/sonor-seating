@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.21.0',
+    version: '0.21.2',
     buildDate: '2026-07-17',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
