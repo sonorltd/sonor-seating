@@ -533,7 +533,7 @@
     P.rect(0, 0, A4.w, A4.h, CREAM);
     pageHead(P, F, m, 'ADDITIONAL OPTIONS', 5, TOTAL_PAGES);
     P.tracked('AVAILABLE ON THIS RANGE', M, 96, 8.5, F.r, GOLD, 2.6);
-    var introLines = wrap('A menu of everything available on the ' + (m.range || '') + ' — in case anything was missed during configuration. Ask us to add any of these to your formal quotation.', F.r, 9, A4.w - M * 2);
+    var introLines = wrap('A menu of everything available on the ' + (m.range || '') + ' — in case anything was missed during configuration. Values show the change to this proposal’s total (ex VAT) if swapped in; ask us to add any of these to your formal quotation.', F.r, 9, A4.w - M * 2);
     introLines.forEach(function (ln, li) { P.text(ln, M, 118 + li * 12, 9, F.r, MUT); });
     var om = m.optionsMenu || {};
     var y = 118 + introLines.length * 12 + 26, colR = A4.w - M;
@@ -545,10 +545,22 @@
       if (right) P.right(right, colR, y - 4, 9.5, F.r, MUT);
       y += 16;
     }
+    // ± increments on THIS configuration's total (ex VAT) — not per-seat prices
+    function deltaText(x) {
+      if (x.selected) return 'selected';
+      if (x.delta == null) return 'at quotation';
+      if (x.delta === 0) return 'no change';
+      return (x.delta > 0 ? '+ ' : '- ') + money(Math.abs(x.delta));
+    }
     if ((om.materials || []).length) {
       section('UPHOLSTERY LINES');
-      om.materials.forEach(function (x) { row(x.name + (x.group ? '  ·  ' + x.group : ''), x.price != null ? 'chair from ' + money(x.price) : '', x.selected); });
-      row("COM — customer's own material", 'priced at quotation', false);
+      om.materials.forEach(function (x) { row(x.name + (x.group ? '  ·  ' + x.group : ''), deltaText(x), x.selected); });
+      row("COM — customer's own material", 'at quotation', false);
+      y += 8;
+    }
+    if ((om.recline || []).length) {
+      section('RECLINE');
+      om.recline.forEach(function (x) { row(x.label, deltaText(x), x.selected); });
       y += 8;
     }
     if ((om.finishes || []).length) {
@@ -560,7 +572,7 @@
       section('ACCESSORIES');
       om.accessories.forEach(function (x) {
         if (y > A4.h - 110) return;
-        row(x.label + (x.qty ? '  (× ' + x.qty + ' selected)' : ''), x.price != null ? money(x.price) + ' each' : 'POA', !!x.qty);
+        row(x.label + (x.qty ? '  (× ' + x.qty + ' selected)' : ''), x.price != null ? '+ ' + money(x.price) + ' each' : 'POA', !!x.qty);
       });
     }
     P.dot(M + 3, A4.h - 79, 3, [173, 153, 120], [173, 153, 120]);

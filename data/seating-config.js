@@ -4,7 +4,7 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.19.3',
+    version: '0.21.0',
     buildDate: '2026-07-17',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
@@ -50,7 +50,7 @@
     manufacturerTerms: {
       _default: { delivery: { type: 'perSeat', gbp: 50 }, leadWeeks: [8, 12], note: 'Custom builds 8–12 weeks; standard stock items (e.g. black leather) ship sooner.' }
     },
-    steps: ['Layout', 'Choose Range', 'Configure', 'Summary'],
+    steps: ['Layout', 'Style', 'Options', 'Summary'],
     // Step 1 generic setup — standard defaults per the brief
     rowOptions: [1, 2, 3, 4],
     seatsPerRowOptions: [2, 3, 4, 5, 6, 7, 8, 9, 10],

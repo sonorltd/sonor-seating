@@ -150,33 +150,35 @@
       var qb = c.from('seating_configs').select('id,label,range_id,app_version,updated_at').eq('archived', false).order('updated_at', { ascending: false }).limit(20);
       var q = await (cfg.projectId ? qb.eq('project_id', cfg.projectId) : qb.eq('project_name', proj));
       if (q.error) throw q.error;
-      if (!q.data.length) { el.innerHTML = '<div class="hint">No saved configurations for this project yet.</div>'; return; }
+      if (!q.data.length) { el.innerHTML = '<div class="hint">No saved configurations for this project yet — design one below and save it at the Summary step.</div>'; return; }
       el.innerHTML = q.data.map(function (row) {
         var d = new Date(row.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
         return '<div class="saved-row' + (row.id === cfg._savedId ? ' cur' : '') + '">' +
           '<div class="saved-b"><div class="saved-n">' + esc(row.label) + '</div><div class="saved-d">' + d + ' · v' + esc(row.app_version || '?') + '</div></div>' +
-          '<button class="ghost sm" onclick="SeatingApp.openSaved(\'' + row.id + '\')">Open</button>' +
+          '<button class="ghost sm" onclick="SeatingApp.openSaved(\'' + row.id + '\')" title="Open at the summary">Open</button>' +
+          '<button class="ghost sm" onclick="SeatingApp.openSaved(\'' + row.id + '\', 3)" title="Open at Configure to make changes">Edit</button>' +
           '<button class="ghost sm" onclick="SeatingApp.renameSaved(\'' + row.id + '\')" title="Rename">✎</button>' +
           '<button class="ghost sm" onclick="SeatingApp.copySavedLink(\'' + row.id + '\')">Link</button>' +
           '<button class="ghost sm" onclick="SeatingApp.deleteSaved(\'' + row.id + '\')" title="Delete">🗑</button></div>';
       }).join('');
     } catch (e) { el.innerHTML = '<div class="hint">Saved list unavailable: ' + esc(e && e.message) + '</div>'; }
   }
-  async function openSaved(id) {
+  async function openSaved(id, targetStep) {
     var c = dbc(); if (!c) return toast('Offline');
     try {
       var q = await c.from('seating_configs').select('id,config').eq('id', id).single();
       if (q.error) throw q.error;
-      applySaved(q.data);
+      applySaved(q.data, targetStep);
     } catch (e) { toast('Load failed: ' + (e && e.message)); }
   }
-  function applySaved(row) {
+  function applySaved(row, targetStep) {
     var saved = row.config || {};
     cfg = Object.assign({ step: 4, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: { name: '', project: '' }, rowOverrides: {} }, saved);
     cfg._savedId = row.id;
-    if (!E.range(cfg.rangeId)) { toast('Saved range no longer in the catalogue'); cfg.step = 2; }
-    enter(); cfg.step = Math.min(saved.step || 4, 4); renderStep();
-    toast('Configuration loaded');
+    var landing = targetStep || Math.min(saved.step || 4, 4);
+    if (!E.range(cfg.rangeId)) { toast('Saved range no longer in the catalogue'); landing = 2; }
+    enter(); cfg.step = landing; renderStep();
+    toast(targetStep === 3 ? 'Configuration loaded — editing' : 'Configuration loaded');
   }
   async function renameSaved(id) {
     var c = dbc(); if (!c) return toast('Offline');
@@ -228,7 +230,15 @@
   function jumpTo(n) { if (n < cfg.step) { cfg.step = n; renderStep(); } }
   function restart() { var keepClient = cfg.client; cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: keepClient || { name: '', project: '' }, rowOverrides: {} }; renderStep(); }
   function setClient(k, v) { cfg.client[k] = v; if (k === 'project' && $('savedList')) { clearTimeout(setClient._t); setClient._t = setTimeout(loadSavedList, 500); } }
+  // v0.21.0 — generic (step-1) fit maths, shared by the guard + option greying
+  function genericRunMm(per) { var g = genericSpec(); return per * g.seatW + (per + 1) * g.armW; }
+  function genericDepthMm(rows) { var g = genericSpec(); return g.wallClear + rows * g.reclD + (rows - 1) * g.rowGap + 400; } // +400mm min screen clearance
+  function genericFit() {
+    var L = cfg.layout;
+    return { overW: genericRunMm(L.seatsPerRow) > (L.widthMm || 0), overL: genericDepthMm(L.rows) > (L.lengthMm || 0) };
+  }
   function nextDisabled() {
+    if (cfg.step === 1) { var g = genericFit(); return g.overW || g.overL; }
     if (cfg.step === 2) return !cfg.rangeId;
     if (cfg.step === 3) { try { if (fitCheck().over) return true; } catch (e) {} }
     return false;
@@ -240,9 +250,10 @@
       return '<div class="pill ' + (done ? 'done' : '') + ' ' + (act ? 'active' : '') + '"' + (done ? ' onclick="SeatingApp.jumpTo(' + n + ')"' : '') + '><span class="pn">' + (done ? '✓' : n) + '</span>' + l + '</div>' + (i < STEPS.length - 1 ? '<span class="parr">›</span>' : '');
     }).join('');
     var back = $('btnBack'); back.style.visibility = cfg.step > 1 ? 'visible' : 'hidden';
+    if (cfg.step > 1) back.textContent = '← Back · ' + STEPS[cfg.step - 2];
     var next = $('btnNext');
-    if (cfg.step === STEPS.length) { next.textContent = 'Start again'; next.onclick = restart; next.disabled = false; }
-    else { next.textContent = 'Continue →'; next.onclick = goNext; next.disabled = nextDisabled(); }
+    if (cfg.step === STEPS.length) { next.textContent = '↺ Start again'; next.onclick = restart; next.disabled = false; }
+    else { next.textContent = 'Continue · ' + STEPS[cfg.step] + ' →'; next.onclick = goNext; next.disabled = nextDisabled(); }
     if (cfg.step === 1) renderLayout();
     if (cfg.step === 2) renderRanges();
     if (cfg.step === 3) renderConfigure();
@@ -256,10 +267,19 @@
     var prefBtns = (CFG.prefs || []).map(function (p) {
       return '<button class="chip ' + (L.prefs[p.id] ? 'on' : '') + '" onclick="SeatingApp.togglePref(\'' + p.id + '\')" title="' + esc(p.hint) + '">' + esc(p.label) + '</button>';
     }).join('');
-    var rowP = CFG.rowOptions.map(function (n) { return '<button class="opt ' + (L.rows === n ? 'on' : '') + '" onclick="SeatingApp.setLayout(\'rows\',' + n + ')">' + n + '</button>'; }).join('');
-    var spr = CFG.seatsPerRowOptions.map(function (n) { return '<button class="opt ' + (L.seatsPerRow === n ? 'on' : '') + '" onclick="SeatingApp.setLayout(\'seatsPerRow\',' + n + ')">' + n + '</button>'; }).join('');
+    var rowP = layoutOptsHtml('rows'), spr = layoutOptsHtml('seatsPerRow');
+    var projName = (cfg.client.project || '').trim();
+    var savedPanel = global.__SEATING_CLIENT__ ? '' :
+      '<div class="panel saved-panel step1">' +
+        '<div class="ptt">Saved configurations' +
+          ' <span class="opt-tag">' + (projName ? esc(projName) : 'select a project above') + '</span>' +
+          (cfg._savedId ? '<button class="ghost sm" style="float:right" onclick="SeatingApp.restart()" title="Start a fresh configuration">+ New configuration</button><span class="opt-tag" style="float:right;margin-right:10px;color:var(--gold)">editing a saved config</span>' : '') +
+        '</div>' +
+        '<div id="savedList"><div class="hint">' + (projName ? 'Loading…' : 'Select a project in the bar above to see its saved configurations.') + '</div></div>' +
+      '</div>';
     $('stepBody').innerHTML =
-      '<div class="lead"><h2>Design your room</h2><p>Start with the space and how many seats you want. We’ll then recommend ranges that fit.</p></div>' +
+      '<div class="lead"><h2>Design your room</h2><p>Open a saved configuration for this project, or start below with the space and how many seats you want — we’ll then recommend ranges that fit.</p></div>' +
+      savedPanel +
       '<div class="layout-grid">' +
         '<div class="panel"><div class="ptt">Room size</div>' +
           '<label class="fld"><span>Width (m)</span><input type="number" step="0.1" min="1.5" value="' + (L.widthMm / 1000) + '" oninput="SeatingApp.setLayout(\'widthMm\', Math.round(this.value*1000))"></label>' +
@@ -267,8 +287,8 @@
           '<div class="hint" id="fitHint"></div>' +
         '</div>' +
         '<div class="panel"><div class="ptt">Seating</div>' +
-          '<div class="lbl">Rows</div><div class="opts">' + rowP + '</div>' +
-          '<div class="lbl">Seats per row</div><div class="opts">' + spr + '</div>' +
+          '<div class="lbl">Rows</div><div class="opts" id="rowOpts">' + rowP + '</div>' +
+          '<div class="lbl">Seats per row</div><div class="opts" id="sprOpts">' + spr + '</div>' +
           '<div class="lbl">Total seats</div><div class="big" id="totalSeats"></div>' +
         '</div>' +
         '<div class="panel"><div class="ptt">Preferences <span class="opt-tag">optional</span></div>' +
@@ -276,8 +296,21 @@
           '<div class="hint">We’ll flag ranges that don’t offer what you pick (e.g. no daybed).</div>' +
         '</div>' +
       '</div>' +
+      '<div id="fitBanner1"></div>' +
       '<div class="roomview" id="roomView"></div>';
     updateLayoutDerived();
+    if (!global.__SEATING_CLIENT__) setTimeout(loadSavedList, 0);
+  }
+  // greyed-out options for counts the room physically can't take (generic dims)
+  function layoutOptsHtml(kind) {
+    var L = cfg.layout;
+    var list = kind === 'rows' ? CFG.rowOptions : CFG.seatsPerRowOptions;
+    return list.map(function (n) {
+      var off = kind === 'rows' ? genericDepthMm(n) > (L.lengthMm || 0) : genericRunMm(n) > (L.widthMm || 0);
+      var on = (kind === 'rows' ? L.rows : L.seatsPerRow) === n;
+      return '<button class="opt ' + (on ? 'on ' : '') + (off ? 'off' : '') + '"' + (off ? ' disabled title="Won’t fit this room"' : '') +
+        ' onclick="SeatingApp.setLayout(\'' + kind + '\',' + n + ')">' + n + '</button>';
+    }).join('');
   }
   function setLayout(k, v) { cfg.layout[k] = v; if (k === 'rows' || k === 'seatsPerRow') renderLayout(); else updateLayoutDerived(); }
   function togglePref(id) { cfg.layout.prefs[id] = !cfg.layout.prefs[id]; renderLayout(); }
@@ -286,6 +319,13 @@
     if ($('totalSeats')) $('totalSeats').textContent = total;
     var usable = L.widthMm - 300;
     if ($('fitHint')) $('fitHint').innerHTML = 'Usable width ≈ <b>' + (usable / 1000).toFixed(1) + 'm</b> (allowing 150mm each side).';
+    if ($('rowOpts')) $('rowOpts').innerHTML = layoutOptsHtml('rows');
+    if ($('sprOpts')) $('sprOpts').innerHTML = layoutOptsHtml('seatsPerRow');
+    var g = genericFit();
+    if ($('fitBanner1')) $('fitBanner1').innerHTML =
+      g.overW ? '<div class="fitwarn block">⚠ ' + L.seatsPerRow + ' seats across won’t fit a ' + (L.widthMm / 1000).toFixed(2) + 'm-wide room (needs ≈ ' + genericRunMm(L.seatsPerRow) + 'mm). Reduce seats per row or widen the room to continue.</div>' :
+      g.overL ? '<div class="fitwarn block">⚠ ' + L.rows + ' rows won’t fit a ' + (L.lengthMm / 1000).toFixed(2) + 'm-long room (needs ≈ ' + genericDepthMm(L.rows) + 'mm incl. screen clearance). Reduce rows or lengthen the room to continue.</div>' : '';
+    var nx = $('btnNext'); if (nx && cfg.step === 1) nx.disabled = nextDisabled();
     if ($('roomView')) $('roomView').innerHTML = roomSVG(L, false, true);
   }
 
@@ -828,7 +868,7 @@
     var capTxt = S.generic ? 'average chair sizes · shared armrests · dims in mm'
       : (S.rangeName ? S.rangeName + ' · ' : '') + (S.real ? 'manufacturer dimensions' : 'standard allowances') + ' · dims in mm';
     s += txt(capTxt, boxW / 2, boxH - 6, 8.5, 'rgba(143,133,116,0.9)', 'middle');
-    if (sideMm < 0) s += txt('run exceeds room width by ' + Math.abs(sideMm * 2) + 'mm', boxW / 2, boxH - 18, 8.5, 'rgba(224,122,95,0.95)', 'middle');
+    // (overflow messaging lives in the page-level fit banners — nothing drawn in-SVG)
     return '<svg viewBox="0 0 ' + boxW + ' ' + boxH + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' + s + '</svg>';
   }
   function planSVG(large) { return roomSVG(cfg.layout, large); }
@@ -889,23 +929,45 @@
       installCost: inst, installLabel: (CFG.installation || {}).label || 'Installation',
       manufacturerLogo: (r.metadata && r.metadata.manufacturer_logo) || (r.manufacturer_meta && r.manufacturer_meta._logo_url) || null,
       countryOfOrigin: (r.manufacturer_meta && r.manufacturer_meta.country_of_origin) || null,
-      // v0.18.0 — 'Additional options' page: everything available on this range that
-      // wasn't picked, so nothing is missed in the config process
-      optionsMenu: {
-        accessories: E.accessoryItems(r.id).map(function (it) {
-          var p = E.itemSell(it, cfg.material);
-          return { label: it.label, price: p != null ? Math.round(p) : null, qty: cfg.accessories[it.id] || 0, generic: !!it.is_universal };
-        }),
-        finishes: ((r.finishes) || []).map(function (f) { return { label: f.label, note: f.note, selected: !!cfg.finishes[f.id] }; }),
-        materials: (r.materials || []).filter(function (m) { return m.available !== false; }).map(function (m) {
-          var p = E.chairFrom(r, m.id);
-          return { name: m.name, group: m.group || '', price: p != null ? Math.round(p) : null, selected: cfg.material === m.id };
-        }),
-        seats: E.seatItems(r.id).slice(0, 14).map(function (s2) {
-          var p = E.itemSell(s2, cfg.material);
-          return { label: s2.label, price: p != null ? Math.round(p) : null };
-        })
-      },
+      // v0.21.0 — 'Additional options' page: everything available on this range that
+      // wasn't picked, priced as ± INCREMENTS on this configuration's total (not per seat)
+      optionsMenu: (function () {
+        var totalSeats = cfg.layout.rows * cfg.layout.seatsPerRow;
+        var curProd = prod;
+        function totalWithMaterial(mid) {
+          var keep = cfg.material, t = null;
+          try { cfg.material = mid; t = productTotal(quoteLines()); } catch (e) {} finally { cfg.material = keep; }
+          return t;
+        }
+        var chosen = primarySeat();
+        var chosenU = chosen ? E.itemSell(chosen, cfg.material) : null;
+        function seatForMotor(mt) {
+          return (E.seatItems(r.id) || []).find(function (s2) {
+            var l = (s2.label || '').toLowerCase();
+            return (mt === '2motor' && /2-?motor/.test(l)) || (mt === '1motor' && /1-?motor/.test(l)) || (mt === 'fixed' && /fixed|non-reclin/.test(l));
+          }) || null;
+        }
+        var motors = E.motorOptions(r) || [];
+        return {
+          accessories: E.accessoryItems(r.id).map(function (it) {
+            var p = E.itemSell(it, cfg.material);
+            return { label: it.label, price: p != null ? Math.round(p) : null, qty: cfg.accessories[it.id] || 0, generic: !!it.is_universal };
+          }),
+          finishes: ((r.finishes) || []).map(function (f) { return { label: f.label, note: f.note, selected: !!cfg.finishes[f.id] }; }),
+          materials: (r.materials || []).filter(function (m2) { return m2.available !== false; }).map(function (m2) {
+            var sel = cfg.material === m2.id;
+            var t2 = sel ? curProd : totalWithMaterial(m2.id);
+            var delta = (!sel && t2 != null && curProd) ? Math.round(t2 - curProd) : (sel ? 0 : null);
+            return { name: m2.name, group: m2.group || '', delta: delta, selected: sel };
+          }),
+          recline: motors.length > 1 ? motors.map(function (mt) {
+            var sel = cfg.motor === mt;
+            var s2 = seatForMotor(mt), u2 = s2 ? E.itemSell(s2, cfg.material) : null;
+            var delta = sel ? 0 : ((u2 != null && chosenU != null) ? Math.round((u2 - chosenU) * totalSeats) : null);
+            return { label: (CFG.motorLabels || {})[mt] || mt, delta: delta, selected: sel };
+          }) : []
+        };
+      })(),
       productUrl: meta.product_url || null,
       datasheetUrl: meta.datasheet_url || null,
       manufacturerUrl: (CFG.manufacturerSites || {})[r.manufacturer] || null,

@@ -238,6 +238,8 @@
     #btnNext:disabled { opacity:.35; cursor:not-allowed; }
     /* v0.15.0 — saved configurations */
     .saved-panel .ptt { display:block; }
+    .saved-panel.step1 { margin:0 0 26px; border:1px solid var(--brd2); border-left:2px solid var(--gold); }
+    .opt.off { opacity:.28; cursor:not-allowed; pointer-events:none; text-decoration:line-through; }
     .saved-row { display:flex; align-items:center; gap:9px; padding:9px 4px; border-bottom:1px solid var(--brd2); }
     .saved-row.cur { background:rgba(173,153,120,.06); border-radius:8px; }
     .saved-b { flex:1; min-width:0; }
@@ -261,10 +263,10 @@
     .empty { padding:60px; text-align:center; color:var(--muted); }
 
     .footer { display:flex; justify-content:space-between; align-items:center; padding:16px 30px; border-top:1px solid var(--brd); background:linear-gradient(rgba(9,8,7,.55), rgba(9,8,7,.9)); position:sticky; bottom:0; backdrop-filter:blur(8px); }
-    .btn { padding:13px 28px; border-radius:2px; border:1px solid transparent; font-family:'Gilroy','DM Sans',sans-serif; font-size:11.5px; font-weight:800; letter-spacing:.11em; text-transform:uppercase; cursor:pointer; transition:background .3s,color .3s,border-color .3s; }
-    .btn.primary { background:#151310; color:var(--cream); border-color:rgba(255,255,255,.14); }
-    .btn.primary:hover { background:var(--gold); color:#151310; border-color:var(--gold); }
-    .btn.primary:disabled { background:var(--bg2); color:var(--muted); border-color:var(--brd2); cursor:not-allowed; }
+    .btn { padding:15px 34px; border-radius:2px; border:1px solid transparent; font-family:'Gilroy','DM Sans',sans-serif; font-size:12.5px; font-weight:800; letter-spacing:.11em; text-transform:uppercase; cursor:pointer; transition:background .3s,color .3s,border-color .3s,box-shadow .3s; }
+    .btn.primary { background:var(--gold); color:#151310; border-color:var(--gold); box-shadow:0 6px 26px rgba(173,153,120,.28); }
+    .btn.primary:hover { background:#c9b28e; border-color:#c9b28e; box-shadow:0 8px 30px rgba(173,153,120,.4); }
+    .btn.primary:disabled { background:var(--bg2); color:var(--muted); border-color:var(--brd2); cursor:not-allowed; box-shadow:none; }
     .btn.ghost { background:transparent; color:var(--gold2); border-color:rgba(173,153,120,.42); } .btn.ghost:hover { background:rgba(128,88,161,.10); border-color:var(--gold2); color:var(--gold2); }
     .btn.sec { background:transparent; color:var(--muted); border-color:rgba(255,255,255,.13); } .btn.sec:hover { color:var(--cream); border-color:var(--gold); }
 
@@ -453,7 +455,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.19.3';
+    const APP_VERSION = '0.21.0';
     document.addEventListener('DOMContentLoaded', function(){ var v = document.getElementById('hdrVer'); if (v) v.textContent = 'v' + APP_VERSION; });
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
