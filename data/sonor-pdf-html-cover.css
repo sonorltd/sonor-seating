@@ -1101,8 +1101,8 @@ body {
   background: var(--accent, #0f2a44);
   background-image: none;
   color: #ffffff;
-  font-size: 7.5px; font-weight: 700;   /* v5.66.2 — single-line headers */
-  letter-spacing: 0.02em;
+  font-size: 8px; font-weight: 800;   /* v5.178.0 — heavier heads (Bryn: "text weight and layout needs to be better"); v5.66.2 single-line */
+  letter-spacing: 0.06em;
   white-space: nowrap;
   overflow: hidden;
   text-transform: uppercase;
@@ -1119,6 +1119,7 @@ body {
   word-wrap: break-word;
   overflow-wrap: break-word;
   color: var(--slate-text, #1a1f28);
+  font-variant-numeric: tabular-nums;   /* v5.178.0 — columns of figures align */
   line-height: 1.28;
   /* v5.5.37 (2026-05-11) — 8 → 7.5px + cell padding 5px (was 6px) + line-
      height 1.22 → 1.18. Bryn 2026-05-11: "block text needs to shrink
@@ -1136,6 +1137,18 @@ body {
 }
 .schedule-table tbody tr.sch-row {
   background: #ffffff;
+}
+/* v5.178.0 — column weight hierarchy (Bryn: "text weight and layout etc
+   needs to be better"): the leading identity column and the terminal
+   qty/total column carry weight; middle descriptive columns stay light.
+   Sub/banner/total rows override with their own rules below. */
+.schedule-table tbody tr.sch-row td:first-child,
+.schedule-table tbody tr.sch-row-alt td:first-child {
+  font-weight: 650;
+}
+.schedule-table tbody tr.sch-row td:last-child,
+.schedule-table tbody tr.sch-row-alt td:last-child {
+  font-weight: 700;
 }
 .schedule-table tbody tr.sch-row-alt {
   background: rgba(247, 248, 250, 0.6);
@@ -1212,8 +1225,8 @@ body {
   background: var(--paper-rule, #f0ece4);
   color: var(--slate-text, #1a1f28);
   font-weight: 800;
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-size: 9.5px;   /* v5.178.0 */
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 4px 10px;
   border-left: 3px solid var(--accent);
@@ -1304,8 +1317,8 @@ body {
 .schedule-table tbody tr.sch-group.sch-group-sub td {
   background: #f7f4ec;
   background: var(--paper-soft, #f7f4ec);
-  color: #4a4338;
-  font-weight: 700;
+  color: #2c2218;      /* v5.178.0 — was #4a4338: room banners read as structure, not decoration */
+  font-weight: 800;
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: none;
