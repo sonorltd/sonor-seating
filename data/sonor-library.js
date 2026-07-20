@@ -114,7 +114,16 @@
 // Add-panel NOT NULL failures). (2) Sub-group management API: getSubgroups /
 // createSubgroup / renameSubgroup / reorderSubgroups, backed by new table
 // sonor_block_subgroups. See CONSUMER-API.md §Subgroups.
-window.SONOR_LIBRARY_VERSION = '3.7.0';
+// v3.8.0 — AV device seam for consumers (CONSUMER-API §26): getAvCatalogue
+// (the §0 canonical deduped product view, cached), getDeviceAliases /
+// resolveDeviceId (§25 device clone-merge renames), deviceMatchesBlock (the
+// §22.2+§22.4 category∩role∩domain match rule — the ONE predicate every
+// consumer must share), getDeviceOptionsForBlock (§22 render source:
+// device_options[] else candidate sweep, default implicit member),
+// getAllProductAccessories / getProductAccessories (§20 parent-linked
+// accessory options). First consumer: Takeoffs v5.174.0 device dropdowns +
+// Device Schedule.
+window.SONOR_LIBRARY_VERSION = '3.8.0';
 window.SonorLibrary = window.SonorLibrary || {};
 
 (function (SL) {
@@ -1894,6 +1903,136 @@ window.SonorLibrary = window.SonorLibrary || {};
   // Devices / misc — non-rack gear was split off in v1.10.5 R58.
   SL.getDevices = function (opts) { return _fetchTable('device_catalogue', opts); };
   SL.getMisc    = function (opts) { return _fetchTable('misc_catalogue',   opts); };
+
+  // ── v3.8.0 (CONSUMER-API §0/§20/§22/§25 → §26) — AV catalogue + block↔device seam ──
+  // `av_catalogue` VIEW is THE canonical deduped product read surface (one row
+  // per model_id, device_catalogue ⋈ misc_catalogue, metadata merged onto the
+  // spec-family template, carries spec_family + source_tables). New consumers
+  // read it — never the two base tables (duplicates + half-filled rows).
+  SL.getAvCatalogue = function (opts) {
+    opts = opts || {};
+    if (!state.client) return Promise.reject(new Error('SonorLibrary.getAvCatalogue: no Supabase client'));
+    if (state._avCache && !opts.force) return Promise.resolve(state._avCache.slice());
+    let q = state.client.from('av_catalogue').select('*');
+    if (!opts.includeDiscontinued) q = q.or('discontinued.is.null,discontinued.eq.false');
+    return q.then(({ data, error }) => {
+      if (error) throw error;
+      state._avCache = data || [];
+      return state._avCache.slice();
+    });
+  };
+
+  // Device rename/clone-merge aliases (§25 — entity_type='device'). Same idiom
+  // as getBlockAliases: cached old model_id → new model_id map.
+  SL.getDeviceAliases = function (force) {
+    if (state._devAliasMap && !force) return Promise.resolve(state._devAliasMap);
+    if (!state.client) return Promise.resolve({});
+    return state.client.from('sonor_catalogue_aliases')
+      .select('old_id, new_id').eq('entity_type', 'device')
+      .then(({ data, error }) => {
+        if (error) return {};
+        const map = {};
+        (data || []).forEach(r => { if (r && r.old_id) map[r.old_id] = r.new_id; });
+        state._devAliasMap = map;
+        return map;
+      })
+      .catch(() => ({}));
+  };
+  SL.resolveDeviceId = async function (id) {
+    if (!id) return id;
+    const map = await SL.getDeviceAliases();
+    let cur = String(id);
+    const seen = {};
+    for (let i = 0; i < 10; i++) {
+      if (seen[cur]) break;
+      seen[cur] = true;
+      const next = map[cur];
+      if (!next || next === cur) break;
+      cur = next;
+    }
+    return cur;
+  };
+
+  // §22.2 + §22.4 match rule — the ONE offered-for-block predicate. Every
+  // consumer MUST use this (or implement it identically):
+  //   device.category ∈ block.device_categories
+  //   ∧ (device_roles empty ∨ device untagged ∨ caps(device) ∩ device_roles ≠ ∅)
+  //       caps(device) = [metadata.speaker_role] ∪ metadata.mount_type[]
+  //   ∧ domain: service 01 ctx accepts cinema+both, 02 accepts smart_home+both,
+  //     untagged devices always show. Other services: no domain constraint.
+  SL.deviceMatchesBlock = function (dev, blockRow) {
+    if (!dev || !blockRow) return false;
+    const md = blockRow.block_metadata || blockRow.metadata || {};
+    const cats = md.device_categories;
+    if (!Array.isArray(cats) || !cats.length) return false;
+    if (cats.indexOf(dev.category) === -1) return false;
+    const roles = md.device_roles;
+    if (Array.isArray(roles) && roles.length) {
+      const dm = dev.metadata || {};
+      let caps = [];
+      if (dm.speaker_role) caps.push(String(dm.speaker_role));
+      if (Array.isArray(dm.mount_type)) caps = caps.concat(dm.mount_type.map(String));
+      else if (dm.mount_type) caps.push(String(dm.mount_type));
+      if (caps.length && !caps.some(c => roles.indexOf(c) !== -1)) return false;
+    }
+    const nn = String(blockRow.service_nn || md.service_nn || '');
+    const ctx = nn === '01' ? 'cinema' : (nn === '02' ? 'smart_home' : null);
+    const dom = (dev.metadata && dev.metadata.domain) || null;
+    if (ctx && dom && dom !== 'both' && dom !== ctx) return false;
+    return true;
+  };
+
+  // §22 render source: curated device_options[] (alias-resolved), FALLBACK to
+  // the full candidate sweep when empty. Default (device_model_id) is always
+  // an implicit member. Returns { options:[row], default, source }.
+  SL.getDeviceOptionsForBlock = async function (blockRow, opts) {
+    if (!blockRow) return { options: [], default: null, source: 'none' };
+    const md = blockRow.block_metadata || blockRow.metadata || {};
+    const [av] = await Promise.all([SL.getAvCatalogue(opts), SL.getDeviceAliases()]);
+    const byId = {};
+    av.forEach(r => { byId[r.model_id] = r; });
+    const canon = async (id) => SL.resolveDeviceId(id);
+    const def = blockRow.device_model_id ? await canon(blockRow.device_model_id) : null;
+    let ids = Array.isArray(md.device_options) ? await Promise.all(md.device_options.map(canon)) : [];
+    let source = 'options';
+    if (!ids.length) {
+      source = 'candidates';
+      ids = av.filter(d => SL.deviceMatchesBlock(d, blockRow)).map(d => d.model_id);
+    }
+    if (def && ids.indexOf(def) === -1) ids.unshift(def);
+    const seen = {};
+    const options = [];
+    ids.forEach(id => {
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      options.push(byId[id] || { model_id: id, make: '', model: id, _missing: true });
+    });
+    options.sort((a, b) => String(a.make || '').localeCompare(String(b.make || ''))
+      || String(a.model || '').localeCompare(String(b.model || '')));
+    return { options, default: def, source };
+  };
+
+  // §20 — product accessories (mounts/stands/grilles/…) for a parent model.
+  // One cached fetch of the whole enabled table (small), filtered client-side.
+  SL.getAllProductAccessories = function (opts) {
+    opts = opts || {};
+    if (state._accCache && !opts.force) return Promise.resolve(state._accCache.slice());
+    if (!state.client) return Promise.reject(new Error('SonorLibrary.getAllProductAccessories: no Supabase client'));
+    let q = state.client.from('product_accessories').select('*');
+    if (!opts.includeInactive) q = q.eq('enabled', true);
+    return q.order('kind').order('sort_order').then(({ data, error }) => {
+      if (error) throw error;
+      state._accCache = data || [];
+      return state._accCache.slice();
+    });
+  };
+  SL.getProductAccessories = async function (modelId, opts) {
+    if (!modelId) return [];
+    const id = await SL.resolveDeviceId(modelId);
+    const all = await SL.getAllProductAccessories(opts);
+    return all.filter(a => Array.isArray(a.compatible_model_ids)
+      && a.compatible_model_ids.indexOf(id) !== -1);
+  };
 
   // ── B-246 / R76 — Unified alias resolution ─────────────────────────────
   // SL.resolveId(kind, id) walks the sonor_catalogue_aliases table to find
