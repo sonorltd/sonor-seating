@@ -95,7 +95,7 @@
 
   'use strict';
 
-  const __version = '1.2.0';   // v1.2.0 — worldPointsThroughMatrix + normaliseCaptureRecord (shade/TV/PJ capture-drift root cause, Takeoffs v5.181.1). v1.1.0 — _sonorLabel stamp in create() (label-parity fix)
+  const __version = '1.3.0';   // v1.3.0 — per-pixel hit-testing for line-like kinds in create() (Takeoffs v5.183.1 selection fix). v1.2.0 — worldPointsThroughMatrix + normaliseCaptureRecord (shade/TV/PJ capture-drift root cause, Takeoffs v5.181.1). v1.1.0 — _sonorLabel stamp in create() (label-parity fix)
 
   // ============================================================
   // FABRIC RESOLUTION
@@ -253,6 +253,17 @@
       hasControls: true,
       lockScalingFlip: true,
     });
+    // v1.3.0 (Takeoffs v5.183.1 — Bryn: "the line has a full box select
+    // boundary, this was similar in the rooms drawing but was fixed to be
+    // single lines. make sure all selections for everything dont hinder
+    // selection of blocks behind") — LINE-LIKE kinds hit-test PER-PIXEL:
+    // clicks land only on drawn ink (stroke / label / glyph pixels, padded
+    // by the canvas targetFindTolerance), so the empty interior of a long
+    // cable / shade / TV / PJ / containment bounding box falls through to
+    // whatever is really underneath — the same medicine rooms got in
+    // v5.122.0. Symbols keep whole-box hits (compact icons want the easy
+    // grab).
+    if (kind !== 'symbol') group.perPixelTargetFind = true;
     // Stash meta + kind on the group for capture/restore parity.
     group.sonorElement = meta;
     group.sonorElement.kind = kind;
