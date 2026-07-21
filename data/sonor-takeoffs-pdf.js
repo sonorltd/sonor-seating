@@ -2194,13 +2194,27 @@ const SonorPdf = (function () {
     // EXPLICIT EMPTY ARRAY = deliberately chipless (v5.47.0 cable schedule).
     if (Array.isArray(a.summary)) {
       if (!a.summary.length) return { headline: null, chips: [] };
+      // v5.182.0 ROOT-CAUSE FIX — every push site passes OBJECT rows
+      // ({label, value, accent?} — the paintSummary shape) but this
+      // converter only read ARRAY rows ([label, value]). `first.length`
+      // is undefined on an object, so headline + chips silently came out
+      // EMPTY and summaryChip rendered NOTHING — the shades / devices /
+      // lighting summary cards were MISSING from the Full-Document HTML
+      // pipeline all along (the standalone jsPDF path was fine because
+      // paintSummary reads objects). Now both shapes normalise.
+      const _norm = (r) => {
+        if (!r) return null;
+        if (Array.isArray(r)) return (r.length >= 2) ? { label: r[0], value: r[1] } : null;
+        if (typeof r === 'object' && 'label' in r) return { label: r.label, value: r.value, accent: r.accent };
+        return null;
+      };
       const summary = { headline: null, chips: [] };
-      const first = a.summary[0];
-      if (first && first.length >= 2) summary.headline = { label: first[0], value: first[1] };
+      const first = _norm(a.summary[0]);
+      if (first) summary.headline = { label: first.label, value: first.value };
       const accent = (ASPECT_ACCENT && ASPECT_ACCENT[a.aspect]) || COLOURS.accent || '#6b4a8a';
       for (let si = 1; si < a.summary.length; si++) {
-        const r = a.summary[si];
-        if (r && r.length >= 2) summary.chips.push({ label: r[0], value: r[1], accent });
+        const r = _norm(a.summary[si]);
+        if (r) summary.chips.push({ label: r.label, value: r.value, accent: r.accent || accent });
       }
       return summary;
     }
