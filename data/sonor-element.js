@@ -95,7 +95,7 @@
 
   'use strict';
 
-  const __version = '1.1.0';   // v1.1.0 — _sonorLabel stamp in create() (label-parity fix)
+  const __version = '1.2.0';   // v1.2.0 — worldPointsThroughMatrix + normaliseCaptureRecord (shade/TV/PJ capture-drift root cause, Takeoffs v5.181.1). v1.1.0 — _sonorLabel stamp in create() (label-parity fix)
 
   // ============================================================
   // FABRIC RESOLUTION
@@ -455,6 +455,86 @@
   }
 
   // ============================================================
+  // v1.2.0 — CAPTURE NORMALISATION (Takeoffs v5.181.1 drift root cause)
+  // ============================================================
+  // Bryn 2026-07-21: "some shades are drifting again". The shade/TV/PJ
+  // persistence record stores WORLD points + a group-transform x/y. Those
+  // two truths disagree after a VERTEX EDIT: the host's object:modified
+  // resync writes true world points into the meta bag, but the group's
+  // left/top stays pinned at the BUILD-TIME centre (the v5.5.51 anti-drift
+  // invariant). Capture then saved {x: o.left, y: o.top} — the stale
+  // centre — while restore rebuilds at centroid(points) and OVERRIDES to
+  // the stale x/y (the v5.1.1 drag fix). Net: every reload translates the
+  // element by (stale centre − new centroid) — exactly half of every
+  // endpoint stretch. Same class as v5.63.1's block drift; same medicine:
+  // SELECTION-NORMALISED CAPTURE. Derive world points through the LIVE
+  // matrix at capture time, store x/y = centroid(worldPts) — precisely
+  // where the rebuild will put the group — so the restore-time override
+  // becomes a no-op. angle is baked into the projected points and stored
+  // as 0 (record-canonical world points; also kills the latent
+  // double-rotation when a toolbar-rotated element later resyncs).
+  // Pure functions — no fabric dependency — unit-tested in
+  // tests/unit/capturedrift.test.mjs.
+
+  /**
+   * Project child-local polyline points to WORLD coords through a fabric
+   * 2×3 transform matrix [a, b, c, d, e, f] (calcTransformMatrix() shape),
+   * subtracting the child's pathOffset first (fabric stores polyline
+   * points relative to pathOffset). Mirrors the host resync handler and
+   * fabric.util.transformPoint exactly.
+   * @param {{x:number, y:number}[]} childPoints
+   * @param {{x:number, y:number}|null} pathOffset
+   * @param {number[]} m  fabric 2×3 matrix
+   * @returns {{x:number, y:number}[]}
+   */
+  function worldPointsThroughMatrix(childPoints, pathOffset, m) {
+    if (!Array.isArray(childPoints) || !Array.isArray(m) || m.length < 6) return [];
+    const ox = (pathOffset && Number(pathOffset.x)) || 0;
+    const oy = (pathOffset && Number(pathOffset.y)) || 0;
+    return childPoints.map(p => {
+      const lx = (Number(p.x) || 0) - ox;
+      const ly = (Number(p.y) || 0) - oy;
+      return {
+        x: m[0] * lx + m[2] * ly + m[4],
+        y: m[1] * lx + m[3] * ly + m[5],
+      };
+    });
+  }
+
+  /**
+   * Build a persistence capture record whose x/y and meta-bag points agree
+   * BY CONSTRUCTION: points = the supplied true world points, x/y = their
+   * centroid (what the group rebuild derives), angle = 0 (rotation is baked
+   * into the world points). Refreshes legacy x1/y1/x2/y2 endpoint mirrors
+   * when the bag carries them (shade records do; _saveShadeEdit keeps them
+   * in sync on its path).
+   * @param {string} bagKey    'sonorShade' | 'sonorTv' | 'sonorPjScreen'
+   * @param {object} bag       the live meta bag (spread-copied, not mutated)
+   * @param {{x:number, y:number}[]} worldPts
+   * @returns {object|null}    capture record, or null when worldPts unusable
+   */
+  function normaliseCaptureRecord(bagKey, bag, worldPts) {
+    if (!bagKey || !bag) return null;
+    if (!Array.isArray(worldPts) || worldPts.length < 2) return null;
+    for (const p of worldPts) {
+      if (!isFinite(p.x) || !isFinite(p.y)) return null;
+    }
+    const pts = worldPts.map(p => ({ x: Number(p.x) || 0, y: Number(p.y) || 0 }));
+    const c = computeCentroid(pts);
+    const outBag = Object.assign({}, bag, { points: pts });
+    if ('x1' in outBag || 'y1' in outBag || bagKey === 'sonorShade') {
+      outBag.x1 = pts[0].x;
+      outBag.y1 = pts[0].y;
+      outBag.x2 = pts[pts.length - 1].x;
+      outBag.y2 = pts[pts.length - 1].y;
+    }
+    if ('angle' in outBag) outBag.angle = 0;
+    const rec = { x: c.x, y: c.y, angle: 0 };
+    rec[bagKey] = outBag;
+    return rec;
+  }
+
+  // ============================================================
   // EXPORTS
   // ============================================================
 
@@ -469,6 +549,8 @@
     localiseGeometry,
     isLegacyShape,
     migrateLegacyShape,
+    worldPointsThroughMatrix,
+    normaliseCaptureRecord,
     __version,
   };
 });
