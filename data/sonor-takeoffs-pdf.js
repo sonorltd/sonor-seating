@@ -2167,6 +2167,25 @@ const SonorPdf = (function () {
   function scheduleHeadersFor(a) {
     const alignArr = (a.align || (a.report && a.report.align) || []);
     const headers = ((a.report && a.report.headers) || []);
+    // v5.185.1 — ALIGNMENT PARITY (Bryn: "all table alignments throughout
+    // the pdf make sure they are perfect"). The HTML pipeline previously
+    // honoured only the collector's explicit align array — any aspect
+    // without one rendered browser-default LEFT on every numeric column,
+    // while the native jsPDF path has had heuristic inference since
+    // v5.3.5. The SAME _inferColAlign now backfills columns with no
+    // explicit value, sampled from the first DATA row (group banners
+    // skipped). 'centre' also normalises to CSS-valid 'center' —
+    // text-align:centre is invalid CSS and silently rendered LEFT.
+    let _sampleRow = null;
+    try {
+      for (const r of ((a.report && a.report.rows) || [])) {
+        if (r && r.group === true) continue;
+        _sampleRow = Array.isArray(r) ? r : (r && Array.isArray(r.values) ? r.values : null);
+        if (_sampleRow) break;
+      }
+    } catch (_) {}
+    const _inferred = _inferColAlign(headers, _sampleRow ? [_sampleRow] : []) || [];
+    const _cssAlign = (v) => (v === 'centre' ? 'center' : (v || null));
     // v5.49.0 — the HTML pipeline now respects the aspect's colWeights
     // (the native jsPDF layout always did). Weights are converted to
     // percentage width hints on the <col> elements, so narrow columns
@@ -2177,7 +2196,7 @@ const SonorPdf = (function () {
       ? a.colWeights : null;
     const wSum = w ? w.reduce((t, x) => t + (Number(x) || 0), 0) : 0;
     return headers.map((label, i) => {
-      const align = alignArr[i] || null;
+      const align = _cssAlign(alignArr[i] || _inferred[i] || null);
       const h = { key: 'c' + i, label, align: align || (i === 0 ? 'left' : null) };
       if (w && wSum > 0) h.width = (((Number(w[i]) || 0) / wSum) * 100).toFixed(2) + '%';
       return h;
@@ -2478,7 +2497,6 @@ const SonorPdf = (function () {
       }
       for (let _pi = 0; _pi < _prefaceList.length; _pi++) {
         try {
-          if (_frontPages > 0) pdf.addPage('a4', 'landscape');
           const _r = await window.SonorPdfHtmlCover.renderCablingInfo({
             pageIndex: _prefaceList[_pi],
             accentHex: '#475161', sectionTitle: null, appName: 'TAKEOFFS',
@@ -2491,13 +2509,24 @@ const SonorPdf = (function () {
             services: _svcChrome
           });
           if (_r && _r.dataUrl) {
+            // v5.185.1 — page added only AFTER a successful render (a mid-
+            // loop failure no longer leaves blank pages behind).
+            if (_frontPages > 0) pdf.addPage('a4', 'landscape');
             pdf.addImage(_r.dataUrl, 'JPEG', 0, 0, _fw, _fh, 'aspect-preface-' + _pi);
             _frontPages++;
           }
         } catch (e) { console.warn('[SonorPdf v5.185.0 aspect] preface info page failed:', e); }
       }
-      // Schedule starts on a fresh page in ITS OWN format.
-      pdf.addPage(format, orientation);
+      // Schedule starts on a fresh page in ITS OWN format — unless NO front
+      // matter actually rendered (then the constructor page is still blank
+      // and the schedule paints straight onto it, swapped to the schedule's
+      // own format when it differs from the a4-landscape front-matter doc).
+      if (_frontPages > 0) {
+        pdf.addPage(format, orientation);
+      } else if (format !== 'a4' || orientation !== 'landscape') {
+        pdf.addPage(format, orientation);
+        try { pdf.deletePage(1); } catch (_) {}
+      }
     } else {
       pdf = new jsPDF({ orientation, unit: 'pt', format, compress: true }); // v5.39.0 (B-350) — stream compression, 40-60% smaller files
       _registerSonorFonts(pdf);
@@ -13169,6 +13198,9 @@ const SonorPdf = (function () {
       if (filteredGeneral.length) {
         const schedIdx = entries.length;
         entries.push({ title: 'Schedules', page: p });
+        // v5.185.1 — parent points at the FIRST schedule's REAL page after
+        // the loop (the sequential counter doesn't know about the cabling
+        // pack pages emitted mid-loop).
         filteredGeneral.forEach(a => {
           if (!a) return;
           const aTitle = (a.title || a.aspect || 'Schedule').replace(/\s+Schedule$/i, '');
@@ -13191,6 +13223,10 @@ const SonorPdf = (function () {
             }
           }
         });
+        // v5.185.1 — snap the Schedules parent to its first child's real page.
+        const _schedFirst = entries.reduce((mn, e) =>
+          (e && e.parentIdx === schedIdx && e.page && e.page < mn) ? e.page : mn, Infinity);
+        if (isFinite(_schedFirst)) entries[schedIdx].page = _schedFirst;
       }
       // v5.4.58 — Per-service blocks (plans + paired schedule). Each entry
       // is the service plan(s) section header; the inline schedule
