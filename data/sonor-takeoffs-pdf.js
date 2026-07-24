@@ -2336,7 +2336,11 @@ const SonorPdf = (function () {
     const pageTotal = opts._pageTotal || null;
     const onPageBreak = () => {
       paintFooter(pdf, { meta, pageNum, pageTotal });
-      pdf.addPage();
+      // v5.185.0 — explicit format/orientation so continuation pages stay
+      // in the schedule's own size when front matter (extract cover /
+      // preface pages) changed the document default.
+      if (opts._pageFormat) pdf.addPage(opts._pageFormat, opts._pageOrientation);
+      else pdf.addPage();
       pageNum++;
       paintHeader(pdf, { title: opts.title, subtitle: opts.subtitle, aspect: opts.aspect, meta });
       // v2.0.0 — repeat the drawing code on every continuation page
@@ -2423,10 +2427,86 @@ const SonorPdf = (function () {
       orientation = 'portrait';
       format = 'a4';
     }
-    const pdf = new jsPDF({ orientation, unit: 'pt', format, compress: true }); // v5.39.0 (B-350) — stream compression, 40-60% smaller files
-    _registerSonorFonts(pdf);
     const meta = collectProjectMeta();
-    _emitAspectIntoPdf(pdf, opts, meta);
+    // v5.185.0 — STANDALONE EXPORT FRONT MATTER (Bryn: "smaller per aspect
+    // exports should have the cover page included but only relevant info
+    // plus a bold note to say which document it is with a sub head to
+    // explain to refer to full takeoff export for all info" + "[cabling
+    // info] included on the cs only export").
+    //   • Light EXTRACT cover: project identity + bold document-type banner
+    //     + "refer to the full take-off" subhead (template o.extract).
+    //   • opts.prefaceInfoPages: CABLING STANDARDS pageIndexes ([3, 4] on
+    //     the Cable Schedule exports) rendered after the cover.
+    // Front matter is A4 landscape (the HTML deck's native size); the
+    // schedule then continues in its own format via explicit addPage args
+    // (_pageFormat/_pageOrientation keep continuation pages in step).
+    const _svcChrome = (typeof SERVICES !== 'undefined' && Array.isArray(SERVICES))
+      ? SERVICES.slice(0, 10).map(sv => ({ nn: sv.nn, key: sv.key, name: sv.name, colour: sv.colour })) : null;
+    const _htmlFrontOk = !!(window.SonorPdfHtmlCover
+      && typeof window.SonorPdfHtmlCover.available === 'function'
+      && window.SonorPdfHtmlCover.available());
+    const _wantCover = opts.noCover !== true && _htmlFrontOk
+      && typeof window.SonorPdfHtmlCover.renderCover === 'function';
+    const _prefaceList = (_htmlFrontOk && Array.isArray(opts.prefaceInfoPages)
+      && typeof window.SonorPdfHtmlCover.renderCablingInfo === 'function')
+      ? opts.prefaceInfoPages.slice() : [];
+    let pdf;
+    let _frontPages = 0;
+    if (_wantCover || _prefaceList.length) {
+      pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
+      _registerSonorFonts(pdf);
+      const _fw = pdf.internal.pageSize.getWidth();
+      const _fh = pdf.internal.pageSize.getHeight();
+      if (_wantCover) {
+        try {
+          if (typeof setStatus === 'function') setStatus('Rendering extract cover (HTML/CSS) …');
+          const cov = await window.SonorPdfHtmlCover.renderCover({
+            projectName: meta.name, client: meta.client, address: meta.address,
+            reference: meta.ref || '', status: meta.status, revision: meta.revision,
+            issueDate: meta.dateUk || meta.date,
+            services: _svcChrome,
+            extract: {
+              label: opts.title || 'Schedule',
+              note: 'EXTRACT — refer to the FULL TAKE-OFF export for complete project information.'
+            }
+          });
+          if (cov && cov.dataUrl) {
+            pdf.addImage(cov.dataUrl, 'JPEG', 0, 0, _fw, _fh, 'aspect-extract-cover');
+            _frontPages = 1;
+          }
+        } catch (e) { console.warn('[SonorPdf v5.185.0 aspect] extract cover failed — continuing without:', e); }
+      }
+      for (let _pi = 0; _pi < _prefaceList.length; _pi++) {
+        try {
+          if (_frontPages > 0) pdf.addPage('a4', 'landscape');
+          const _r = await window.SonorPdfHtmlCover.renderCablingInfo({
+            pageIndex: _prefaceList[_pi],
+            accentHex: '#475161', sectionTitle: null, appName: 'TAKEOFFS',
+            reference: meta.ref || '', projectName: meta.name, client: meta.client,
+            address: meta.address, revision: meta.revision,
+            issueDate: meta.dateUk || meta.date, status: meta.status,
+            pageNum: _frontPages + 1, pageTotal: null,
+            pageOrdinal: _pi, totalInfoPages: _prefaceList.length,
+            footerSlim: false,
+            services: _svcChrome
+          });
+          if (_r && _r.dataUrl) {
+            pdf.addImage(_r.dataUrl, 'JPEG', 0, 0, _fw, _fh, 'aspect-preface-' + _pi);
+            _frontPages++;
+          }
+        } catch (e) { console.warn('[SonorPdf v5.185.0 aspect] preface info page failed:', e); }
+      }
+      // Schedule starts on a fresh page in ITS OWN format.
+      pdf.addPage(format, orientation);
+    } else {
+      pdf = new jsPDF({ orientation, unit: 'pt', format, compress: true }); // v5.39.0 (B-350) — stream compression, 40-60% smaller files
+      _registerSonorFonts(pdf);
+    }
+    _emitAspectIntoPdf(pdf, Object.assign({}, opts, {
+      _pageNumStart: _frontPages + 1,
+      _pageFormat: format,
+      _pageOrientation: orientation
+    }), meta);
 
     const stamp = meta.date;
     const slug = (opts.aspect || 'aspect').toLowerCase();
@@ -10845,18 +10925,29 @@ const SonorPdf = (function () {
     // — per-page ticks inside the Info & standards section, keyed through the
     // SAME _secOn store as every other section (persistence, presets and
     // all/none come free). Master 'info' still gates the whole block.
-    const _INFO_CABLING = [
+    // v5.185.0 — INFO SPLIT (Bryn: "info 00.3, 00.5, 00.1, 00.7 should all
+    // go to a new section before the cable schedule"): FRONT pages (plan-
+    // reading info) emit after the cover as before; the CABLING STANDARDS
+    // pack (template pageIndex 3 + 4) + the bend-radius page now emit
+    // immediately BEFORE the first cable schedule aspect. Tick keys are
+    // unchanged so persisted export presets keep working — infoinstall /
+    // infotails now gate the two pack pages.
+    const _INFO_FRONT = [
       { key: 'inforev',     idx: 0 },   // Revision history & notes
-      { key: 'infotax',     idx: 1 },   // Taxonomy & conventions
-      { key: 'infokey',     idx: 2 },   // Drawing key & mounting
-      { key: 'infoinstall', idx: 3 },   // Install & annotations
-      { key: 'infotails',   idx: 4 }    // Tails protocol
+      { key: 'infotax',     idx: 1 },   // 00.0 Taxonomy + 00.1 Symbol Convention
+      { key: 'infokey',     idx: 2 }    // 00.2 Mounting + 00.3 Annotations
+    ];
+    const _INFO_PACK = [
+      { key: 'infoinstall', idx: 3 },   // 00.5 Cable ID + 00.6 Types & Bend Radii
+      { key: 'infotails',   idx: 4 }    // 00.7 Install Notes + 00.8 Tails Protocol
     ];
     const _infoCablingIdxFor = (hasRev) => {
-      const l = _INFO_CABLING.filter(pg => _secOn(pg.key)).map(pg => pg.idx);
-      if (hasRev && _secOn('inforev')) l.push(5);   // 00.11 legacy table rides the rev tick
+      // FRONT pages only (the pack emits later, before the Cable Schedule).
+      const l = _INFO_FRONT.filter(pg => _secOn(pg.key)).map(pg => pg.idx);
+      if (hasRev && _secOn('inforev')) l.push(5);   // 00.4 legacy rev table rides the rev tick
       return l;
     };
+    const _infoPackIdxList = () => _INFO_PACK.filter(pg => _secOn(pg.key)).map(pg => pg.idx);
     // Map an aspect key → ticklist section key. Unknown aspects always emit.
     const _aspectSecKey = (asp) => {
       asp = String(asp || '');
@@ -10960,8 +11051,11 @@ const SonorPdf = (function () {
       // Plans (v5.4.51 — Bryn directive 2026-05-08 "combined plans and overall
       // counts come after the info pages").
       // v5.170.0 — count ONLY the ticked info pages (shared list with the emit loop)
+      // v5.185.0 — total info pages = FRONT + CABLING PACK + bend (position
+      // moved, count unchanged — _planFinalTotal stays exact).
       const _refForCount = _incInfo
         ? (_infoCablingIdxFor(!!(meta && meta.revisionHistory && meta.revisionHistory.length)).length
+           + _infoPackIdxList().length
            + (_secOn('infobend') ? 1 : 0))
         : 0;
       let total = 1 /* cover */ + _refForCount /* ref pages incl 00.10 */ + captured.length + (_incOverall ? 1 : 0) /* overall counts */;
@@ -11572,22 +11666,25 @@ const SonorPdf = (function () {
     // v5.18.0 — whole Information & Standards block gated by the section
     // ticklist. When unticked, _refForCount/REF_PAGES_COUNT resolve to 0 so
     // the page-total math stays exact (cover + plans + remaining sections).
+    // v5.185.0 — FRONT info pages only (the CABLING STANDARDS pack + bend
+    // radius emit immediately before the Cable Schedule — see
+    // _emitCablingStandardsPack below). Ordinals span the whole info
+    // family so "(x of y)" stays continuous across the split.
+    const _infoIdxList = _incInfo ? _infoCablingIdxFor(_hasRevHistory) : [];
+    const _packIdxListResolved = _incInfo ? _infoPackIdxList() : [];
+    const _infoEnabledTotal = _infoIdxList.length + _packIdxListResolved.length + (_secOn('infobend') ? 1 : 0);
     if (_incInfo) {
-    // v5.170.0 — only the TICKED info pages emit; pageIndex keeps selecting
-    // the right template content, ordinal drives page numbers + '(x of y)'.
-    const _infoIdxList = _infoCablingIdxFor(_hasRevHistory);
-    const _infoEnabledTotal = _infoIdxList.length + (_secOn('infobend') ? 1 : 0);
-    const _cablingSections = _infoIdxList.length;
     for (let _p = 0; _p < _infoIdxList.length; _p++) {
       await _emitCablingPage(_infoIdxList[_p], 2 + contentsPagesAdded + _p, _p, _infoEnabledTotal);   // v5.87.0 — CONTENTS shifts info pages +1
     }
 
-    // BEND RADIUS (00.10) — its own page, full-canvas SVG.
-    // v5.4.47 — pageNum dynamic now (depends on whether revision history
-    // is present and adds to cabling section count). Always renders just
-    // BEFORE 00.11 if present, and is the LAST info page if not.
-    if (_secOn('infobend')) {   // v5.170.0 — bend radius has its own tick
-    const _bendPageNum = 2 + contentsPagesAdded + _cablingSections;   // v5.87.0 — CONTENTS shifts info pages +1
+    }  // v5.18.0 — end _incInfo (FRONT info block)
+
+    // BEND RADIUS (00.9) — its own page, full-canvas SVG.
+    // v5.185.0 — REFACTORED into a callable + RELOCATED: emits with the
+    // CABLING STANDARDS pack immediately before the Cable Schedule (was
+    // the last front info page). pageNum now passed by the caller.
+    async function _emitBendRadiusPageAt(_bendPageNum) {
     pdf.addPage();
     let bendHtmlOk = false;
     if (_htmlInfoEnabled) {
@@ -11635,8 +11732,36 @@ const SonorPdf = (function () {
       try { _paintBendRadiusPage(pdf, meta, _bendPageNum, _planFinalTotal); }
       catch (e) { console.warn('[fullDocument v2.0.0] bend radius page failed:', e); }
     }
-    }  // v5.170.0 — end infobend tick gate
-    }  // v5.18.0 — end _incInfo (Information & Standards) gate
+    }  // v5.185.0 — end _emitBendRadiusPageAt
+
+    // v5.185.0 — CABLING STANDARDS pack (00.5-00.8 pages + 00.9 bend
+    // radius): emits ONCE, immediately before the first cables-family
+    // schedule aspect (after the v5.111.0 electrical block). Returns pages
+    // added; records real start pages for the outline/contents.
+    let _cablePackDone = false;
+    let _cablePackPageStart = null;
+    let _bendPageReal = null;
+    async function _emitCablingStandardsPack(currentPageNumIn) {
+      if (_cablePackDone || !_incInfo) return 0;
+      _cablePackDone = true;
+      let added = 0;
+      try {
+        const _frontCount = _infoIdxList.length;
+        for (let _q = 0; _q < _packIdxListResolved.length; _q++) {
+          if (added === 0) _cablePackPageStart = currentPageNumIn + 1;
+          await _emitCablingPage(_packIdxListResolved[_q], currentPageNumIn + added + 1,
+            _frontCount + _q, _infoEnabledTotal);
+          added++;
+        }
+        if (_secOn('infobend')) {
+          _bendPageReal = currentPageNumIn + added + 1;
+          if (_cablePackPageStart === null) _cablePackPageStart = _bendPageReal;
+          await _emitBendRadiusPageAt(_bendPageReal);
+          added++;
+        }
+      } catch (e) { console.warn('[v5.185.0] cabling standards pack emit failed:', e); }
+      return added;
+    }
 
     // Pages 4..(3+N) — one PLAN canvas page per floor (shifted +2 by ref pages)
     // v5.4.34 — try HTML chrome path first; fall back to native jsPDF on failure.
@@ -12175,8 +12300,12 @@ const SonorPdf = (function () {
     // the same value here without redeclaring (TDZ-safe — outer fn scope).
     // v5.18.0 — 0 when the Information & Standards section is unticked, so
     // currentPageNum + the outline page offsets below stay exact.
-    const _cablingSectionPages = _incInfo ? _infoCablingIdxFor(_hasRevHistory).length : 0;   // v5.170.0 — ticked pages only
-    const REF_PAGES_COUNT = _incInfo ? (_cablingSectionPages + (_secOn('infobend') ? 1 : 0)) : 0;
+    const _cablingSectionPages = _incInfo ? _infoCablingIdxFor(_hasRevHistory).length : 0;   // v5.170.0 — ticked pages only; v5.185.0 — FRONT pages only
+    // v5.185.0 — the seed counts only pages that emit BEFORE the plans.
+    // The CABLING STANDARDS pack + bend radius now emit inside the
+    // schedule loop (before the Cable Schedule) and advance currentPageNum
+    // there, so they must NOT be pre-counted here.
+    const REF_PAGES_COUNT = _incInfo ? _cablingSectionPages : 0;
     // v5.4.51 — Overall Counts scoreboard adds 1 page between Combined Plans
     // and CCTV/Electrical/per-service slices. Counted separately so existing
     // page-num math stays explicit.
@@ -12451,6 +12580,13 @@ const SonorPdf = (function () {
       if (a && _isCablesFamilyAspect(a.aspect) && !_elecBlockDone) {
         try { currentPageNum += await _emitElectricalRequirementsBlock(); }
         catch (_e) { console.warn('[v5.111.0] electrical block emit failed:', _e); }
+      }
+      // v5.185.0 — CABLING STANDARDS pack (00.5-00.8 + 00.9 bend radius)
+      // lands directly before the first cable schedule (after the
+      // electrical block per the v5.111.0 ordering law).
+      if (a && _isCablesFamilyAspect(a.aspect) && !_cablePackDone) {
+        try { currentPageNum += await _emitCablingStandardsPack(currentPageNum); }
+        catch (_e) { console.warn('[v5.185.0] cabling standards pack failed:', _e); }
       }
       if (plan.useHtml && plan.pages && plan.pages.length) {
         let aspectImages = [];
@@ -12965,13 +13101,11 @@ const SonorPdf = (function () {
         const refIdx = entries.length;
         entries.push({ title: 'Reference', page: p });
         if (_cablingSectionPages > 0) {
-          entries.push({ title: 'Cabling Information', page: p, parentIdx: refIdx });
+          entries.push({ title: 'Project Information', page: p, parentIdx: refIdx });
           p += _cablingSectionPages;
         }
-        if (_secOn('infobend')) {
-          entries.push({ title: 'Bend Radius Reference', page: p, parentIdx: refIdx });
-          p++;
-        }
+        // v5.185.0 — bend radius rides the CABLING STANDARDS pack now
+        // (bookmarked below at its REAL emitted page).
       }
       // Plans parent
       const plansIdx = entries.length;
@@ -13023,6 +13157,15 @@ const SonorPdf = (function () {
       // below (computed from the live page count, exact by construction).
       // v5.4.58 — General schedules (filteredGeneral aspects only — per-service
       // svc_NN aspects are now emitted INSIDE their per-service block below).
+      // v5.185.0 — CABLING STANDARDS pack bookmarks (real recorded pages;
+      // sits between the plans block and the schedules in page order).
+      if (_cablePackPageStart) {
+        const packIdx = entries.length;
+        entries.push({ title: 'Cabling Standards', page: _cablePackPageStart });
+        if (_bendPageReal) {
+          entries.push({ title: 'Bend Radius Reference', page: _bendPageReal, parentIdx: packIdx });
+        }
+      }
       if (filteredGeneral.length) {
         const schedIdx = entries.length;
         entries.push({ title: 'Schedules', page: p });

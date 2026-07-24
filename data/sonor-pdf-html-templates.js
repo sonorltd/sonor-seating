@@ -210,6 +210,17 @@
            actually need or client name)") — accent line + client REMOVED;
            address dropped too: at the 280px hero it overflowed into the
            SUMMARY panel (the "overlapped text" — harness-reproduced). -->
+      <!-- v5.185.0 — EXTRACT BANNER (Bryn: "smaller per aspect exports
+           should have the cover page included but only relevant info plus
+           a bold note to say which document it is with a sub head to
+           explain to refer to full takeoff export for all info").
+           o.extract = { label, note } renders a bold document-type banner
+           under the project title on standalone per-aspect covers. -->
+      ${o.extract && o.extract.label ? `
+      <div style="margin-top:14px; display:inline-block; text-align:left;">
+        <div style="font-size:21px; font-weight:800; letter-spacing:0.10em; text-transform:uppercase; color:#ffffff; background:${h.esc(accent)}; padding:8px 18px; border-radius:6px; display:inline-block;">${h.esc(o.extract.label)}</div>
+        <div style="margin-top:8px; font-size:11.5px; font-weight:600; letter-spacing:0.05em; color:rgba(255,255,255,0.85); text-transform:uppercase;">${h.esc(o.extract.note || 'Extract — refer to the full take-off export for complete project information.')}</div>
+      </div>` : ''}
     </div>
     <div class="hero-bottom">
       <!-- v5.5.78 — Bryn directive 2026-05-21: "remove the cedia from front
@@ -559,7 +570,7 @@
       { type: 'Control',         r: '65',  notes: '—',                code: 'K', colour: '#e67eb1', darkText: false },
       { type: 'Lighting (LX)',   r: '60',  notes: 'CC/DALI/DMX feeds',code: 'L', colour: '#f5d05c', darkText: true  },
       { type: 'Optical fibre',   r: '200', notes: 'Special handling', code: 'F', colour: '#78ba57', darkText: false },
-      { type: 'Blinds (Sivoia)', r: '90',  notes: '—',                code: 'B', colour: '#ad9978', darkText: false }
+      { type: 'Shades / Blinds', r: '90',  notes: 'Somfy 4-core mains (default) · Lutron QS where specified', code: 'B', colour: '#ad9978', darkText: false }   // v5.185.0 — Sivoia-era label refreshed (somfy-4core is the project default since v5.147.0)
     ];
     const cableRowsHtml = cableTypes.map(r => {
       const ink = r.darkText ? '#1a1f28' : '#ffffff';
@@ -586,7 +597,7 @@
       ['Wall Speaker',          '1.0 m', '5.0 m', ''],
       ['Data / Cat6',           '0.5 m', '5.0 m', ''],
       ['Wireless Access Point', '0.5 m', '5.0 m', ''],
-      ['Shade / Blind',         '1.0 m', '3.0 m', '(SHD-PANEL)'],
+      ['Shade / Blind',         '1.0 m', '3.0 m', '(SHPNL)'],   // v5.185.0 — canonical shade-panel code
       ['Lighting Keypad',       '0.3 m', '5.0 m', '(LPNL)'],
       ['CCTV Camera',           '0.5 m', '5.0 m', '(NVR)']
     ];
@@ -887,29 +898,34 @@
     // Pre-v5.4.61 the taxonomy held the 00.1 slot; everything else
     // shifts down by one to fill the freed numbers.
     //
-    //   00.1  Cable ID Format             (was 00.2)
-    //   00.2  Symbol Convention           (was 00.3)
-    //   00.3  Drawing Key (cable types)   (was 00.4)
-    //   00.4  Mounting Options            (was 00.5)
-    //   00.5  Standing Install Notes      (was 00.6)
-    //   00.6  Drawing Annotations         (was 00.7)
-    //   00.7  Tails Protocol              (v1.12.0 — clouds legend moved to glance page)
-    //   00.8  Bend Radius                 (own page)
-    //   00.9  Revision History            (conditional)
+    // v5.185.0 numbering (front vs CABLING STANDARDS pack):
+    //   00.0  Service Taxonomy            (front)
+    //   00.1  Symbol Convention           (front)
+    //   00.2  Mounting Options            (front)
+    //   00.3  Drawing Annotations         (front)
+    //   00.4  Revision History            (front, conditional)
+    //   00.5  Cable ID Format             (CABLING PACK — before Cable Schedule)
+    //   00.6  Cable Types & Bend Radii    (CABLING PACK)
+    //   00.7  Standing Install Notes      (CABLING PACK)
+    //   00.8  Tails Protocol              (CABLING PACK)
+    //   00.9  Bend Radius                 (own page, rides with the pack)
 
-    // 00.1 — Cable ID Format
-    const _section00_2 = _sec('00.1', 'Cable ID Format', `
+    // v5.185.0 — 00.5 Cable ID Format (was 00.1): moved to the CABLING
+    // STANDARDS pack that emits immediately before the Cable Schedule
+    // (Bryn: "info 00.3, 00.5, 00.1, 00.7 should all go to a new section
+    // before the cable schedule and also be included on the cs only export").
+    const _section00_2 = _sec('00.5', 'Cable ID Format', `
       <div class="info-id-format">B2ES-S-01</div>
       <dl class="info-id-key">
-        <dt>B2ES</dt><dd>Room (4-char) — Bedroom 2 Ensuite. See 00.3 drawing key for room codes.</dd>
+        <dt>B2ES</dt><dd>Room (4-char) — Bedroom 2 Ensuite. See 00.6 drawing key for room codes.</dd>
         <dt>S</dt><dd>Cable type — Speaker. Drawing-key code (S/A/D/C/K/L/F/B).</dd>
         <dt>01</dt><dd>Sequential number, per type, per room.</dd>
         <dt>Destination</dt><dd>HE = Audio/Video Head End  ·  RK = Rack  ·  KP = Keypad</dd>
       </dl>
     `);
 
-    // 00.2 — Symbol Convention
-    const _section00_3 = _sec('00.2', 'Symbol Convention', `
+    // v5.185.0 — 00.1 Symbol Convention (was 00.2): front info block.
+    const _section00_3 = _sec('00.1', 'Symbol Convention', `
       <ul class="info-symbol-list">
         <li><span class="info-bullet"></span><span>Speaker (in-ceiling)</span><span class="info-code">SP-AA-1</span></li>
         <li><span class="info-bullet"></span><span>Wall plate (Cat6 + RG6)</span><span class="info-code">WP-AA-2</span></li>
@@ -919,11 +935,12 @@
       </ul>
     `);
 
-    // 00.3 — Cable Types & Bend Radii (DRAWING KEY)
+    // v5.185.0 — 00.6 Cable Types & Bend Radii (was 00.3): CABLING
+    // STANDARDS pack (before the Cable Schedule).
     const _section00_4 = `
       <section class="info-section info-section-numbered info-section-key">
         <div class="info-section-head-row">
-          <span class="info-section-num">00.3</span>
+          <span class="info-section-num">00.6</span>
           <h3 class="info-section-head">Cable Types &middot; Bend Radii &middot; Drawing Colour</h3>
           <span class="info-section-key-tag">DRAWING KEY</span>
         </div>
@@ -936,8 +953,8 @@
         </div>
       </section>`;
 
-    // 00.4 — Mounting Options
-    const _section00_5 = _sec('00.4', 'Mounting Options', `
+    // v5.185.0 — 00.2 Mounting Options (was 00.4): front info block.
+    const _section00_5 = _sec('00.2', 'Mounting Options', `
       <div class="info-mount-grid">
         <div class="info-mount-cell">
           <div class="info-mount-head">Ceiling</div>
@@ -958,8 +975,9 @@
       </div>
     `);
 
-    // 00.5 — Standing Install Notes
-    const _section00_6 = _sec('00.5', 'Standing Install Notes', `
+    // v5.185.0 — 00.7 Standing Install Notes (was 00.5): CABLING
+    // STANDARDS pack (before the Cable Schedule).
+    const _section00_6 = _sec('00.7', 'Standing Install Notes', `
       <ol class="info-numbered">
         <li>Do not scale from this drawing — all dimensions to be confirmed on-site.</li>
         <li>Label cables 150 mm from the cable end (both ends) using approved markers.</li>
@@ -972,8 +990,8 @@
       </ol>
     `);
 
-    // 00.6 — Drawing Annotations / Height Prefix
-    const _section00_7 = _sec('00.6', 'Drawing Annotations — Height Prefix', `
+    // v5.185.0 — 00.3 Drawing Annotations (was 00.6): front info block.
+    const _section00_7 = _sec('00.3', 'Drawing Annotations — Height Prefix', `
       <div class="info-section-sublabel">Small letter inside the outlet symbol</div>
       <dl class="info-prefix-key">
         <dt><span class="info-prefix-box">C</span></dt><dd>High level — under ceiling</dd>
@@ -987,7 +1005,7 @@
 
     // v1.12.0 — 00.7 Revision-Status Clouds section MOVED to the glance
     // page (under Revision History); Tails Protocol takes the 00.7 slot.
-    const _section00_9 = _sec('00.7', 'Tails Protocol', `
+    const _section00_9 = _sec('00.8', 'Tails Protocol', `   // v5.185.0 — was 00.7; CABLING STANDARDS pack
       <div class="info-section-sublabel">SERVICE LOOP @ EACH END (per outlet · per head-end)</div>
       <table class="info-table">
         <thead><tr><th>Outlet Type</th><th>@ Outlet</th><th>@ Head-end</th></tr></thead>
@@ -996,9 +1014,9 @@
       <p class="info-footnote">Coil cables loosely 1.0 m above FFL at termination point pending second-fix. Loop where indicated.</p>
     `);
 
-    // 00.10 — Revision History (only emits when there ARE revisions; empty
-    // table looks like a section bug to the reader). Was 00.11 pre-v5.4.61.
-    const _section00_11 = revHistory.length ? _sec('00.9', 'Revision History', `
+    // v5.185.0 — 00.4 Revision History (was 00.9; only emits when there ARE
+    // revisions — an empty table looks like a section bug to the reader).
+    const _section00_11 = revHistory.length ? _sec('00.4', 'Revision History', `
       <table class="info-table">
         <thead><tr><th>Rev</th><th>Date</th><th>Version</th><th>Notes</th></tr></thead>
         <tbody>${revRowsHtml}</tbody>
@@ -1006,28 +1024,34 @@
     `) : '';
 
     // ---- Page composition by pageIndex --------------------------------------
-    // v5.4.63 — taxonomy migrated to top of page 3 as 00.0 (Bryn directive
-    // 2026-05-10). Page 2 stays as the project-at-a-glance (floors / totals
-    // / revisions) but loses the taxonomy strip; that strip now opens
-    // page 3 above the existing 00.1 + 00.2 sections.
+    // v5.185.0 — INFO CATEGORIES REORGANISED (Bryn: "info 00.3, 00.5, 00.1,
+    // 00.7 should all go to a new section before the cable schedule and
+    // also be included on the cs only export. make more sense of the info
+    // categories in general"). The cable-focused sections (Cable ID Format,
+    // Cable Types & Bend Radii, Install Notes, Tails Protocol) now form the
+    // CABLING STANDARDS pack — pageIndex 3 + 4 — which the orchestrator
+    // emits immediately BEFORE the Cable Schedule (and the standalone Cable
+    // Schedule exports carry as preface pages). The plan-reading sections
+    // stay at the front of the document.
     //
-    // Page composition (pages 1-N of the info section, after cover):
-    //   pageIndex 0 → PROJECT AT A GLANCE (floors+totals + revisions)
-    //   pageIndex 1 → 00.0 Taxonomy + 00.1 Cable ID + 00.2 Symbol Convention
-    //   pageIndex 2 → 00.3 Drawing Key + 00.4 Mounting Options
-    //   pageIndex 3 → 00.5 Install Notes + 00.6 Drawing Annotations
-    //   pageIndex 4 → 00.7 Tails Protocol (clouds legend lives on the glance page since v1.12.0)
-    //   pageIndex 5 → 00.9 Revision History  (conditional — when revHistory.length > 0)
-    //   (00.8 Bend Radius on its own page via buildBendRadiusPage)
+    // Page composition:
+    //   pageIndex 0 → REVISION HISTORY (glance panel — unnumbered)
+    //   pageIndex 1 → 00.0 Taxonomy + 00.1 Symbol Convention        (FRONT)
+    //   pageIndex 2 → 00.2 Mounting Options + 00.3 Annotations      (FRONT)
+    //   pageIndex 3 → 00.5 Cable ID + 00.6 Types & Bend Radii       (CABLING PACK)
+    //   pageIndex 4 → 00.7 Install Notes + 00.8 Tails Protocol      (CABLING PACK)
+    //   pageIndex 5 → 00.4 Revision History (conditional — FRONT)
+    //   (00.9 Bend Radius on its own page via buildBendRadiusPage — rides
+    //    with the CABLING PACK in the full document)
     //
     // Each section heads with the 00.X numbered pill + title in a tinted
     // banner (.info-section-head-row), then its body block underneath.
     const _PAGE_ROWS = [
       { label: 'REVISION HISTORY',      rows: [_section00_1], full: true },   // v5.145.0 — was PROJECT AT A GLANCE
-      { label: 'TAXONOMY & CONVENTIONS',rows: [_section00_taxonomy, _section00_2, _section00_3] },
-      { label: 'DRAWING KEY & MOUNTING',rows: [_section00_4, _section00_5] },
-      { label: 'INSTALL & ANNOTATIONS', rows: [_section00_6, _section00_7] },
-      { label: 'TAILS PROTOCOL',        rows: [_section00_9] }   // v1.12.0 — clouds legend moved to glance page
+      { label: 'TAXONOMY & CONVENTIONS',rows: [_section00_taxonomy, _section00_3] },
+      { label: 'KEY & ANNOTATIONS',     rows: [_section00_5, _section00_7] },
+      { label: 'CABLING STANDARDS',     rows: [_section00_2, _section00_4] },
+      { label: 'CABLING STANDARDS — INSTALL & TAILS', rows: [_section00_6, _section00_9] }
     ];
     if (revHistory.length) {
       _PAGE_ROWS.push({ label: 'REVISION HISTORY', rows: [_section00_11] });
