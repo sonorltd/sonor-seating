@@ -18,6 +18,15 @@
  * Exports: window.SonorPdf — API surface unchanged from inline IIFE.
  *
  * History:
+ *   v5.185.2 2026-08-01 B-362 CLOSED — ONE aspect→section map. The two
+ *                       hand-mirrored copies (_aspecSec in _buildFullDocSpec
+ *                       precount + _aspectSecKey in fullDocument emit filter)
+ *                       had already diverged on the pjscreen branch (prefix
+ *                       match vs enumeration — a future pjscreen_* aspect key
+ *                       would be precounted but not emitted, the B-359 PAGE
+ *                       x OF y drift class). Both now alias the single
+ *                       module-scope _aspectSectionKey(); prefix-match
+ *                       behaviour kept (superset of the enumeration).
  *   v2.4.3  2026-04-28  pdf-lib FULL INTEGRATION. Cabling Info + Bend Radii
  *                       reference pages migrated to native vector. Page order
  *                       now matches v2.0.4 jsPDF (cover → CBL → BRD → plans →
@@ -10549,6 +10558,33 @@ const SonorPdf = (function () {
     return cover;
   }
 
+  // ---- v5.185.2 (B-362) — ONE aspect→section-key map ----
+  // Maps an aspect key → Full-Document ticklist section key. Used by BOTH
+  // the _buildFullDocSpec precount AND the fullDocument emit filter — the
+  // two sites previously carried hand-mirrored copies that diverged on the
+  // pjscreen branch (B-359 "PAGE x OF y" drift class). ONE source now.
+  // Unknown aspects return null → always emit (never gate what we can't name).
+  function _aspectSectionKey(asp) {
+    asp = String(asp || '');
+    if (asp === 'rooms') return 'rooms';
+    if (asp === 'zones') return 'zones';
+    if (asp === 'symbols' || asp === 'blocks') return 'blocks';
+    // v5.71.0 — cables_lighting was unmapped → ALWAYS included regardless
+    // of the ticklist. Both cable schedules ship under the "Cable
+    // schedule" section tick.
+    if (asp === 'cables_v2' || asp === 'cables' || asp === 'cable_summary'
+        || asp === 'cables_lighting') return 'cables';
+    if (asp === 'leds') return 'leds';
+    if (asp === 'lighting') return 'lighting';
+    if (asp === 'shades') return 'shades';
+    if (asp === 'tvs' || asp === 'displays') return 'displays';
+    // Prefix match (kept from the precount copy — superset of the emit
+    // filter's old enumeration, so any pjscreen_* variant maps consistently).
+    if (asp.indexOf('pjscreen') === 0) return 'pjscreens';
+    if (asp.indexOf('svc_') === 0) return 'slices';
+    return null;
+  }
+
   // ---- v5.5.61 — Full Document spec builder ----
   // Pure data assembly: given opts + an embed context (with planRefsByFloor
   // pre-computed), returns the ordered list of pages to render. Each page
@@ -10582,25 +10618,9 @@ const SonorPdf = (function () {
         ? window._sonorFullDocSecDefault(key) !== false
         : true;
     };
-    const _aspecSec = (asp) => {
-      asp = String(asp || '');
-      if (asp === 'rooms') return 'rooms';
-      if (asp === 'zones') return 'zones';
-      if (asp === 'symbols' || asp === 'blocks') return 'blocks';
-      // v5.71.0 — cables_lighting was unmapped → ALWAYS included regardless
-      // of the ticklist. Both cable schedules ship under the "Cable
-      // schedule" section tick. (NOTE: this map exists TWICE — precount +
-      // emit filter — keep both in step or better, B-362 will unify.)
-      if (asp === 'cables_v2' || asp === 'cables' || asp === 'cable_summary'
-          || asp === 'cables_lighting') return 'cables';
-      if (asp === 'leds') return 'leds';
-      if (asp === 'lighting') return 'lighting';
-      if (asp === 'shades') return 'shades';
-      if (asp === 'tvs' || asp === 'displays') return 'displays';
-      if (asp.indexOf('pjscreen') === 0) return 'pjscreens';
-      if (asp.indexOf('svc_') === 0) return 'slices';
-      return null;
-    };
+    // v5.185.2 (B-362) — alias of the ONE module-scope map (was a
+    // hand-mirrored copy of the fullDocument emit filter's map).
+    const _aspecSec = _aspectSectionKey;
     const _incInfo  = _secOn('info');
     const _incCctv  = _secOn('cctv');
     const _incElec  = _secOn('electrical');
@@ -10978,25 +10998,10 @@ const SonorPdf = (function () {
     };
     const _infoPackIdxList = () => _INFO_PACK.filter(pg => _secOn(pg.key)).map(pg => pg.idx);
     // Map an aspect key → ticklist section key. Unknown aspects always emit.
-    const _aspectSecKey = (asp) => {
-      asp = String(asp || '');
-      if (asp === 'rooms') return 'rooms';
-      if (asp === 'zones') return 'zones';
-      if (asp === 'symbols' || asp === 'blocks') return 'blocks';
-      // v5.71.0 — cables_lighting was unmapped → ALWAYS included regardless
-      // of the ticklist. Both cable schedules ship under the "Cable
-      // schedule" section tick. (NOTE: this map exists TWICE — precount +
-      // emit filter — keep both in step or better, B-362 will unify.)
-      if (asp === 'cables_v2' || asp === 'cables' || asp === 'cable_summary'
-          || asp === 'cables_lighting') return 'cables';
-      if (asp === 'leds') return 'leds';
-      if (asp === 'lighting') return 'lighting';
-      if (asp === 'shades') return 'shades';
-      if (asp === 'tvs' || asp === 'displays') return 'displays';
-      if (asp === 'pjscreens' || asp === 'pjscreen' || asp === 'pjscreens_v2') return 'pjscreens';
-      if (asp.indexOf('svc_') === 0) return 'slices';
-      return null;
-    };
+    // v5.185.2 (B-362) — alias of the ONE module-scope map. The old inline
+    // copy here enumerated pjscreen keys exactly and had already drifted
+    // from the precount's prefix match (B-359 page-total drift class).
+    const _aspectSecKey = _aspectSectionKey;
     const _aspectIncluded = (a) => {
       const k = a && _aspectSecKey(a.aspect);
       if (!k) return true;
