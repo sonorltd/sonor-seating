@@ -18,6 +18,9 @@
  * Exports: window.SonorPdf — API surface unchanged from inline IIFE.
  *
  * History:
+ *   v2.5.0  2026-08-01  SONOR_PDF_VERSION single version-of-record + banner
+ *                       derivation + window.SonorPdf.__version (module gets its
+ *                       own semver line again; host releases stamp the cache-bust).
  *   v5.185.2 2026-08-01 B-362 CLOSED — ONE aspect→section map. The two
  *                       hand-mirrored copies (_aspecSec in _buildFullDocSpec
  *                       precount + _aspectSecKey in fullDocument emit filter)
@@ -53,6 +56,12 @@
 (function () {
   'use strict';
 
+  // v5.187.0 — SINGLE VERSION-OF-RECORD for this module (survey found the
+  // header History, boot banner and host cache-bust all disagreeing).
+  // Bump THIS on every functional change to the module; the banner and
+  // window.SonorPdf.__version derive from it.
+  var SONOR_PDF_VERSION = '2.5.0';
+
 // ============================================================
 // Boot diagnostic — resolved PDF pipeline
 // ============================================================
@@ -71,7 +80,7 @@ try {
       const libOk = !!(window.PDFLib && window.PDFLib.PDFDocument
         && typeof window.PDFLib.PDFDocument.create === 'function');
       const optIn = !!(ls && ls.getItem('takeoffs-pdf-lib') === '1');
-      console.info('[Sonor PDF v5.5.71] Pipeline:',
+      console.info('[Sonor PDF v' + SONOR_PDF_VERSION + '] Pipeline:',
         (optIn && !optOut && libOk) ? 'pdf-lib (opt-in)' : 'jsPDF (default — proven v5.4.0 hero + v1.23.0 footer)',
         '— PDFLib loaded:', libOk,
         '— takeoffs-pdf-lib flag:', ls ? ls.getItem('takeoffs-pdf-lib') : '(no localStorage)');
@@ -8405,7 +8414,7 @@ const SonorPdf = (function () {
       if (typeof localStorage === 'undefined') return false;
       if (localStorage.getItem('takeoffs-pdf-lib-disable') === '1') return false;
       if (localStorage.getItem('takeoffs-pdf-lib') === '1') {
-        try { console.warn('[Sonor PDF v5.5.71] takeoffs-pdf-lib=1 → opt-in pdf-lib (NOT default — painter parity pending)'); } catch (_) {}
+        try { console.warn('[Sonor PDF v' + SONOR_PDF_VERSION + '] takeoffs-pdf-lib=1 → opt-in pdf-lib (NOT default — painter parity pending)'); } catch (_) {}
         return true;
       }
       return false;
@@ -13416,5 +13425,6 @@ const SonorPdf = (function () {
   // they did when the module was an inline IIFE.
   if (typeof window !== 'undefined') {
     window.SonorPdf = SonorPdf;
+    try { window.SonorPdf.__version = SONOR_PDF_VERSION; } catch (_) {}
   }
 })();

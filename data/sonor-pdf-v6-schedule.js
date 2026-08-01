@@ -173,7 +173,11 @@
           color: H.toLibRgb(groupColour),
           opacity: 0.14,
         });
-        H.drawText(page, String(row._group).toUpperCase(), {
+        // v6.0.0-rc.4 (2026-08-01) — draw the COMPUTED groupLabel. The rc.2
+        // dual-shape acceptance derived groupLabel from either {_group} or
+        // v5-legacy {group:true,label} but this draw still read row._group —
+        // every v5-shape group banner would have rendered "UNDEFINED".
+        H.drawText(page, String(groupLabel).toUpperCase(), {
           x: x + PAD_X, y: y + 7,
           font: fonts.bold, size: 10, color: groupColour,
           letterSpacing: 2,
