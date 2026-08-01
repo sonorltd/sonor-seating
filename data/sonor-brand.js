@@ -131,7 +131,8 @@ window.__SONOR_BRAND__ = {
       flyers:      '../MARKETING - Flyers/index.html',
       followup:    '../APP - Follow-Up Portal/dashboard/sonor-followup.html',
       tender:      '../APP - Tender/sonor-tender.html',
-      seating:     '../APP - Seating Configurator/dashboard/sonor-seating.html'
+      seating:     '../APP - Seating Configurator/dashboard/sonor-seating.html',
+      'cinema-aesthetic': '../APP - Cinema Aesthetic/dashboard/sonor-cinema-aesthetic.html'
     },
     hosted: {
       master:      'https://sonorltd.github.io/sonor-master/',
@@ -170,7 +171,8 @@ window.__SONOR_BRAND__ = {
       flyers:      'https://sonorltd.github.io/sonor-flyers/',
       followup:    'https://sonorltd.github.io/sonor-followup-portal/',
       tender:      'https://sonorltd.github.io/sonor-tender/',
-      seating:     'https://sonorltd.github.io/sonor-seating/'
+      seating:     'https://sonorltd.github.io/sonor-seating/',
+      'cinema-aesthetic': 'https://sonorltd.github.io/sonor-cinema-aesthetic/'
     }
   },
 

@@ -35,11 +35,11 @@
  * Pass `status` + `metadata` too when available — they drive the completed sink
  * (rows without them are treated as live, never hidden).
  *
- * @version 1.1.0
+ * @version 1.2.0
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
 
   // Parse the WeQuote number from a ref ("1381 - Awaken Spa" -> 1381). null if none.
   function wqOf(p) {
@@ -71,6 +71,27 @@
     return !!DONE_SONOR[st];
   }
 
+  // v1.2.0 — HOLDING PATTERN (Bryn 2026-07-31: gcal-created SITE-* projects
+  // "need to be categorised in a holding pattern until they are assigned
+  // properly or not"). States in projects.metadata.holding:
+  //   'holding'   → parked in a ⏳ group above the completed sink
+  //   'assigned'  → treated as a normal live project
+  //   'dismissed' → hidden from every picker (data kept; un-dismiss via Blueprint)
+  // AUTO-RULE (no key set): a calendar-created project (metadata.source='gcal')
+  // with no WeQuote number in its ref is holding by default — so future gcal
+  // imports park themselves without waiting for the importer to tag them.
+  // Assigning a real WQ ref (or setting holding='assigned') releases it.
+  function holdingStateOf(p) {
+    if (!p) return null;
+    var h = String(p.holding || ((p.metadata || {}).holding) || '').toLowerCase();
+    if (h) return h;
+    var src = String(p.source || ((p.metadata || {}).source) || '').toLowerCase();
+    if (src === 'gcal' && wqOf(p) == null) return 'holding';
+    return null;
+  }
+  function holdingOf(p) { return holdingStateOf(p) === 'holding'; }
+  function dismissedOf(p) { return holdingStateOf(p) === 'dismissed'; }
+
   // Pure — returns ordered groups: [{ key, label, items:[...] }]
   function group(rows, opts) {
     opts = opts || {};
@@ -82,7 +103,9 @@
     // v1.1.0 — completed/cancelled projects (WQ status first, Sonor status
     // fallback) sink to their own group at the very bottom and stay out of
     // the live groups + the recent convenience slots.
-    var live = list.filter(function (p) { return !doneOf(p); });
+    list = list.filter(function (p) { return !dismissedOf(p); });   // v1.2.0 — dismissed hidden everywhere
+    var holding = list.filter(function (p) { return holdingOf(p) && !doneOf(p); });
+    var live = list.filter(function (p) { return !doneOf(p) && !holdingOf(p); });
     var done = list.filter(doneOf);
 
     var recent = live.filter(function (p) { return tsOf(p) > 0; })
@@ -99,6 +122,9 @@
         return String((a && (a.name || a.ref)) || '').localeCompare(String((b && (b.name || b.ref)) || ''));
       });
     if (trials.length) out.push({ key: 'trials', label: 'Trials / no WQ', items: trials });
+
+    holding.sort(function (a, b) { return tsOf(b) - tsOf(a); });   // newest site visit first
+    if (holding.length) out.push({ key: 'holding', label: '⏳  Site / holding — to assign', items: holding });
 
     done.sort(function (a, b) {
       var wa = wqOf(a), wb = wqOf(b);
@@ -148,6 +174,7 @@
 
   global.SonorProjectList = {
     VERSION: VERSION, wqOf: wqOf, tsOf: tsOf, doneOf: doneOf,
+    holdingStateOf: holdingStateOf, holdingOf: holdingOf, dismissedOf: dismissedOf,
     group: group, populateSelect: populateSelect, defaultLabel: defaultLabel
   };
 })(typeof window !== 'undefined' ? window : this);

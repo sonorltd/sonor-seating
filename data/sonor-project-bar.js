@@ -98,6 +98,28 @@
     return `<a class="brief-link" href="${BRIEF_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Client brief for this project — opens in a new tab">📄 Brief</a>`;
   }
 
+  // v1.6.0 — per-project TRADES page (builder / joiner works list). Neutral
+  // surface in the Project Master repo, exact brief-link pattern; shown when
+  // the project carries a trades list (projects.metadata.trades — written by
+  // the trades page via sonor_merge_project_metadata). Areas carry
+  // PROJECT-ROOM TAGs {floor_id, floor_code, name} from takeoffs_floors
+  // areas — the same room identity RFI clouds resolve to; tasks join later.
+  const TRADES_URL = 'https://sonorltd.github.io/sonor-project-master/trades.html';
+  function _tradesLink(active) {
+    if (!active || !active.metadata || !active.metadata.trades) return '';
+    return `<a class="brief-link" href="${TRADES_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Builder & joiner works list — opens in a new tab">🔨 Trades</a>`;
+  }
+
+  // v1.7.0 — per-project BLUEPRINT (the all-app index: brief, design spec,
+  // boards, seating, takeoffs rooms + revisions, WeQuote quote links, trades,
+  // snags, tasks, renders, schedules). Always shown for the active project —
+  // "all projects should have the blueprint regardless of used or not".
+  const BLUEPRINT_URL = 'https://sonorltd.github.io/sonor-project-master/blueprint.html';
+  function _blueprintLink(active) {
+    if (!active) return '';
+    return `<a class="brief-link" href="${BLUEPRINT_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Project blueprint — every surface from every app, opens in a new tab">🧭 Blueprint</a>`;
+  }
+
   // ---- Internal state ----
   let _supa = null;
   let _projects = [];                 // cached rows
@@ -257,7 +279,7 @@
             <span class="meta">
               ${active.client_name ? `<span class="meta-cell"><span class="k">CLIENT</span><span>${_esc(active.client_name)}</span></span>` : ''}
               ${status ? `<span class="status-pill" style="background:${statusCol}33;border:1px solid ${statusCol};color:#F4F1EC">${_esc(status)}</span>` : ''}
-              ${_briefLink(active)}
+              ${_blueprintLink(active)}${_briefLink(active)}${_tradesLink(active)}
             </span>
           ` : '<span class="note">No project selected in the host app yet.</span>'}
         </div>
@@ -274,7 +296,7 @@
             ${active.client_name ? `<span class="meta-cell"><span class="k">CLIENT</span><span>${_esc(active.client_name)}</span></span>` : ''}
             ${active.address ? `<span class="meta-cell"><span class="k">ADDR</span><span>${_esc(active.address)}</span></span>` : ''}
             ${status ? `<span class="status-pill" style="background:${statusCol}33;border:1px solid ${statusCol};color:#F4F1EC">${_esc(status)}</span>` : ''}
-            ${_briefLink(active)}
+            ${_blueprintLink(active)}${_briefLink(active)}${_tradesLink(active)}
           </span>
         ` : '<span class="note">No project selected — pick one above to load it into this app.</span>'}
         <span class="actions">
@@ -546,6 +568,17 @@
     // Restore active project from localStorage — v1.4.0: scoped key when
     // appKey given (per-app memory); GLOBAL key for readOnly/legacy bars.
     _activeId = _read(_lsKeyFor()) || null;
+    // v1.8.0 — universal ?pid= deep link (Blueprint / Brief / Trades convention):
+    // any app opened with ?pid=<project-uuid> adopts that project on load.
+    // App-specific params (?project=, ?config=…) stay app-owned; an explicit
+    // link wins over per-app memory, and the choice persists to it.
+    try {
+      const _pid = new URLSearchParams(location.search).get('pid');
+      if (_pid && /^[0-9a-f-]{36}$/i.test(_pid) && !_readOnly) {
+        _activeId = _pid;
+        if (_appKey) _write(_lsKeyFor(), _pid);
+      }
+    } catch (e) {}
     _render();   // initial empty render so the bar shows immediately
     if (_supa) await loadProjects();
     // If we have an active id but the project isn't in the list, render anyway
