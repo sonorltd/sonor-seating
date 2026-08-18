@@ -1,4 +1,30 @@
-# Seating Configurator — Claude Code Context (v0.12.0)
+# Seating Configurator — Claude Code Context (v0.23.0)
+
+> **v0.23.0 — MODULAR CONFIGURATIONS (FrontRow Serenity).** Modular ranges are sold as
+> whole rows, not as N × single chair: a row is ONE linked configuration
+> ("4 Seat Straight (Option 8)" = 78+60+60+78 = 276cm) priced as a unit. New GENERIC
+> capability keyed off the SSOT's `item_metadata.kind='config'` — no range is named in
+> code, so any future modular brand inherits it.
+> **Engine:** `isConfigRange / configItems / moduleItems / configsFor / pickConfig /
+> siblingConfig / configWidthMm`; items adapt `width_mm, seat_count, shape,
+> seat_widths_mm[], upright_depth_mm, reclined_depth_mm, module_code`; `motorOptions()`
+> now reads `motor_type` from the SSOT instead of sniffing labels; `chairFrom()` uses
+> the cheapest COMPLETE single-chair configuration (never a bare module).
+> **App:** Configure gains a **configuration picker** — best fit for the room
+> auto-selected, straight/curved filter, each option showing width, module breakdown,
+> fit badge and per-row price. The quote emits **one line per row** at the
+> configuration's price (identical rows collapse, Qty = rows); plan SVG + PDF layout
+> page draw the REAL per-module widths and dimension every module; per-row overrides
+> choose configurations; flipping recline keeps the same configuration in the other
+> motor variant; a seat count the range doesn't build blocks Continue with a clear note.
+> **SSOT (this session, user-directed):** FrontRow geometry filled from
+> homecinemaseating.co.uk — width_cm + metadata (seat_count / shape / seat_widths_cm /
+> depths) on 136 configurations, module_code / widths / weights on 27 modules, range
+> dims + `config.config_driven` + row rule. **Pricing was reconciled, not changed:**
+> 324/324 scraped price cells matched `seating_prices` exactly (site inc VAT ÷ 1.2).
+> cacheKey v5→v6; seed regenerated (376 items). See `/SEATING-SSOT-CONTRACT.md` §8.
+
+
 
 > **v0.12.0 — bridge reciprocals executed; Library seating role MERGED INTO THIS SESSION.**
 > **Assets hosted:** all 60 images (range-assets + cineca-assets + intro hero) uploaded to the

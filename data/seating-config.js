@@ -4,8 +4,8 @@
 */
 (function () {
   window.__SEATING_CONFIG__ = {
-    version: '0.22.5',
-    buildDate: '2026-07-17',
+    version: '0.23.0',
+    buildDate: '2026-08-18',
     // Manufacturer websites (for proposal links). Only verified domains — add as confirmed.
     manufacturerSites: {
       'Moovia': 'https://moovia.de',
@@ -71,6 +71,6 @@
       headrest: 'Motorised Headrest', bean_bag: 'Bean Bag', stool: 'Bar Stool', accessory: 'Accessory'
     },
     accMax: { chaise: 2, _default: 8 },
-    cacheKey: 'sonor_seating_ssot_v5'
+    cacheKey: 'sonor_seating_ssot_v6'
   };
 })();

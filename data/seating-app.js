@@ -12,6 +12,9 @@
     layout: Object.assign({ prefs: {} }, CFG.defaultRoom),
     rangeId: null, material: null, colour: null, motor: null,
     includeArmrests: true, accessories: {}, finishes: {},
+    // v0.23.0 — modular ranges: the chosen whole-row CONFIGURATION (null = auto-pick
+    // the best fit for the room). configShape filters the picker (straight / curved).
+    configId: null, configShape: null,
     client: { name: '', project: '' }, rowOverrides: {}
   };
 
@@ -228,7 +231,7 @@
   function goNext() { if (cfg.step < STEPS.length && !nextDisabled()) { cfg.step++; renderStep(); } }
   function goBack() { if (cfg.step > 1) { cfg.step--; renderStep(); } }
   function jumpTo(n) { if (n < cfg.step) { cfg.step = n; renderStep(); } }
-  function restart() { var keepClient = cfg.client; cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, client: keepClient || { name: '', project: '' }, rowOverrides: {} }; renderStep(); }
+  function restart() { var keepClient = cfg.client; cfg = { step: 1, layout: Object.assign({ prefs: {} }, CFG.defaultRoom), rangeId: null, material: null, colour: null, motor: null, includeArmrests: true, accessories: {}, finishes: {}, configId: null, configShape: null, client: keepClient || { name: '', project: '' }, rowOverrides: {} }; renderStep(); }
   function setClient(k, v) { cfg.client[k] = v; if (k === 'project' && $('savedList')) { clearTimeout(setClient._t); setClient._t = setTimeout(loadSavedList, 500); } }
   // v0.21.0 — generic (step-1) fit maths, shared by the guard + option greying
   function genericRunMm(per) { var g = genericSpec(); return per * g.seatW + (per + 1) * g.armW; }
@@ -240,7 +243,11 @@
   function nextDisabled() {
     if (cfg.step === 1) { var g = genericFit(); return g.overW || g.overL; }
     if (cfg.step === 2) return !cfg.rangeId;
-    if (cfg.step === 3) { try { if (fitCheck().over) return true; } catch (e) {} }
+    if (cfg.step === 3) {
+      try { if (fitCheck().over) return true; } catch (e) {}
+      // v0.23.0 — modular ranges: no configuration for this seat count ⇒ nothing to quote
+      try { if (isCfgRange() && !primaryConfig()) return true; } catch (e) {}
+    }
     return false;
   }
 
@@ -421,13 +428,60 @@
       '<div class="lead"><h2>Configure your ' + esc(r.name) + '</h2><p>' + esc(r.manufacturer) + (r.style ? ' · ' + esc(r.style) : '') + '</p></div>' +
       '<div id="fitBanner">' + fitBannerHtml() + '</div>' +
       '<div class="cfg-grid"><div class="cfg-left">' +
-        layoutPanelHtml('setLayout2') + motorHtml + matHtml + finHtml + arm + accHtml +
+        layoutPanelHtml('setLayout2') + motorHtml + configPickerHtml(r) + matHtml + finHtml + arm + accHtml +
         '</div>' +
         '<div class="cfg-right"><div class="panel sticky"><div class="ptt">Your cinema</div><div id="planWrap"></div>' +
           '<div id="liveTotal" class="live"></div></div></div>' +
       '</div>';
     updateLive();
     scheduleTint();
+  }
+
+  // ── v0.23.0 · seating-configuration picker (modular ranges) ──────────────────
+  // Real manufacturer configurations for the chosen seat count. The best fit for
+  // the room is pre-selected; the client can switch to any other option (straight
+  // or curved) and the price, plan and proposal follow.
+  function configPickerHtml(r) {
+    if (!isCfgRange()) return '';
+    var per = cfg.layout.seatsPerRow;
+    var all = configChoices({ shape: null });
+    var picked = primaryConfig();
+    if (!all.length) {
+      var counts = {};
+      (E.configItems(cfg.rangeId) || []).forEach(function (c) { if (c.seat_count) counts[c.seat_count] = 1; });
+      var avail = Object.keys(counts).map(Number).sort(function (a, b) { return a - b; });
+      return '<div class="panel"><div class="ptt">Seating configuration</div>' +
+        '<div class="fitwarn block">⚠ ' + esc(r.name) + ' is not built as a ' + per + '-across row' +
+        (avail.length ? ' — it is supplied in rows of ' + avail.join(', ') + ' seats' : '') +
+        '. Change seats per row above, or split the seating across more rows.</div></div>';
+    }
+    var shapes = [];
+    all.forEach(function (c) { if (c.shape && shapes.indexOf(c.shape) < 0) shapes.push(c.shape); });
+    var filter = shapes.length > 1 ? '<div class="opts" style="margin-bottom:10px">' +
+      '<button class="opt ' + (!cfg.configShape ? 'on' : '') + '" onclick="SeatingApp.setConfigShape(\'\')">All</button>' +
+      shapes.map(function (s) { return '<button class="opt ' + (cfg.configShape === s ? 'on' : '') + '" onclick="SeatingApp.setConfigShape(\'' + s + '\')">' + esc(s.charAt(0).toUpperCase() + s.slice(1)) + '</button>'; }).join('') +
+      '</div>' : '';
+    var list = cfg.configShape ? all.filter(function (c) { return c.shape === cfg.configShape; }) : all;
+    var cards = list.map(function (c) {
+      var on = picked && c.id === picked.id;
+      var w = c.width_mm != null ? (c.width_mm / 10).toFixed(0) + 'cm wide' : 'width to confirm';
+      var mods = (c.seat_widths_mm && c.seat_widths_mm.length) ? c.seat_widths_mm.map(function (m) { return (m / 10) + ''; }).join(' + ') + 'cm' : null;
+      var badge = c._fits === false ? '<span class="flag warn">⚠ ' + Math.round((c.width_mm - c._availMm) / 10) + 'cm too wide</span>'
+        : (c._fits === true ? '<span class="plus">✓ fits with ' + Math.round((c._availMm - c.width_mm) / 20) + 'cm each side</span>' : '');
+      var off = c.off_catalogue ? '<span class="opt-tag">price list only</span>' : '';
+      return '<button class="cfgopt' + (on ? ' on' : '') + '" onclick="SeatingApp.setConfig(' + c.id + ')">' +
+        '<span class="cfgopt-n">' + esc(c.label.replace(/^Serenity\s+/i, '')) + ' ' + off + '</span>' +
+        '<span class="cfgopt-d">' + esc(w) + (mods ? ' · ' + esc(mods) : '') + '</span>' +
+        '<span class="cfgopt-p">' + (c._price != null ? money(Math.round(c._price)) + ' per row' : 'POA') + ' ' + badge + '</span>' +
+        '</button>';
+    }).join('');
+    var auto = cfg.configId == null;
+    return '<div class="panel"><div class="ptt">Seating configuration <span class="opt-tag">' + list.length + ' × ' + per + '-seat option' + (list.length === 1 ? '' : 's') + '</span>' +
+      (auto ? '' : '<button class="rowed-reset" onclick="SeatingApp.configResetPick()">Use best fit</button>') + '</div>' +
+      filter +
+      '<div class="cfgopts">' + cards + '</div>' +
+      '<div class="hint">' + esc(r.manufacturer) + ' builds each row as one configuration of linked modules, priced as a unit — not as ' + per + ' separate chairs. ' +
+      (auto ? 'We have pre-selected the best fit for your room; pick another to compare.' : 'Your choice is applied to every row — vary it row by row on the Summary step.') + '</div></div>';
   }
 
   // ── v0.14.0 · digital colour visualisation ──────────────────────────────────
@@ -571,21 +625,77 @@
   function setColour(n) { cfg.colour = n; renderConfigure(); }
   function toggleFinish(id, v) { cfg.finishes[id] = v; updateLive(); }
   function selectedFinishes() { var r0 = E.range(cfg.rangeId); var fins = (r0 && r0.finishes) || []; return fins.filter(function (f) { return cfg.finishes[f.id]; }); }
-  function setMotor(mt) { cfg.motor = mt; updateLive(); document.querySelectorAll('.cfg-left .opt').forEach(function () {}); renderConfigure(); }
-  function setLayout2(k, v) { cfg.layout[k] = v; renderConfigure(); }
+  function setMotor(mt) {
+    cfg.motor = mt;
+    // v0.23.0 — keep the SAME configuration, in the newly chosen motor variant
+    if (cfg.configId != null && E.siblingConfig) {
+      var cur = E.itemsOf(cfg.rangeId).find(function (i) { return i.id === cfg.configId; });
+      var sib = E.siblingConfig(cur, mt);
+      cfg.configId = sib ? sib.id : null;
+    }
+    renderConfigure();
+  }
+  function setLayout2(k, v) {
+    cfg.layout[k] = v;
+    if (k === 'seatsPerRow') { cfg.configId = null; cfg.rowOverrides = {}; }   // configurations are seat-count specific
+    renderConfigure();
+  }
   function toggleArm(v) { cfg.includeArmrests = v; updateLive(); }
   function acc(id, d) { var m = itemById(id); var max = (CFG.accMax && CFG.accMax[accType(m)]) || (CFG.accMax && CFG.accMax._default) || 8; cfg.accessories[id] = Math.max(0, Math.min(max, (cfg.accessories[id] || 0) + d)); var el = $('q_' + id); if (el) el.textContent = cfg.accessories[id]; updateLive(); }
   function accType(it) { var l = (it.label || '').toLowerCase(); return /chaise/.test(l) ? 'chaise' : '_default'; }
 
+  // ── modular CONFIGURATIONS (v0.23.0) ─────────────────────────────────────────
+  // For ranges sold as whole rows (FrontRow Serenity et al) a row is ONE priced
+  // configuration — "4 Seat Straight (Option 8)", 78+60+60+78 = 2760mm — not four
+  // single chairs. Everything here is generic: it switches on the SSOT's config
+  // items, so any future modular range behaves the same way.
+  function isCfgRange() { var r = E.range(cfg.rangeId); return !!(r && E.isConfigRange && E.isConfigRange(r)); }
+  function sideWallMm() { return (CFG.clearance && CFG.clearance.sideWallMm) || 150; }
+  // every configuration matching the current seats-per-row (and shape filter)
+  function configChoices(opts) {
+    opts = opts || {};
+    if (!E.configsFor) return [];
+    return E.configsFor(cfg.rangeId, {
+      seats: opts.seats != null ? opts.seats : cfg.layout.seatsPerRow,
+      motor: opts.motor !== undefined ? opts.motor : cfg.motor,
+      shape: opts.shape !== undefined ? opts.shape : cfg.configShape,
+      roomWidthMm: cfg.layout.widthMm, sideWallMm: sideWallMm(),
+      materialId: cfg.material
+    });
+  }
+  // the configuration in play — the client's pick when it still matches the layout,
+  // otherwise the best-fitting one for this room and seat count.
+  function primaryConfig() {
+    if (!isCfgRange()) return null;
+    var all = configChoices({ shape: null });
+    if (!all.length) return null;
+    if (cfg.configId != null) {
+      var exact = all.find(function (c) { return c.id === cfg.configId; });
+      if (exact) return exact;
+      // seats-per-row or recline changed under the selection — keep the same
+      // configuration name where it still exists, else fall back to the best fit.
+      var prev = E.itemsOf(cfg.rangeId).find(function (i) { return i.id === cfg.configId; });
+      if (prev) { var same = all.find(function (c) { return c.label === prev.label; }); if (same) return same; }
+    }
+    var shaped = cfg.configShape ? all.filter(function (c) { return c.shape === cfg.configShape; }) : all;
+    return shaped[0] || all[0];
+  }
+  function setConfig(id) { cfg.configId = id ? Number(id) : null; renderConfigure(); }
+  function setConfigShape(s) { cfg.configShape = s || null; cfg.configId = null; renderConfigure(); }
+  function configResetPick() { cfg.configId = null; renderConfigure(); }
+
   // ── quote build (MSRP) ──────────────────────────────────────────────────────
   function primarySeat() {
+    if (isCfgRange()) return primaryConfig();
     var seats = E.seatItems(cfg.rangeId);
     if (!seats.length) return null;
-    if (cfg.motor) { var m = seats.find(function (s) { var l = (s.label || '').toLowerCase(); return (cfg.motor === '2motor' && /2-?motor/.test(l)) || (cfg.motor === '1motor' && /1-?motor/.test(l)) || (cfg.motor === 'fixed' && /fixed|non-reclin/.test(l)); }); if (m) return m; }
+    if (cfg.motor) { var m = seats.find(function (s) { if (s.motor_type) return s.motor_type === cfg.motor; var l = (s.label || '').toLowerCase(); return (cfg.motor === '2motor' && /2-?motor/.test(l)) || (cfg.motor === '1motor' && /1-?motor/.test(l)) || (cfg.motor === 'fixed' && /fixed|non-reclin/.test(l)); }); if (m) return m; }
     // cheapest priced seat, else first
     var priced = seats.filter(function (s) { return s.sell_price_gbp != null; }).sort(function (a, b) { return a.sell_price_gbp - b.sell_price_gbp; });
     return priced[0] || seats[0];
   }
+  // seat/configuration items offered in the per-row editor
+  function rowSeatChoices() { return isCfgRange() ? configChoices({ shape: null }) : E.seatItems(cfg.rangeId); }
   function itemById(id) {
     var u = (E.accessoryItems(cfg.rangeId) || []).find(function (x) { return String(x.id) === String(id); });
     if (u) return u; return E.itemsOf(cfg.rangeId).find(function (i) { return i.id === id; }); }
@@ -611,6 +721,24 @@
   function quoteLines() {
     var lines = [], total = cfg.layout.rows * cfg.layout.seatsPerRow;
     var globalUp = 1 + materialUpcharge() / 100;
+    // v0.23.0 — modular ranges quote ONE line per row: the whole configuration at
+    // its own price. Identical rows collapse into a single line (Qty = rows).
+    if (isCfgRange()) {
+      var byKey = {};
+      for (var ci = 0; ci < cfg.layout.rows; ci++) {
+        var rcc = rowConfig(ci);
+        if (!rcc.seat) continue;
+        var midc = rcc.mat ? rcc.mat.id : cfg.material;
+        var uc = E.itemSell(rcc.seat, midc), upc = E.hasExactPrice(rcc.seat, midc) ? 1 : 1 + (rcc.upcharge || 0) / 100;
+        var mLbl = rcc.seat.motor_type ? ' · ' + ((CFG.motorLabels || {})[rcc.seat.motor_type] || rcc.seat.motor_type) : '';
+        var lblc = rcc.seat.label + mLbl + (rcc.mat ? ' · ' + rcc.mat.name + (rcc.colour ? ' (' + rcc.colour + ')' : '') : '');
+        var keyc = lblc + '|' + midc;
+        if (byKey[keyc]) { byKey[keyc].qty++; }
+        else { byKey[keyc] = { label: lblc, qty: 1, unit: uc != null ? Math.round(uc * upc) : null, iid: rcc.seat.id, mid: midc, config: true, seats: rcc.seat.seat_count || cfg.layout.seatsPerRow }; lines.push(byKey[keyc]); }
+      }
+      Object.keys(cfg.accessories).forEach(function (id) { var q = cfg.accessories[id]; if (!q) return; var it = itemById(id); if (it) lines.push({ label: it.label, qty: q, unit: E.itemSell(it, cfg.material), acc: true, iid: it.id, mid: cfg.material }); });
+      return lines;
+    }
     if (hasRowOverrides()) {
       for (var ri = 0; ri < cfg.layout.rows; ri++) {
         var rc = rowConfig(ri);
@@ -694,6 +822,11 @@
         '<div class="strip">' +
           cell('Room', (cfg.layout.widthMm / 1000).toFixed(1) + 'm × ' + (cfg.layout.lengthMm / 1000).toFixed(1) + 'm') +
           cell('Layout', (cfg.layout.rows * cfg.layout.seatsPerRow) + ' seats', cfg.layout.rows + ' rows × ' + cfg.layout.seatsPerRow) +
+          (function () {
+            var pc = primaryConfig();
+            if (!pc) return '';
+            return cell('Configuration', esc(pc.label.replace(/^Serenity\s+/i, '')), pc.width_mm != null ? Math.round(pc.width_mm / 10) + 'cm wide per row' : 'width to confirm');
+          })() +
           cell('Upholstery', mat ? esc(mat.name) : (catFinish(r) || 'TBC'), cfg.colour ? esc(cfg.colour) : '') +
           cell('Lead time', lt || 'On request', 'from order') +
           cell('Total inc VAT', anyPriced ? money(Math.round(vb.gross)) : 'On request', 'inc. delivery & VAT') +
@@ -721,7 +854,9 @@
 
   // ── per-row editor (Summary) ─────────────────────────────────────────────────
   function rowEditorHtml(r) {
-    var seats = E.seatItems(cfg.rangeId);
+    // v0.23.0 — on modular ranges a row varies by CONFIGURATION, not by single seat
+    var seats = rowSeatChoices();
+    var cfgRange = isCfgRange();
     var mats = (r.materials || []).filter(function (m) { return m.available !== false; });
     if (seats.length < 2 && mats.length < 2) return '';   // nothing to vary
     var any = hasRowOverrides();
@@ -729,7 +864,11 @@
     for (var ri = 0; ri < cfg.layout.rows; ri++) {
       var o = cfg.rowOverrides[ri] || {}, rc = rowConfig(ri);
       var seatOpts = '<option value="">' + esc((primarySeat() || {}).label || 'Standard seat') + ' (default)</option>' +
-        seats.map(function (s) { return '<option value="' + s.id + '"' + (o.seatId === s.id ? ' selected' : '') + '>' + esc(s.label) + (E.itemSell(s) != null ? ' — ' + money(E.itemSell(s)) : '') + '</option>'; }).join('');
+        seats.map(function (s) {
+          var w = (cfgRange && s.width_mm != null) ? ' · ' + Math.round(s.width_mm / 10) + 'cm' : '';
+          var p = E.itemSell(s, cfg.material);
+          return '<option value="' + s.id + '"' + (o.seatId === s.id ? ' selected' : '') + '>' + esc(s.label) + w + (p != null ? ' — ' + money(p) : '') + '</option>';
+        }).join('');
       var matOpts = '<option value="">' + esc(cfg.material ? ((mats.find(function (m) { return m.id === cfg.material; }) || {}).name || 'As configured') : 'As configured') + ' (default)</option>' +
         mats.map(function (m) { return '<option value="' + m.id + '"' + (o.material === m.id ? ' selected' : '') + '>' + esc(m.name) + (m.upcharge > 0 ? ' (+' + m.upcharge + '%)' : '') + '</option>'; }).join('');
       var colOpts = '';
@@ -742,10 +881,10 @@
         '<select onchange="SeatingApp.rowSet(' + ri + ',\'material\',this.value||null)">' + matOpts + '</select>' +
         colOpts + '</div>';
     }
-    return '<div class="panel" style="margin-bottom:22px"><div class="ptt">Row configuration <span class="opt-tag">optional — mix seats &amp; finishes per row</span>' +
+    return '<div class="panel" style="margin-bottom:22px"><div class="ptt">Row configuration <span class="opt-tag">optional — ' + (cfgRange ? 'a different configuration &amp; finish per row' : 'mix seats &amp; finishes per row') + '</span>' +
       (any ? '<button class="rowed-reset" onclick="SeatingApp.rowsReset()">Reset all rows</button>' : '') + '</div>' +
       rowsHtml +
-      '<div class="hint">Rows are priced individually when varied — the quote below updates as you change them.</div></div>';
+      '<div class="hint">' + (cfgRange ? 'Each row is one manufacturer configuration, priced as a unit — front and rear rows are often different widths.' : 'Rows are priced individually when varied — the quote below updates as you change them.') + '</div></div>';
   }
 
   // ── plans (SVG) ─────────────────────────────────────────────────────────────
@@ -770,17 +909,41 @@
     var armW0 = null;
     for (var ai = 0; ai < arms.length && !armW0; ai++) armW0 = parseCm(arms[ai].size_label || arms[ai].size);
     var modularArms = !!(arms.length && cfg.includeArmrests);
+    // v0.23.0 — a chosen configuration supplies its REAL overall width and the
+    // left-to-right module widths, so the plan draws the actual row (e.g. a 60cm
+    // love-seat module between two 78cm recliners) instead of N identical chairs.
+    var pc = isCfgRange() ? primaryConfig() : null;
+    var seatWidths = null, runMm = null;
+    if (pc) {
+      if (pc.upright_depth_mm) uprD = pc.upright_depth_mm;
+      if (pc.reclined_depth_mm) reclD = Math.max(pc.reclined_depth_mm, uprD);
+      if (pc.width_mm) runMm = pc.width_mm;
+      if (pc.seat_widths_mm && pc.seat_widths_mm.length === cfg.layout.seatsPerRow) {
+        seatWidths = pc.seat_widths_mm.slice();
+        seatW = Math.max.apply(null, seatWidths);
+      } else if (pc.width_mm && cfg.layout.seatsPerRow) {
+        seatW = Math.round(pc.width_mm / cfg.layout.seatsPerRow);
+      }
+      modularArms = false;                       // arms are built into the modules
+    }
     return {
       seatW: seatW, uprD: uprD, reclD: reclD,
+      seatWidths: seatWidths, runMm: runMm, configName: pc ? pc.label : null,
+      configShape: pc ? pc.shape : null,
       armW: modularArms ? (armW0 || 150) : null, modularArms: modularArms,
       rowGap: (CFG.clearance && CFG.clearance.rowGapMm) || 50,
       wallClear: (cap.wall_clearance_mm != null && cap.wall_clearance_mm !== 0) ? cap.wall_clearance_mm : (cap.wall_clearance_mm === 0 ? 0 : 100),
-      real: !!(cap.seat_width_mm || cap.seat_depth_mm || cap.reclined_depth_mm),
+      real: !!(pc && pc.width_mm) || !!(cap.seat_width_mm || cap.seat_depth_mm || cap.reclined_depth_mm),
       rangeName: r ? r.name : null
     };
   }
-  // row run in mm — arms as shared modules between/around seats when separate
-  function rowRunMm(S, per) { return S.modularArms ? per * S.seatW + (per + 1) * S.armW : per * S.seatW; }
+  // row run in mm — a configuration's published width wins; otherwise arms are
+  // shared modules between/around seats when the range sells them separately.
+  function rowRunMm(S, per) {
+    if (S.runMm) return S.runMm;
+    if (S.seatWidths && S.seatWidths.length) return S.seatWidths.reduce(function (a, b) { return a + b; }, 0);
+    return S.modularArms ? per * S.seatW + (per + 1) * S.armW : per * S.seatW;
+  }
   // v0.18.1 — room-width fit guard: widest row's run vs the room. over ⇒ BLOCKS Continue.
   function fitCheck() {
     var S = planSpec(), per = cfg.layout.seatsPerRow, roomW = cfg.layout.widthMm || 4000;
@@ -788,7 +951,14 @@
     try {
       for (var ri = 0; ri < cfg.layout.rows; ri++) {
         var rc = rowConfig(ri);
-        var w = rc && rc.seat ? parseCm(rc.seat.size_label || rc.seat.size) : null;
+        if (!rc || !rc.seat) continue;
+        // v0.23.0 — a configuration knows its own overall width; single seats fall
+        // back to the width parsed out of the size label.
+        if (rc.seat.width_mm && rc.seat.kind === 'config') {
+          if (rc.seat.width_mm > maxRun) maxRun = rc.seat.width_mm;
+          continue;
+        }
+        var w = parseCm(rc.seat.size_label || rc.seat.size);
         if (w) {
           var run = S.modularArms ? per * w + (per + 1) * S.armW : per * w;
           if (run > maxRun) maxRun = run;
@@ -859,17 +1029,19 @@
       var rRear = rearY - (rows - 1 - r) * pitch, ryU = rRear - uprPX, ryR = rRear - reclPX;
       var cx = sx0;
       for (var i = 0; i < per; i++) {
+        // v0.23.0 — per-module widths when the chosen configuration publishes them
+        var seatPXi = (S.seatWidths && S.seatWidths[i]) ? S.seatWidths[i] * sc : seatPX;
         if (S.modularArms) { s += rr(cx, ryU, armPX, uprPX, 2, G(0.1), G(0.55), 0.8); cx += armPX; }   // shared/end armrest module
-        var aw = S.modularArms ? 0 : seatPX * 0.15;
-        if (reclPX > uprPX + 2) s += rr(cx + 1, ryR, seatPX - 2, reclPX - uprPX + 2, 2, 'none', G(0.28), 0.7);
-        s += rr(cx, ryU, seatPX, uprPX, 3, 'rgba(128,88,161,0.14)', G(0.85), 1);
+        var aw = S.modularArms ? 0 : seatPXi * 0.15;
+        if (reclPX > uprPX + 2) s += rr(cx + 1, ryR, seatPXi - 2, reclPX - uprPX + 2, 2, 'none', G(0.28), 0.7);
+        s += rr(cx, ryU, seatPXi, uprPX, 3, 'rgba(128,88,161,0.14)', G(0.85), 1);
         if (!S.modularArms) {
           s += rr(cx + 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
-          s += rr(cx + seatPX - aw - 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
+          s += rr(cx + seatPXi - aw - 1, ryU + 1, aw, uprPX - 2, 2, 'none', G(0.4), 0.6);
         }
-        s += rr(cx + aw + 2, ryU + uprPX * 0.08, seatPX - 2 * aw - 4, uprPX * 0.52, 2, 'none', G(0.5), 0.7);
-        s += rr(cx + aw + 2, ryU + uprPX * 0.66, seatPX - 2 * aw - 4, uprPX * 0.26, 2, G(0.14), G(0.7), 0.9);
-        cx += seatPX;
+        s += rr(cx + aw + 2, ryU + uprPX * 0.08, seatPXi - 2 * aw - 4, uprPX * 0.52, 2, 'none', G(0.5), 0.7);
+        s += rr(cx + aw + 2, ryU + uprPX * 0.66, seatPXi - 2 * aw - 4, uprPX * 0.26, 2, G(0.14), G(0.7), 0.9);
+        cx += seatPXi;
       }
       if (S.modularArms) s += rr(cx, ryU, armPX, uprPX, 2, G(0.1), G(0.55), 0.8);
     }
@@ -882,7 +1054,7 @@
     }
     s += dimH(sx0, sx0 + totalRowW * sc, ry + rl + 12, Math.round(totalRowW) + '', false);
     var capTxt = S.generic ? 'average chair sizes · shared armrests · dims in mm'
-      : (S.rangeName ? S.rangeName + ' · ' : '') + (S.real ? 'manufacturer dimensions' : 'standard allowances') + ' · dims in mm';
+      : (S.configName ? S.configName + ' · ' : (S.rangeName ? S.rangeName + ' · ' : '')) + (S.real ? 'manufacturer dimensions' : 'standard allowances') + ' · dims in mm';
     s += txt(capTxt, boxW / 2, boxH - 6, 8.5, 'rgba(143,133,116,0.9)', 'middle');
     // (overflow messaging lives in the page-level fit banners — nothing drawn in-SVG)
     return '<svg viewBox="0 0 ' + boxW + ' ' + boxH + '" width="100%" style="max-width:' + (big ? 680 : 460) + 'px;display:block">' + s + '</svg>';
@@ -922,6 +1094,10 @@
         armWidthMm: (function () { var S0 = planSpec(); return S0.modularArms ? S0.armW : null; })(),
         modularArms: planSpec().modularArms,
         planSeatWidthSel: planSpec().seatW,
+        // v0.23.0 — real per-module widths + the configuration's own overall width
+        seatWidthsMm: planSpec().seatWidths,
+        configName: planSpec().configName,
+        configShape: planSpec().configShape,
         rowRunMm: rowRunMm(planSpec(), cfg.layout.seatsPerRow),
         seatWidthMm: cap.seat_width_mm || seatW, seatDepthMm: cap.seat_depth_mm || null,
         reclinedDepthMm: cap.reclined_depth_mm || null, wallClearanceMm: cap.wall_clearance_mm || null,
@@ -958,7 +1134,11 @@
         var chosen = primarySeat();
         var chosenU = chosen ? E.itemSell(chosen, cfg.material) : null;
         function seatForMotor(mt) {
+          // v0.23.0 — on modular ranges compare the SAME configuration in the other
+          // motor variant, so the delta is a true like-for-like upgrade cost.
+          if (isCfgRange()) return E.siblingConfig(chosen, mt);
           return (E.seatItems(r.id) || []).find(function (s2) {
+            if (s2.motor_type) return s2.motor_type === mt;
             var l = (s2.label || '').toLowerCase();
             return (mt === '2motor' && /2-?motor/.test(l)) || (mt === '1motor' && /1-?motor/.test(l)) || (mt === 'fixed' && /fixed|non-reclin/.test(l));
           }) || null;
@@ -979,7 +1159,9 @@
           recline: motors.length > 1 ? motors.map(function (mt) {
             var sel = cfg.motor === mt;
             var s2 = seatForMotor(mt), u2 = s2 ? E.itemSell(s2, cfg.material) : null;
-            var delta = sel ? 0 : ((u2 != null && chosenU != null) ? Math.round((u2 - chosenU) * totalSeats) : null);
+            // config ranges price per ROW, single-seat ranges price per seat
+            var mult = isCfgRange() ? cfg.layout.rows : totalSeats;
+            var delta = sel ? 0 : ((u2 != null && chosenU != null) ? Math.round((u2 - chosenU) * mult) : null);
             return { label: (CFG.motorLabels || {})[mt] || mt, delta: delta, selected: sel };
           }) : []
         };
@@ -1115,6 +1297,7 @@
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
     toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, saveBom: saveBom, toggleFinish: toggleFinish, setClient: setClient,
     rowSet: rowSet, rowsReset: rowsReset,
+    setConfig: setConfig, setConfigShape: setConfigShape, configResetPick: configResetPick,
     saveConfig: saveConfig, openSaved: openSaved, copySavedLink: copySavedLink, renameSaved: renameSaved, deleteSaved: deleteSaved
   };
 })(typeof window !== 'undefined' ? window : this);

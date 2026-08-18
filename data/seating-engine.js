@@ -89,7 +89,14 @@
             seat_depth_mm: row.seat_depth_cm ? Math.round(row.seat_depth_cm * 10) : null,
             reclined_depth_mm: row.reclined_depth_cm ? Math.round(row.reclined_depth_cm * 10) : null,
             wall_clearance_mm: row.wall_clearance_mm || null,
-            max_seats: cfg.max_seats || null, features: {}
+            max_seats: cfg.max_seats || null, features: {},
+            // v0.23.0 — modular ranges whose SSOT carries whole-row CONFIGURATIONS
+            // (seating_items.metadata.kind = 'config'). Generic: any range the Library
+            // flags range_config.config_driven, or that simply holds config items.
+            config_driven: cfg.config_driven === true || null,
+            min_seats: cfg.min_seats || null,
+            row_spacing_min_mm: cfg.row_spacing_min_mm || null,
+            row_spacing_rec_mm: cfg.row_spacing_rec_mm || null
           },
           materials: adaptMaterials(row.materials, COLOURS),
           finishes: (typeof FINOPTS !== 'undefined' && FINOPTS[row.manufacturer_slug]) || [],
@@ -109,7 +116,20 @@
         row.prices.forEach(function (p) { if (p && p.available !== false && p.srp != null) pmap[p.material_id || '_'] = Number(p.srp); });
         if (!Object.keys(pmap).length) pmap = null;
       }
-      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: ((row.item_metadata || {}).kind) || null, complete_chair: !!((row.item_metadata || {}).complete_chair), img: ((row.item_metadata || {}).img) || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, prices: pmap, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null });
+      // v0.23.0 — item geometry from the Library (item_metadata is SSOT; the view's
+      // width_cm is a fallback). Configurations carry their real overall width and the
+      // left-to-right list of module widths that make up the row.
+      var im = row.item_metadata || {};
+      var wCm = im.width_cm != null ? im.width_cm : (row.width_cm != null ? row.width_cm : null);
+      R._items.push({ id: row.item_id, range_id: rid, furniture_type: ft, kind: im.kind || null, complete_chair: !!im.complete_chair, img: im.img || null, label: label, sell_price_gbp: row.price_srp_from != null ? Number(row.price_srp_from) : null, prices: pmap, sort_order: row.item_sort || 0, motor_type: row.motor_type || null, size_label: row.size_label || null,
+        width_mm: wCm != null ? Math.round(Number(wCm) * 10) : null,
+        seat_count: im.seat_count != null ? Number(im.seat_count) : null,
+        shape: im.shape || null,
+        seat_widths_mm: Array.isArray(im.seat_widths_cm) ? im.seat_widths_cm.map(function (c) { return Math.round(Number(c) * 10); }) : null,
+        upright_depth_mm: im.depth_upright_cm != null ? Math.round(Number(im.depth_upright_cm) * 10) : null,
+        reclined_depth_mm: im.depth_reclined_cm != null ? Math.round(Number(im.depth_reclined_cm) * 10) : null,
+        module_code: im.module_code || null,
+        off_catalogue: im._not_on_public_site === true });
     });
     var rs = [], cat = [];
     order.forEach(function (rid) {
@@ -120,7 +140,9 @@
       if (R._items.some(function (i) { return i.motor_type; }) || /reclin|motor/.test(styleStr)) f.reclining = true;
       if (/daybed|day-bed|lounger|chaise/.test(styleStr) || R._items.some(function (i) { return /chaise|daybed|lounger/i.test(i.label); })) f.daybed = true;
       if (R._items.some(function (i) { return /chaise/i.test(i.label); })) f.chaise = true;
-      if (/sofa|loveseat|love seat/.test(styleStr) || R._items.some(function (i) { return /sofa|loveseat|double|triple|2-seat|3-seat/i.test(i.label); })) f.sofa = true;
+      if (/sofa|loveseat|love seat/.test(styleStr) || R._items.some(function (i) { return /sofa|loveseat|couch|double|triple|[23][\s-]?seat/i.test(i.label); })) f.sofa = true;
+      // v0.23.0 — modular ranges sold as whole-row configurations
+      if (R._items.some(function (i) { return i.kind === 'config' || i.kind === 'module'; })) { f.modular = true; R.capability.config_driven = R.capability.config_driven || R._items.some(function (i) { return i.kind === 'config'; }); }
       cat = cat.concat(R._items); delete R._items; rs.push(R);
     });
     return { ranges: rs, catalogue: cat, universal: universal };
@@ -213,17 +235,77 @@
     return own.concat(gen);
   }
 
+  // ── modular CONFIGURATIONS (v0.23.0) ─────────────────────────────────────────
+  // Some ranges are not sold as N × single chair but as whole-row configurations
+  // (FrontRow Serenity: "4 Seat Straight (Option 8)" — 78+60+60+78 = 276cm, priced
+  // as one unit). The Library flags these `seating_items.metadata.kind = 'config'`
+  // and files seat_count / shape / width_cm / seat_widths_cm alongside. Everything
+  // below is generic — any range with config items gets this behaviour.
+  function configItems(rangeId) { return itemsOf(rangeId).filter(function (i) { return i.kind === 'config'; }); }
+  function moduleItems(rangeId) { return itemsOf(rangeId).filter(function (i) { return i.kind === 'module'; }); }
+  function isConfigRange(r) {
+    if (!r) return false;
+    if ((r.capability || {}).config_driven) return true;
+    return configItems(r.id).length > 0;
+  }
+  // Every configuration in the range that seats exactly `seats` people.
+  // opts: { seats, motor, shape, roomWidthMm, sideWallMm, materialId }
+  // Ranked: fits the room first, then cheapest, then narrowest, then by name.
+  function configsFor(rangeId, opts) {
+    opts = opts || {};
+    var seats = opts.seats || null, motor = opts.motor || null, shape = opts.shape || null;
+    var side = opts.sideWallMm != null ? opts.sideWallMm : ((CFG.clearance || {}).sideWallMm || 150);
+    var avail = opts.roomWidthMm ? opts.roomWidthMm - 2 * side : null;
+    var list = configItems(rangeId).filter(function (i) {
+      if (seats != null && i.seat_count !== seats) return false;
+      if (motor && i.motor_type && i.motor_type !== motor) return false;
+      if (shape && i.shape && i.shape !== shape) return false;
+      return true;
+    });
+    return list.map(function (i) {
+      var price = itemSell(i, opts.materialId);
+      var fits = (avail == null || i.width_mm == null) ? null : i.width_mm <= avail;
+      return Object.assign({}, i, { _price: price, _fits: fits, _availMm: avail });
+    }).sort(function (a, b) {
+      var fa = a._fits === false ? 1 : 0, fb = b._fits === false ? 1 : 0;   // non-fitting last
+      if (fa !== fb) return fa - fb;
+      var wa = a.width_mm == null ? 1 : 0, wb = b.width_mm == null ? 1 : 0; // unknown width last
+      if (wa !== wb) return wa - wb;
+      var pa = a._price == null ? Infinity : a._price, pb = b._price == null ? Infinity : b._price;
+      if (pa !== pb) return pa - pb;
+      var aw = a.width_mm == null ? Infinity : a.width_mm, bw = b.width_mm == null ? Infinity : b.width_mm;
+      if (aw !== bw) return aw - bw;
+      return String(a.label).localeCompare(String(b.label));
+    });
+  }
+  // Best-fitting configuration for the layout — the app auto-picks this, the client
+  // can then switch to any other configuration for the same seat count.
+  function pickConfig(rangeId, opts) { var l = configsFor(rangeId, opts); return l[0] || null; }
+  // Same configuration in a different motor variant (used when the client flips recline).
+  function siblingConfig(item, motor) {
+    if (!item) return null;
+    if (!motor || item.motor_type === motor) return item;
+    return configItems(item.range_id).find(function (i) { return i.label === item.label && i.motor_type === motor; }) || item;
+  }
+  // Overall width of a configuration row (mm), else null.
+  function configWidthMm(item) { return item && item.width_mm != null ? item.width_mm : null; }
+
   // motor variants a range's seat items expose (from Cineca motor_type or capability)
   function motorOptions(r) {
     var m = (r.capability || {}).motor_options;
     if (m && m.length) return m;
-    // derive from labels
-    var set = [];
+    // v0.23.0 — the SSOT's motor_type is authoritative (config ranges name the
+    // variant on the item, not in the label); label sniffing stays as a fallback.
+    var set = [], ORDER = ['fixed', '1motor', '2motor'];
     seatItems(r.id).forEach(function (i) {
-      var lbl = (i.label || '').toLowerCase();
-      var mt = /2-?motor/.test(lbl) ? '2motor' : /1-?motor/.test(lbl) ? '1motor' : /fixed|non-reclin/.test(lbl) ? 'fixed' : null;
+      var mt = i.motor_type || null;
+      if (!mt) {
+        var lbl = (i.label || '').toLowerCase();
+        mt = /2-?motor/.test(lbl) ? '2motor' : /1-?motor/.test(lbl) ? '1motor' : /fixed|non-reclin/.test(lbl) ? 'fixed' : null;
+      }
       if (mt && set.indexOf(mt) < 0) set.push(mt);
     });
+    set.sort(function (a, b) { return ORDER.indexOf(a) - ORDER.indexOf(b); });
     return set;
   }
 
@@ -259,6 +341,13 @@
   function chairFrom(r, materialId) {
     if (!r) return null;
     var seats = seatItems(r.id), arms = armrestItems(r.id);
+    // v0.23.0 — on config ranges the "from" price is the cheapest COMPLETE single
+    // chair configuration, never a bare module (a module is half a chair and can
+    // price higher than the finished single, which read as nonsense on the card).
+    if (isConfigRange(r)) {
+      var singles = configItems(r.id).filter(function (i) { return i.seat_count === 1; });
+      if (singles.length) seats = singles;
+    }
     // Module-built ranges with no separate armrests (FrontRow): a bare module
     // understates the chair — use items the library flags as complete chairs,
     // else exclude raw modules from the from-price.
@@ -302,6 +391,8 @@
     load: load, get source() { return source; },
     seatingRanges: seatingRanges, range: range, itemsOf: itemsOf,
     seatItems: seatItems, armrestItems: armrestItems, accessoryItems: accessoryItems, chairFrom: chairFrom, hasExactPrice: hasExactPrice,
+    isConfigRange: isConfigRange, configItems: configItems, moduleItems: moduleItems,
+    configsFor: configsFor, pickConfig: pickConfig, siblingConfig: siblingConfig, configWidthMm: configWidthMm,
     motorOptions: motorOptions, seatWidthMm: seatWidthMm, seatDepthMm: seatDepthMm, feature: feature,
     priced: priced, fromPrice: fromPrice, itemSell: itemSell,
     manufacturerTerms: manufacturerTerms, deliveryCost: deliveryCost, leadWeeks: leadWeeks

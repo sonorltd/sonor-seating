@@ -371,6 +371,7 @@
     P.rect(0, 0, A4.w, A4.h, CREAM);
     pageHead(P, F, m, 'DIMENSIONED LAYOUT', 3, TOTAL_PAGES);
     P.text(m.range + ' — ' + (m.rows || 2) + ' rows × ' + (m.seatsPerRow || 3), M - 1, 106, 22, F.b, INK);
+    if (m.spec && m.spec.configName) P.text(m.spec.configName + (m.rows > 1 ? ' × ' + m.rows + ' rows' : ''), M - 1, 122, 10, F.r, MUT);
     P.right('All dimensions in mm', A4.w - M, 108, 9, F.r, MUT);
 
     var S = m.spec || {};
@@ -407,7 +408,11 @@
     // Seats butt arm-to-arm (manufacturer width includes arms) — no invented gap,
     // so the total run = per × seat width and the drawing reads truly to scale.
     // seats butt together; separate armrest MODULES sit between and at row ends
-    var totalRowW = S.rowRunMm || (S.modularArms ? per * seatW + (per + 1) * armW : per * seatW);
+    // v0.23.0 — modular ranges supply the configuration's real overall width and the
+    // left-to-right module widths, so the plan draws the actual row.
+    var seatWidths = (S.seatWidthsMm && S.seatWidthsMm.length === per) ? S.seatWidthsMm : null;
+    var totalRowW = S.rowRunMm || (seatWidths ? seatWidths.reduce(function (a, b) { return a + b; }, 0)
+      : (S.modularArms ? per * seatW + (per + 1) * armW : per * seatW));
     var sideSpace = Math.round((roomW - totalRowW) / 2);
     var sx0 = rx + (rw - totalRowW * sc) / 2;
     var seatPX = seatW * sc, uprPX = uprD * sc, reclPX = reclD * sc, armPX = armW * sc, rowGapPX = rowGap * sc;
@@ -420,17 +425,18 @@
       var ryR = rRear - reclPX;                                         // reclined top
       var cx = sx0;
       for (var s = 0; s < per; s++) {
+        var seatPXi = seatWidths ? seatWidths[s] * sc : seatPX;
         if (armW) { P.rrect(cx, ryU, armPX, uprPX, 2.5, INK2, 0.7, 0.6); cx += armPX; }   // armrest module (shared / row end)
-        var aw = armW ? 0 : seatPX * 0.15;
-        if (reclPX > uprPX + 2) P.rrect(cx + 1.5, ryR, seatPX - 3, reclPX - uprPX + 3, 3, GHOST, 0.7, 0.55);
-        P.rrect(cx, ryU, seatPX, uprPX, 4, INK2, 1, 0.9);
+        var aw = armW ? 0 : seatPXi * 0.15;
+        if (reclPX > uprPX + 2) P.rrect(cx + 1.5, ryR, seatPXi - 3, reclPX - uprPX + 3, 3, GHOST, 0.7, 0.55);
+        P.rrect(cx, ryU, seatPXi, uprPX, 4, INK2, 1, 0.9);
         if (!armW) {
           P.rrect(cx + 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);
-          P.rrect(cx + seatPX - aw - 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);
+          P.rrect(cx + seatPXi - aw - 1.2, ryU + 1.2, aw, uprPX - 2.4, 2.5, INK2, 0.6, 0.55);
         }
-        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.08, seatPX - 2 * aw - 5, uprPX * 0.52, 3, INK2, 0.7, 0.75);
-        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.66, seatPX - 2 * aw - 5, uprPX * 0.26, 3, INK2, 0.9, 0.9);
-        cx += seatPX;
+        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.08, seatPXi - 2 * aw - 5, uprPX * 0.52, 3, INK2, 0.7, 0.75);
+        P.rrect(cx + aw + 2.5, ryU + uprPX * 0.66, seatPXi - 2 * aw - 5, uprPX * 0.26, 3, INK2, 0.9, 0.9);
+        cx += seatPXi;
       }
       if (armW) P.rrect(cx, ryU, armPX, uprPX, 2.5, INK2, 0.7, 0.6);                        // closing end armrest
     }
@@ -448,7 +454,17 @@
     dimH(rx, rx + rw, rTop - 18, roomW + '', true);
     dimV(rx - 20, rTop, rTop + rl, roomL + '', true);
     // seat width (above the front row's reclined envelope, clear of the room lines)
-    dimH(sx0 + armPX, sx0 + armPX + seatPX, frontRowRear - reclPX - 12, Math.round(seatW) + '', true);
+    // v0.23.0 — a configuration dims EVERY module, since widths vary along the row
+    if (seatWidths) {
+      var dcx = sx0;
+      for (var dsi = 0; dsi < seatWidths.length; dsi++) {
+        var dw = seatWidths[dsi] * sc;
+        dimH(dcx, dcx + dw, frontRowRear - reclPX - 12, Math.round(seatWidths[dsi]) + '', true);
+        dcx += dw;
+      }
+    } else {
+      dimH(sx0 + armPX, sx0 + armPX + seatPX, frontRowRear - reclPX - 12, Math.round(seatW) + '', true);
+    }
     // armrest width — only when the library holds a real armrest dimension
     if (armW) dimH(sx0, sx0 + armPX, frontRowRear - reclPX - 34, 'arm ' + Math.round(armW), true);
     // side space either side of the run — at the rear row, inside the room
@@ -467,7 +483,10 @@
     var ny = bTop + bh + 58;
     P.hline(M, A4.w - M, ny - 20, LINE, 0.7);
     var src = S.dimsReal ? 'Seat dimensions from manufacturer data' : 'Seat dimensions are standard allowances (manufacturer data pending)';
-    var notes = src + ': width ' + Math.round(seatW) + 'mm · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter)' + (S.armWidthMm ? ' · armrest ' + Math.round(S.armWidthMm) + 'mm' : '') + '. Rows sit ' + rowGap + 'mm behind the reclined envelope ahead · ' + sideSpace + 'mm free each side. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
+    var widthTxt = seatWidths
+      ? 'module widths ' + seatWidths.map(function (w) { return Math.round(w); }).join(' + ') + 'mm = ' + Math.round(totalRowW) + 'mm per row'
+      : 'width ' + Math.round(seatW) + 'mm';
+    var notes = src + ': ' + widthTxt + ' · upright depth ' + Math.round(uprD) + 'mm · reclined ' + Math.round(reclD) + 'mm (shown lighter)' + (S.armWidthMm ? ' · armrest ' + Math.round(S.armWidthMm) + 'mm' : '') + '. ' + (S.configName ? 'Each row is supplied as one linked configuration (' + S.configName + '), not as separate chairs. ' : '') + 'Rows sit ' + rowGap + 'mm behind the reclined envelope ahead · ' + sideSpace + 'mm free each side. Indicative seating layout only — refer to the main cinema design plans for the final specification; site survey confirms setting-out.';
     wrap(notes, F.r, 8.5, A4.w - M * 2).forEach(function (ln, li) { P.text(ln, M, ny + li * 11.5, 8.5, F.r, MUT); });
     pageFoot(P, F, m);
   }
