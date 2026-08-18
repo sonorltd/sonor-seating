@@ -104,10 +104,14 @@
   // the trades page via sonor_merge_project_metadata). Areas carry
   // PROJECT-ROOM TAGs {floor_id, floor_code, name} from takeoffs_floors
   // areas — the same room identity RFI clouds resolve to; tasks join later.
-  const TRADES_URL = 'https://sonorltd.github.io/sonor-project-master/trades.html';
+  // v1.9.0 — trades + budget are now ONE surface: COSTS (budget.html —
+  // provisional budget + trade works quote list, xlsx import/export, all
+  // PDFs). trades.html is a redirect stub there. Shown when the project
+  // carries either dataset (metadata.trades OR metadata.budget).
+  const COSTS_URL = 'https://sonorltd.github.io/sonor-project-master/budget.html';
   function _tradesLink(active) {
-    if (!active || !active.metadata || !active.metadata.trades) return '';
-    return `<a class="brief-link" href="${TRADES_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Builder & joiner works list — opens in a new tab">🔨 Trades</a>`;
+    if (!active || !active.metadata || (!active.metadata.trades && !active.metadata.budget)) return '';
+    return `<a class="brief-link" href="${COSTS_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Costs — provisional budget + builder/joiner trade works, opens in a new tab">💷 Costs</a>`;
   }
 
   // v1.7.0 — per-project BLUEPRINT (the all-app index: brief, design spec,
@@ -601,7 +605,7 @@
   const api = {
     init, refresh, loadProjects,
     getActiveId, getProject, getProjects, setActive,
-    __version: '1.8.0',
+    __version: '1.9.0',
     __ls_key: LS_KEY
   };
   if (typeof window !== 'undefined') window.SonorProjectBar = api;
