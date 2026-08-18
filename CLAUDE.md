@@ -1,4 +1,32 @@
-# Seating Configurator — Claude Code Context (v0.23.0)
+# Seating Configurator — Claude Code Context (v0.24.0)
+
+> **v0.24.0 — FrontRow's own diagrams + a seats-per-row selector.** The 70 Serenity
+> configuration drawings and 14 module tiles that were scraped in July were sitting in
+> `WQ - API/FrontRow-Serenity-images` and had never reached the SSOT. All 85 objects are
+> now in the **`seating-assets` bucket under `frontrow/`** (uploaded under a temporary
+> scoped anon-INSERT policy, since dropped; read via `tmp_seating_assets_sel`), and
+> `seating_items.metadata.img` is filed on every one of the 140 configurations and 27
+> modules — the engine already adapts `img`, so it flows through with no schema change.
+> **MODULE BUILD-UP:** the scrape's MANIFEST carries the module composition per
+> configuration (`03L + 06 + 06 + 03R`) — now in `metadata.modules[]`. Per-module widths
+> are DERIVED from that composition (01/02/08 widen on curved rows) and solved against
+> each published total: **68 of 70 hit the published width exactly**. Two corrections
+> fell out: **6 Seat Straight (Option 4)** had the narrow 06 modules in the wrong
+> positions (now 78+60+78+78+60+78), and the two trade-price-list configurations
+> (4 Seat Straight Option 15, 6 Seat Straight Option 8) now have real widths (330cm /
+> 468cm) and diagrams — they are no longer "width to confirm". FrontRow's own width
+> string for Option 15 reads 333cm while its modules sum to 330cm; 330 is used and the
+> conflict is noted on the row.
+> **APP:** the configuration picker now shows **FrontRow's actual layout drawing** per
+> option (line art inverted onto the dark canvas) plus module chips with each module's
+> width, and gains a **seats-per-row selector** (only the sizes the range is built in)
+> alongside the straight/curved filter — so you can browse the Option variants within
+> 2, 3, 4 … 8-seat rows without leaving the step. The chosen configuration's diagram
+> also appears on the Summary and on **PDF page 3** beside the scaled plan, captioned
+> with the module build-up. Engine adds `configSeatCounts()` + `moduleImage()`;
+> items adapt `modules[]`. cacheKey v6→v7; seed regenerated.
+
+
 
 > **v0.23.0 — MODULAR CONFIGURATIONS (FrontRow Serenity).** Modular ranges are sold as
 > whole rows, not as N × single chair: a row is ONE linked configuration

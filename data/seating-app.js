@@ -446,41 +446,53 @@
     var per = cfg.layout.seatsPerRow;
     var all = configChoices({ shape: null });
     var picked = primaryConfig();
+    // seat-count selector — the sizes this range is actually built in
+    var counts = (E.configSeatCounts ? E.configSeatCounts(cfg.rangeId, cfg.motor) : []);
+    var countBar = counts.length > 1 ? '<div class="cfgbar"><span class="cfgbar-l">Seats per row</span><div class="opts">' +
+      counts.map(function (n) {
+        return '<button class="opt ' + (n === per ? 'on' : '') + '" onclick="SeatingApp.setConfigSeats(' + n + ')">' + n + '</button>';
+      }).join('') + '</div></div>' : '';
     if (!all.length) {
-      var counts = {};
-      (E.configItems(cfg.rangeId) || []).forEach(function (c) { if (c.seat_count) counts[c.seat_count] = 1; });
-      var avail = Object.keys(counts).map(Number).sort(function (a, b) { return a - b; });
-      return '<div class="panel"><div class="ptt">Seating configuration</div>' +
+      return '<div class="panel"><div class="ptt">Seating configuration</div>' + countBar +
         '<div class="fitwarn block">⚠ ' + esc(r.name) + ' is not built as a ' + per + '-across row' +
-        (avail.length ? ' — it is supplied in rows of ' + avail.join(', ') + ' seats' : '') +
-        '. Change seats per row above, or split the seating across more rows.</div></div>';
+        (counts.length ? ' — it is supplied in rows of ' + counts.join(', ') + ' seats' : '') +
+        '. Pick one of the sizes above, or split the seating across more rows.</div></div>';
     }
     var shapes = [];
     all.forEach(function (c) { if (c.shape && shapes.indexOf(c.shape) < 0) shapes.push(c.shape); });
-    var filter = shapes.length > 1 ? '<div class="opts" style="margin-bottom:10px">' +
+    var shapeBar = shapes.length > 1 ? '<div class="cfgbar"><span class="cfgbar-l">Shape</span><div class="opts">' +
       '<button class="opt ' + (!cfg.configShape ? 'on' : '') + '" onclick="SeatingApp.setConfigShape(\'\')">All</button>' +
       shapes.map(function (s) { return '<button class="opt ' + (cfg.configShape === s ? 'on' : '') + '" onclick="SeatingApp.setConfigShape(\'' + s + '\')">' + esc(s.charAt(0).toUpperCase() + s.slice(1)) + '</button>'; }).join('') +
-      '</div>' : '';
+      '</div></div>' : '';
     var list = cfg.configShape ? all.filter(function (c) { return c.shape === cfg.configShape; }) : all;
     var cards = list.map(function (c) {
       var on = picked && c.id === picked.id;
-      var w = c.width_mm != null ? (c.width_mm / 10).toFixed(0) + 'cm wide' : 'width to confirm';
-      var mods = (c.seat_widths_mm && c.seat_widths_mm.length) ? c.seat_widths_mm.map(function (m) { return (m / 10) + ''; }).join(' + ') + 'cm' : null;
+      var w = c.width_mm != null ? Math.round(c.width_mm / 10) + 'cm wide' : 'width to confirm';
+      // the manufacturer's own layout diagram + the module build-up behind it
+      var dia = c.img ? '<span class="cfgopt-img"><img src="' + esc(c.img) + '" alt="" loading="lazy"></span>' : '';
+      var mods = (c.modules && c.modules.length)
+        ? '<span class="cfgopt-mods">' + c.modules.map(function (m, i) {
+            var mm = c.seat_widths_mm && c.seat_widths_mm[i] ? Math.round(c.seat_widths_mm[i] / 10) : null;
+            return '<span class="mod">' + esc(m) + (mm ? '<i>' + mm + '</i>' : '') + '</span>';
+          }).join('') + '</span>' : '';
       var badge = c._fits === false ? '<span class="flag warn">⚠ ' + Math.round((c.width_mm - c._availMm) / 10) + 'cm too wide</span>'
-        : (c._fits === true ? '<span class="plus">✓ fits with ' + Math.round((c._availMm - c.width_mm) / 20) + 'cm each side</span>' : '');
+        : (c._fits === true ? '<span class="plus">✓ ' + Math.round((c._availMm - c.width_mm) / 20) + 'cm free each side</span>' : '');
       var off = c.off_catalogue ? '<span class="opt-tag">price list only</span>' : '';
       return '<button class="cfgopt' + (on ? ' on' : '') + '" onclick="SeatingApp.setConfig(' + c.id + ')">' +
-        '<span class="cfgopt-n">' + esc(c.label.replace(/^Serenity\s+/i, '')) + ' ' + off + '</span>' +
-        '<span class="cfgopt-d">' + esc(w) + (mods ? ' · ' + esc(mods) : '') + '</span>' +
-        '<span class="cfgopt-p">' + (c._price != null ? money(Math.round(c._price)) + ' per row' : 'POA') + ' ' + badge + '</span>' +
-        '</button>';
+        dia +
+        '<span class="cfgopt-body">' +
+          '<span class="cfgopt-n">' + esc(c.label.replace(/^Serenity\s+/i, '')) + ' ' + off + '</span>' +
+          '<span class="cfgopt-d">' + esc(w) + '</span>' + mods +
+          '<span class="cfgopt-p">' + (c._price != null ? money(Math.round(c._price)) + ' per row' : 'POA') + ' ' + badge + '</span>' +
+        '</span></button>';
     }).join('');
     var auto = cfg.configId == null;
     return '<div class="panel"><div class="ptt">Seating configuration <span class="opt-tag">' + list.length + ' × ' + per + '-seat option' + (list.length === 1 ? '' : 's') + '</span>' +
       (auto ? '' : '<button class="rowed-reset" onclick="SeatingApp.configResetPick()">Use best fit</button>') + '</div>' +
-      filter +
+      countBar + shapeBar +
       '<div class="cfgopts">' + cards + '</div>' +
       '<div class="hint">' + esc(r.manufacturer) + ' builds each row as one configuration of linked modules, priced as a unit — not as ' + per + ' separate chairs. ' +
+      'Diagrams and module codes are ' + esc(r.manufacturer) + '’s own. ' +
       (auto ? 'We have pre-selected the best fit for your room; pick another to compare.' : 'Your choice is applied to every row — vary it row by row on the Summary step.') + '</div></div>';
   }
 
@@ -681,6 +693,9 @@
     return shaped[0] || all[0];
   }
   function setConfig(id) { cfg.configId = id ? Number(id) : null; renderConfigure(); }
+  // seat-count selector inside the picker — browse the option variants built in
+  // 2, 3, 4 … seats. Changing it drives the layout so the quote and plan follow.
+  function setConfigSeats(n) { setLayout2('seatsPerRow', Number(n)); }
   function setConfigShape(s) { cfg.configShape = s || null; cfg.configId = null; renderConfigure(); }
   function configResetPick() { cfg.configId = null; renderConfigure(); }
 
@@ -831,6 +846,16 @@
           cell('Lead time', lt || 'On request', 'from order') +
           cell('Total inc VAT', anyPriced ? money(Math.round(vb.gross)) : 'On request', 'inc. delivery & VAT') +
         '</div>' +
+        (function () {
+          // v0.23.0 — the manufacturer's own diagram for the chosen configuration
+          var pc = primaryConfig();
+          if (!pc || !pc.img) return '';
+          var mods = (pc.modules && pc.modules.length) ? pc.modules.join(' + ') : null;
+          return '<div class="cfgdia"><img src="' + esc(pc.img) + '" alt="' + esc(pc.label) + '">' +
+            '<div class="cap">' + esc(pc.label) + (mods ? ' — ' + esc(mods) : '') +
+            (pc.width_mm != null ? ' · ' + Math.round(pc.width_mm / 10) + 'cm' : '') +
+            ' · ' + esc(r.manufacturer) + ' configuration diagram</div></div>';
+        })() +
         rowEditorHtml(r) +
         '<div class="planbig">' + planSVG(true) + '</div>' +
         '<table class="quote"><thead><tr><th>Item</th><th>Qty</th><th class="r">Unit MSRP</th><th class="r">Line MSRP</th></tr></thead><tbody>' +
@@ -1098,6 +1123,9 @@
         seatWidthsMm: planSpec().seatWidths,
         configName: planSpec().configName,
         configShape: planSpec().configShape,
+        configModules: (function () { var pc = primaryConfig(); return pc && pc.modules ? pc.modules.slice() : null; })(),
+        // manufacturer layout diagram — served from our own bucket, so pdf-lib can read the bytes
+        configImage: (function () { var pc = primaryConfig(); return pc ? (pc.img || null) : null; })(),
         rowRunMm: rowRunMm(planSpec(), cfg.layout.seatsPerRow),
         seatWidthMm: cap.seat_width_mm || seatW, seatDepthMm: cap.seat_depth_mm || null,
         reclinedDepthMm: cap.reclined_depth_mm || null, wallClearanceMm: cap.wall_clearance_mm || null,
@@ -1297,7 +1325,7 @@
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
     toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, saveBom: saveBom, toggleFinish: toggleFinish, setClient: setClient,
     rowSet: rowSet, rowsReset: rowsReset,
-    setConfig: setConfig, setConfigShape: setConfigShape, configResetPick: configResetPick,
+    setConfig: setConfig, setConfigShape: setConfigShape, setConfigSeats: setConfigSeats, configResetPick: configResetPick,
     saveConfig: saveConfig, openSaved: openSaved, copySavedLink: copySavedLink, renameSaved: renameSaved, deleteSaved: deleteSaved
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -126,6 +126,7 @@
         seat_count: im.seat_count != null ? Number(im.seat_count) : null,
         shape: im.shape || null,
         seat_widths_mm: Array.isArray(im.seat_widths_cm) ? im.seat_widths_cm.map(function (c) { return Math.round(Number(c) * 10); }) : null,
+        modules: Array.isArray(im.modules) ? im.modules.slice() : null,
         upright_depth_mm: im.depth_upright_cm != null ? Math.round(Number(im.depth_upright_cm) * 10) : null,
         reclined_depth_mm: im.depth_reclined_cm != null ? Math.round(Number(im.depth_reclined_cm) * 10) : null,
         module_code: im.module_code || null,
@@ -289,6 +290,20 @@
   }
   // Overall width of a configuration row (mm), else null.
   function configWidthMm(item) { return item && item.width_mm != null ? item.width_mm : null; }
+  // Seat counts a modular range is actually built in, ascending (2, 3, 4 … 8).
+  function configSeatCounts(rangeId, motor) {
+    var seen = {};
+    configItems(rangeId).forEach(function (i) {
+      if (motor && i.motor_type && i.motor_type !== motor) return;
+      if (i.seat_count) seen[i.seat_count] = 1;
+    });
+    return Object.keys(seen).map(Number).sort(function (a, b) { return a - b; });
+  }
+  // The module tile image for a code ('03L', '06', 'COULABU') within a range.
+  function moduleImage(rangeId, code) {
+    var m = moduleItems(rangeId).find(function (i) { return i.module_code === code || (i.module_code || '').indexOf(code) === 0; });
+    return m ? m.img : null;
+  }
 
   // motor variants a range's seat items expose (from Cineca motor_type or capability)
   function motorOptions(r) {
@@ -393,6 +408,7 @@
     seatItems: seatItems, armrestItems: armrestItems, accessoryItems: accessoryItems, chairFrom: chairFrom, hasExactPrice: hasExactPrice,
     isConfigRange: isConfigRange, configItems: configItems, moduleItems: moduleItems,
     configsFor: configsFor, pickConfig: pickConfig, siblingConfig: siblingConfig, configWidthMm: configWidthMm,
+    configSeatCounts: configSeatCounts, moduleImage: moduleImage,
     motorOptions: motorOptions, seatWidthMm: seatWidthMm, seatDepthMm: seatDepthMm, feature: feature,
     priced: priced, fromPrice: fromPrice, itemSell: itemSell,
     manufacturerTerms: manufacturerTerms, deliveryCost: deliveryCost, leadWeeks: leadWeeks

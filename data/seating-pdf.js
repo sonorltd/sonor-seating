@@ -367,11 +367,25 @@
   }
 
   // ── PAGE 3 · DIMENSIONED SEATING PLAN (CAD-style) ────────────────────────────
-  function drawing(P, F, m, TOTAL_PAGES) {
+  function drawing(P, F, m, TOTAL_PAGES, configImg) {
     P.rect(0, 0, A4.w, A4.h, CREAM);
     pageHead(P, F, m, 'DIMENSIONED LAYOUT', 3, TOTAL_PAGES);
     P.text(m.range + ' — ' + (m.rows || 2) + ' rows × ' + (m.seatsPerRow || 3), M - 1, 106, 22, F.b, INK);
-    if (m.spec && m.spec.configName) P.text(m.spec.configName + (m.rows > 1 ? ' × ' + m.rows + ' rows' : ''), M - 1, 122, 10, F.r, MUT);
+    if (m.spec && m.spec.configName) {
+      var sub = m.spec.configName + (m.rows > 1 ? ' × ' + m.rows + ' rows' : '');
+      if (m.spec.configModules && m.spec.configModules.length) sub += '  ·  ' + m.spec.configModules.join(' + ');
+      P.text(sub, M - 1, 122, 10, F.r, MUT);
+    }
+    // manufacturer configuration diagram, top-right — the client sees the actual
+    // product build-up next to the scaled room plan.
+    if (configImg) {
+      try {
+        var cw = 168, chMax = 52, iw0 = configImg.width, ih0 = configImg.height;
+        var s0 = Math.min(cw / iw0, chMax / ih0), dw0 = iw0 * s0, dh0 = ih0 * s0;
+        P.image(configImg, A4.w - M - dw0, 88, dw0, dh0, 1);
+        P.right((m.manufacturer || '') + ' configuration diagram', A4.w - M, 88 + dh0 + 9, 7, F.r, MUT);
+      } catch (e) {}
+    }
     P.right('All dimensions in mm', A4.w - M, 108, 9, F.r, MUT);
 
     var S = m.spec || {};
@@ -826,7 +840,10 @@
     try { if (m.manufacturerLogo) mfrLogoImg = await loadImage(doc, m.manufacturerLogo); } catch (e) {}
     cover(mk(doc.addPage([A4.w, A4.h]), doc), F, m, hero, fadeImg, mfrLogoImg);
     quote(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL, rangeImg, swatchImg);
-    drawing(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
+    // v0.23.0 — modular ranges: the manufacturer's own configuration diagram
+    var configImg = null;
+    try { if (m.spec && m.spec.configImage) configImg = await loadImage(doc, m.spec.configImage); } catch (e) {}
+    drawing(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL, configImg);
     techspec(mk(doc.addPage([A4.w, A4.h]), doc), F, m, rangeImg, TOTAL, mfrLogoImg);
     optionsPage(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
     termsPage(mk(doc.addPage([A4.w, A4.h]), doc), F, m, TOTAL);
