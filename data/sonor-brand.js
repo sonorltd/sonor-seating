@@ -132,7 +132,8 @@ window.__SONOR_BRAND__ = {
       followup:    '../APP - Follow-Up Portal/dashboard/sonor-followup.html',
       tender:      '../APP - Tender/sonor-tender.html',
       seating:     '../APP - Seating Configurator/dashboard/sonor-seating.html',
-      'cinema-aesthetic': '../APP - Cinema Aesthetic/dashboard/sonor-cinema-aesthetic.html'
+      'cinema-aesthetic': '../APP - Cinema Aesthetic/dashboard/sonor-cinema-aesthetic.html',
+      'lighting-design': '../APP - Lighting Design/dashboard/sonor-lighting-design.html'
     },
     hosted: {
       master:      'https://sonorltd.github.io/sonor-master/',
@@ -172,7 +173,8 @@ window.__SONOR_BRAND__ = {
       followup:    'https://sonorltd.github.io/sonor-followup-portal/',
       tender:      'https://sonorltd.github.io/sonor-tender/',
       seating:     'https://sonorltd.github.io/sonor-seating/',
-      'cinema-aesthetic': 'https://sonorltd.github.io/sonor-cinema-aesthetic/'
+      'cinema-aesthetic': 'https://sonorltd.github.io/sonor-cinema-aesthetic/',
+      'lighting-design': 'https://sonorltd.github.io/sonor-lighting-design/'
     }
   },
 
