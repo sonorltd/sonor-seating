@@ -2128,6 +2128,20 @@ body {
 .lg-svc { font-size: 9.5px; margin: 6px 0 2px; }
 .lg-sub { font-size: 8px; margin: 2px 0 1px 8px; }
 
+/* v5.198.0 — dense legend tiers (auto, by row count) so a long summary
+   compresses instead of clipping its last services. The 700px legend cap
+   stays: a taller legend would stretch the grid row and push the plan
+   image off the page. */
+.plan-legend-dense-1 .lg-item { padding: 0 0 0 8px; font-size: 8.2px; line-height: 1.25; }
+.plan-legend-dense-1 .lg-item-label, .plan-legend-dense-1 .lg-item-qty { font-size: 8.2px; }
+.plan-legend-dense-1 .lg-svc { font-size: 8.8px; margin: 4px 0 1px; }
+.plan-legend-dense-1 .lg-sub { font-size: 7.4px; margin: 1px 0 0 8px; }
+.plan-legend-dense-2 .lg-item { padding: 0 0 0 6px; font-size: 7.4px; line-height: 1.15; }
+.plan-legend-dense-2 .lg-item-label, .plan-legend-dense-2 .lg-item-qty { font-size: 7.4px; }
+.plan-legend-dense-2 .lg-svc { font-size: 8px; margin: 3px 0 0; }
+.plan-legend-dense-2 .lg-sub { font-size: 6.8px; margin: 0 0 0 6px; }
+.plan-legend-dense-2 .panel-legend .panel-card-body { padding: 4px 10px; }
+
 /* Floor Totals always visible (highest visual priority) */
 .panel-floor-totals { flex-shrink: 0; }
 .panel-notes { flex-shrink: 0; min-height: 100px; }
@@ -3045,6 +3059,11 @@ body {
   color: var(--slate-text, #1a1f28); vertical-align: top;
 }
 .er-table tr:last-child td { border-bottom: 0; }
+/* v5.198.0 — dense electrical requirements (many stats / panels) */
+.page-elecreq.er-compact .er-table { font-size: 8.6px; }
+.page-elecreq.er-compact .er-table td { padding: 2px 8px; }
+.page-elecreq.er-compact .er-table th { padding-top: 3px; padding-bottom: 3px; }
+.page-elecreq.er-compact .er-notes li { margin-bottom: 3px; font-size: 8.6px; }
 .er-req { color: #b3232f; font-weight: 600; }
 .er-kind {
   display: inline-block; font-size: 7.5px; font-weight: 800; letter-spacing: 0.05em;

@@ -36,7 +36,7 @@
 (function () {
   'use strict';
 
-  const MODULE_VERSION = '1.7.1';
+  const MODULE_VERSION = '1.8.0';   // v1.8.0 — measureSchedule + onLayout row-fit (Takeoffs v5.198.0)
 
   // ---- CSS cache ---------------------------------------------------------
 
@@ -204,6 +204,15 @@
         } catch (_) {}
       }
       await new Promise(r => requestAnimationFrame(r));
+      // v1.8.0 (Takeoffs v5.198.0) — MEASURE hook. Runs against the laid-out
+      // document before capture; may hide overflowing rows and returns an
+      // object merged into the result. `measureOnly` skips html2canvas
+      // entirely (layout-only pass — cheap, used to paginate by real heights).
+      let _measured = null;
+      if (typeof opts.onLayout === 'function') {
+        try { _measured = opts.onLayout(doc) || null; } catch (e) { _measured = { error: String(e && e.message || e) }; }
+      }
+      if (opts.measureOnly) return Object.assign({ dataUrl: null, w: 0, h: 0 }, _measured || {});
       // v1.7.1 — also race html2canvas with a 30 s timeout. If html2canvas
       // itself stalls (e.g. cross-origin image that 404s and never errors),
       // the export pipeline shouldn't block forever. 30 s is generous —
@@ -217,7 +226,7 @@
         }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('html2canvas 30 s timeout')), 30000))
       ]);
-      return { dataUrl: canvas.toDataURL('image/jpeg', 0.92), w: canvas.width, h: canvas.height };
+      return Object.assign({ dataUrl: canvas.toDataURL('image/jpeg', 0.92), w: canvas.width, h: canvas.height }, _measured || {});
     } finally {
       try { document.body.removeChild(iframe); } catch (_) {}
     }
@@ -277,12 +286,42 @@
   // Schedules render at A3 landscape (1190×842 in jsPDF points) — matches the
   // host's existing schedule format. Caller passes the same opts shape that
   // SonorPdfHtmlTemplates.buildSchedule expects.
+  // v1.8.0 (Takeoffs v5.198.0) — how many schedule rows really fit the page.
+  // The table wrap is `flex:1; overflow:hidden`, so anything past its box
+  // was silently CLIPPED (Heybridge export: Utility/WC devices, the Study
+  // PIRs and three shades vanished at page breaks). Rows are measured
+  // against the wrap's bottom edge; overflowing rows are hidden before
+  // capture and the count of fitted item rows is reported so the caller
+  // can carry the tail onto the next page. The total row counts separately.
+  function _scheduleFitLayout(doc) {
+    const wrap = doc.querySelector('.page-table-wrap');
+    if (!wrap) return null;
+    const limit = wrap.getBoundingClientRect().bottom - 1;
+    const rows = Array.prototype.slice.call(wrap.querySelectorAll('table tbody tr, table tfoot tr'));
+    let fit = 0, itemCount = 0, totalFits = true, overflow = false;
+    rows.forEach(tr => {
+      const isTotal = /(^|\s)sch-total(\s|$)/.test(tr.className || '');
+      const fits = tr.getBoundingClientRect().bottom <= limit;
+      if (!isTotal) { itemCount++; if (fits && !overflow) fit++; else overflow = true; }
+      else if (!fits || overflow) totalFits = false;
+      if (!fits || overflow) tr.style.display = 'none';
+    });
+    return { fitCount: fit, itemCount, totalFits, overflow: overflow || !totalFits };
+  }
+  async function measureSchedule(opts) {
+    const css = await _loadCss();
+    const html = window.SonorPdfHtmlTemplates.buildSchedule(opts || {}, css);
+    return _renderHtmlToImage(html, { width: 1190, height: 842, scale: 1, measureOnly: true, onLayout: _scheduleFitLayout });
+  }
+
   async function renderSchedule(opts) {
     try {
       const css = await _loadCss();
       const html = window.SonorPdfHtmlTemplates.buildSchedule(opts || {}, css);
       // v5.147.0 — quality preset (min 3 so table text stays crisp on Draft).
-      const result = await _renderHtmlToImage(html, { width: 1190, height: 842, scale: Math.max(3, _pageScale(4)) });
+      // v1.8.0 — overflowing rows are hidden at capture (never half-clipped);
+      // result.fitCount tells the caller what actually made it onto the page.
+      const result = await _renderHtmlToImage(html, { width: 1190, height: 842, scale: Math.max(3, _pageScale(4)), onLayout: _scheduleFitLayout });
       try { window.__SONOR_HTMLCOVER_LAST_PATH__ = 'rendered-schedule'; } catch (_) {}
       return result;
     } catch (e) {
@@ -409,7 +448,7 @@
   if (typeof window !== 'undefined') {
     window.SonorPdfHtmlCover = {
       __version: MODULE_VERSION,
-      renderCover, renderSectionDivider, renderSchedule, renderPlanPage,
+      renderCover, renderSectionDivider, renderSchedule, measureSchedule, renderPlanPage,
       renderCablingInfo, renderBendRadius, renderOverallCounts,
       renderContents,   // v5.146.0
       renderElectricalRequirements,

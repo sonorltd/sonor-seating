@@ -1,4 +1,6 @@
-/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.0.0, root master)
+/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.1.2, root master)
+   v1.1.0 (2026-09-10, Service Contracts): OPT-IN pageHead brand:'large', pageFoot {logos:[…]} (partner-logo footer),
+   cover brandLarge + footLogos. Defaults unchanged — Cinema Aesthetic / Cinema Tools render byte-identical.
    window.SonorPdfLuxury — the proven pdf-lib page system from the Seating
    Configurator proposal (seating-pdf.js v0.22.x), extracted VERBATIM so every
    client-facing proposal (seating · cinema design · future docs) shares ONE
@@ -153,16 +155,38 @@
 
   // shared page furniture — content pages. docLabel appears on pages 1–2's LHS;
   // pages 3+ carry their own section label (v0.19.0 rule).
-  function pageHead(P, F, label, pageNo, total, docLabel) {
+  // opts (v1.1.0, all optional — defaults keep the seating/cinema look):
+  //   brand: 'large' → Sonor mark + wordmark top-left (22 pt), section label sits after it
+  function pageHead(P, F, label, pageNo, total, docLabel, opts) {
+    opts = opts || {};
     var lhs = (pageNo >= 3 && label) ? label : (docLabel || 'PROPOSAL');
-    P.tracked(lhs, M, 42, 8, F.r, COL.LABEL, 2.4);
+    if (opts.brand === 'large') {
+      P.logo(M, 30, 22, COL.GOLD);
+      P.tracked('SONOR', M + 27, 34.5, 14, F.b, COL.INK, 3.6);
+      P.tracked(lhs, M + 118, 42, 8, F.r, COL.LABEL, 2.4);
+    } else {
+      P.tracked(lhs, M, 42, 8, F.r, COL.LABEL, 2.4);
+    }
     if (pageNo) P.trackedRight(pageNo + ' / ' + total, A4.w - M, 42, 8, F.r, COL.PAGE_NO, 1.6);
     P.hline(M, A4.w - M, 68, COL.LINE, 0.8);
   }
-  function pageFoot(P, F) {
+  // opts (v1.1.0): { logos: [pdf-lib images] } → footer band shows ONLY those logos (partners /
+  // third parties / manufacturers), centred, ≤ 18 pt tall; no wordmark, no contact line.
+  function pageFoot(P, F, opts) {
+    opts = opts || {};
+    if (opts.logos) {
+      P.hline(M, A4.w - M, A4.h - 56, COL.LINE, 0.8);
+      var imgs = opts.logos.filter(Boolean), maxH = 18, gapL = 22, dims = imgs.map(function (im) { var h = Math.min(maxH, im.height), w = im.width * (h / im.height); if (w > 110) { w = 110; h = im.height * (w / im.width); } return { im: im, w: w, h: h }; });
+      var totalW = dims.reduce(function (a, d) { return a + d.w; }, 0) + gapL * Math.max(0, dims.length - 1);
+      var x = (A4.w - totalW) / 2, cy = A4.h - 30;
+      dims.forEach(function (d) { P.image(d.im, x, cy - d.h / 2, d.w, d.h, 0.9); x += d.w + gapL; });
+      if (opts.note) P.tracked(String(opts.note).toUpperCase(), M, A4.h - 44.2, 6.5, F.r, COL.INFO, 1.4);
+      return;
+    }
     var GDEEP = COL.GDEEP;
     P.hline(M, A4.w - M, A4.h - 56, COL.LINE, 0.8);
-    P.tracked('PROJECTS@SONOR.CO.UK', M, A4.h - 44.2, 7.2, F.r, GDEEP, 1.4);
+    // opts.email (v1.1.1) — per-document contact address; default stays projects@ for proposals
+    P.tracked(String(opts.email || 'projects@sonor.co.uk').toUpperCase(), M, A4.h - 44.2, 7.2, F.r, GDEEP, 1.4);
     var s = 'SONOR', ss = 9.5, tr = 2.8, tw = 0;
     for (var i = 0; i < s.length; i++) tw += F.b.widthOfTextAtSize(s[i], ss) + tr;
     tw -= tr;
@@ -187,7 +211,7 @@
       var iw = opts.hero.width, ih = opts.hero.height, s = Math.max(A4.w / iw, A4.h / ih);
       var dw = iw * s, dh = ih * s;
       P.image(opts.hero, (A4.w - dw) / 2, 0, dw, dh, 1);
-      var fTop = A4.h * 0.66, fH = A4.h * 0.22;
+      var fTop = A4.h * (opts.airy ? 0.58 : 0.66), fH = A4.h * (opts.airy ? 0.26 : 0.22);
       if (opts.fadeImg) P.image(opts.fadeImg, 0, fTop, A4.w, fH, 1);
       else P.fadeDown(0, fTop, A4.w, fH, COL.DARK, 1, 56);
       P.rect(0, fTop + fH - 1, A4.w, A4.h - (fTop + fH) + 1, COL.DARK, 1);
@@ -195,31 +219,44 @@
     // inset frame — CONSISTENT inset on all four sides; content sits inside it
     P.rectB(M * 0.62, M * 0.62, A4.w - M * 1.24, A4.h - M * 1.24, COL.GOLD, 0.7, 0.34);
 
-    var ty = 672;
+    // airy (v1.1.0, Service Contracts): title block starts higher and the info row sits lower, so a
+    // title + subtitle + 3-cell info row breathe instead of stacking tight above the logo strip.
+    var ty = opts.airy ? 630 : 672;
     P.hline(M, M + 26, ty - 20, COL.GOLD, 1, 0.95);
     P.tracked(String(opts.eyebrow || 'PROPOSAL').toUpperCase(), M + 34, ty - 24, 8.5, F.r, COL.GOLDL, 3.2);
     var title = opts.title || 'Proposal';
     var tsize = F.b.widthOfTextAtSize(title, 54) > (A4.w - M * 2) ? 38 : 54;
     P.text(title, M - 2, ty + (tsize === 38 ? 12 : 0), tsize, F.b, COL.CREAM);
-    if (opts.subtitle) P.text(opts.subtitle, M, ty + 62, 19, F.l, COL.GOLDL);
+    if (opts.subtitle) P.text(opts.subtitle, M, ty + (opts.airy ? 68 : 62), 19, F.l, COL.GOLDL);
 
-    var iy = 772, cw = (A4.w - M * 2) / 3;
+    var iy = opts.airy ? 766 : 772, cw = (A4.w - M * 2) / 3;
     P.hline(M, A4.w - M, iy - 16, COL.GOLD, 0.5, 0.45);
     (opts.info || []).slice(0, 3).forEach(function (c, i) {
       var x = M + i * cw;
       P.tracked(c[0], x, iy, 7, F.r, COL.INFO, 1.8);
       P.text(c[1] || '—', x, iy + 13, 12.5, F.b, COL.CREAM, { maxWidth: cw - 16 });
     });
+    // brandLarge (v1.1.0): mark + wordmark top-left inside the frame instead of the small strip entry
+    if (opts.brandLarge) {
+      P.logo(M, M * 0.62 + 22, 30, COL.CREAM);
+      P.tracked('SONOR', M + 37, M * 0.62 + 28, 18, F.b, COL.CREAM, 4.2);
+    }
     // logo strip — clear band BELOW the frame (heights ≤13, one centreline)
     var cyL = A4.h - 14;
-    P.logo(M, cyL - 6, 12, COL.CREAM);
-    P.tracked('SONOR', M + 18, cyL - 4, 8, F.b, COL.CREAM, 2.4);
+    if (!opts.brandLarge) { P.logo(M, cyL - 6, 12, COL.CREAM); P.tracked('SONOR', M + 18, cyL - 4, 8, F.b, COL.CREAM, 2.4); }
+    // footLogos (v1.1.2): CEDIA always first on the left, then the partner / brand marks spaced evenly after it
+    if (opts.footLogos && opts.footLogos.length) {
+      var fx = M, fh = 12, gapF = 22;
+      if (opts.cediaImg) { var ch0 = (opts.cediaImg.width / opts.cediaImg.height) < 3 ? 13 : 9; var cw0 = ch0 * (opts.cediaImg.width / opts.cediaImg.height); P.image(opts.cediaImg, fx, cyL - ch0 / 2, cw0, ch0, 0.92); fx += cw0 + gapF + 6; }
+      opts.footLogos.filter(Boolean).forEach(function (im) { var fw = im.width * (fh / im.height), h2 = fh; if (fw > 70) { fw = 70; h2 = im.height * (fw / im.width); } P.image(im, fx, cyL - h2 / 2, fw, h2, 0.9); fx += fw + gapF; });
+    }
     if (opts.centreLogoImg) {
       var mlh = 10, mlw = opts.centreLogoImg.width * (mlh / opts.centreLogoImg.height);
       if (mlw > 95) { mlw = 95; mlh = opts.centreLogoImg.height * (mlw / opts.centreLogoImg.width); }
       P.image(opts.centreLogoImg, (A4.w - mlw) / 2, cyL - mlh / 2, mlw, mlh, 0.92);
     }
-    if (opts.cediaImg) {
+    if (opts.footLogos && opts.footLogos.length) { /* CEDIA already drawn at the left of the strip */ }
+    else if (opts.cediaImg) {
       var ch = (opts.cediaImg.width / opts.cediaImg.height) < 3 ? 13 : 9;
       var cwd = ch * (opts.cediaImg.width / opts.cediaImg.height);
       P.image(opts.cediaImg, A4.w - M - cwd, cyL - ch / 2, cwd, ch, 0.92);

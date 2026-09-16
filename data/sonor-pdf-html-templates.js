@@ -444,7 +444,12 @@
           ${o.scaleLabel ? `<div class="plan-scale-label">${h.esc(o.scaleLabel)}</div>` : ''}
         </div>
       </div>
-      <aside class="plan-sidebar">
+      <aside class="plan-sidebar${(() => {
+        // v5.198.0 — auto-densify long legends so the last services never clip
+        // (Heybridge GF: 44 legend rows → 09.3 / 10 fell off the sidebar).
+        const n = Array.isArray(o.legend) ? o.legend.length : 0;
+        return n > 42 ? ' plan-legend-dense-2' : (n > 30 ? ' plan-legend-dense-1' : '');
+      })()}">
         ${sidebarParts.join('')}
       </aside>
     </main>
@@ -636,9 +641,14 @@
     //     (added / moved / removed) — leverages meta.revAdded etc. for the
     //     latest revision row; older rows show '—' until per-revision
     //     cloud metadata lands.
+    // v5.198.0 — names/colours from the live registry when the host passes it
+    // (o.services carries every service incl. 11/12); the Heybridge export
+    // printed "12 Trades" here but "12 Construction" on Overall Counts.
+    const _svcAll = Array.isArray(o.services) ? o.services : [];
+    const _svcNamed = (nn, fallback) => { const f = _svcAll.find(x => x && String(x.nn) === nn); return f ? { nn, name: f.name || fallback.name, colour: f.colour || fallback.colour } : fallback; };
     const TAXONOMY_EXTRA = [
-      { nn: '11', name: 'Electrical',  colour: '#c84545' },
-      { nn: '12', name: 'Trades',      colour: '#8b6f4a' }
+      _svcNamed('11', { nn: '11', name: 'Electrical',   colour: '#c84545' }),
+      _svcNamed('12', { nn: '12', name: 'Construction', colour: '#8b6f4a' })
     ];
     const _taxCard = (s) => `
       <div class="info-tax-card info-tax-card-compact">
@@ -914,24 +924,30 @@
     // STANDARDS pack that emits immediately before the Cable Schedule
     // (Bryn: "info 00.3, 00.5, 00.1, 00.7 should all go to a new section
     // before the cable schedule and also be included on the cs only export").
+    // v5.198.0 — describes the ID scheme the schedules and plans ACTUALLY use
+    // ({SHORT}-{FLOOR}-{ROOM}-{NN} + /letter per cable); the old B2ES-S-01
+    // text matched nothing in the document.
     const _section00_2 = _sec('00.5', 'Cable ID Format', `
-      <div class="info-id-format">B2ES-S-01</div>
+      <div class="info-id-format">TV4K-GF-LNGE-01/A</div>
       <dl class="info-id-key">
-        <dt>B2ES</dt><dd>Room (4-char) — Bedroom 2 Ensuite. See 00.6 drawing key for room codes.</dd>
-        <dt>S</dt><dd>Cable type — Speaker. Drawing-key code (S/A/D/C/K/L/F/B).</dd>
-        <dt>01</dt><dd>Sequential number, per type, per room.</dd>
-        <dt>Destination</dt><dd>HE = Audio/Video Head End  ·  RK = Rack  ·  KP = Keypad</dd>
+        <dt>TV4K</dt><dd>Block short code (drawn on the plan symbol) — TV point 4K. Same code on Blocks / Cable / Device schedules.</dd>
+        <dt>GF</dt><dd>Floor code — GF Ground · 1F First · 2F Second · BA Basement · EXT external.</dd>
+        <dt>LNGE</dt><dd>Room code (4-char, per floor — see Rooms Schedule). EXT-{floor} = outside the building outline · omitted when no room applies.</dd>
+        <dt>01</dt><dd>Instance number within the room — omitted when the room holds only one of that block.</dd>
+        <dt>/A</dt><dd>Cable letter — one per cable the block needs (A, B, C …). Origin column = head-end / panel it runs from (N0 = Node 0 head end · SHP = shade panel · LPNL = lighting panel).</dd>
+        <dt>Cameras</dt><dd>CCTV-{ROOM}-A/B/C… clockwise within the room · CCTV-01, 02 … clockwise around the site for cameras outside any room.</dd>
       </dl>
     `);
 
     // v5.185.0 — 00.1 Symbol Convention (was 00.2): front info block.
     const _section00_3 = _sec('00.1', 'Symbol Convention', `
       <ul class="info-symbol-list">
-        <li><span class="info-bullet"></span><span>Speaker (in-ceiling)</span><span class="info-code">SP-AA-1</span></li>
-        <li><span class="info-bullet"></span><span>Wall plate (Cat6 + RG6)</span><span class="info-code">WP-AA-2</span></li>
-        <li><span class="info-bullet"></span><span>Camera (CCTV)</span><span class="info-code">CCTV-AA-1</span></li>
-        <li><span class="info-bullet"></span><span>Keypad / control</span><span class="info-code">KP-AA-1</span></li>
-        <li><span class="info-bullet"></span><span>LED strip terminator</span><span class="info-code">LED-AA-1</span></li>
+        <li><span class="info-bullet"></span><span>Every placed block is a service-coloured symbol carrying its short code (LKCB, CP, TS, TV4K …) and an auto-ID label</span><span class="info-code">{SHORT}-{FLOOR}-{ROOM}-{NN}</span></li>
+        <li><span class="info-bullet"></span><span>Lighting keypad, Ground Floor, Lounge, second of two</span><span class="info-code">LKCB-GF-LNGE-02</span></li>
+        <li><span class="info-bullet"></span><span>Ceiling PIR, First Floor, Master Bedroom — only one in the room, so no number</span><span class="info-code">CP-1F-MBED</span></li>
+        <li><span class="info-bullet"></span><span>Outdoor access point outside the building outline</span><span class="info-code">AP-GF-EXT-01</span></li>
+        <li><span class="info-bullet"></span><span>Room-less block (e.g. a doorbell on the entrance)</span><span class="info-code">DB-GF</span></li>
+        <li><span class="info-bullet"></span><span>Shades are drawn window treatments — RL roller · CT curtain track</span><span class="info-code">RL-GF-KITD-01</span></li>
       </ul>
     `);
 
@@ -1005,7 +1021,9 @@
 
     // v1.12.0 — 00.7 Revision-Status Clouds section MOVED to the glance
     // page (under Revision History); Tails Protocol takes the 00.7 slot.
-    const _section00_9 = _sec('00.8', 'Tails Protocol', `   // v5.185.0 — was 00.7; CABLING STANDARDS pack
+    // v5.185.0 — was 00.7; CABLING STANDARDS pack. (v5.198.0 — this note used
+    // to sit INSIDE the template literal and printed on the client PDF.)
+    const _section00_9 = _sec('00.8', 'Tails Protocol', `
       <div class="info-section-sublabel">SERVICE LOOP @ EACH END (per outlet · per head-end)</div>
       <table class="info-table">
         <thead><tr><th>Outlet Type</th><th>@ Outlet</th><th>@ Head-end</th></tr></thead>
@@ -1305,7 +1323,13 @@
     const svc11   = Array.isArray(d.svc11Rows) ? d.svc11Rows : [];
     const hvac    = Array.isArray(d.hvac)    ? d.hvac    : [];   // v5.153.0
 
-    const MAX_ROWS = 14;   // keep the page single-sheet; overflow rolls up
+    // v5.198.0 — the row cap is a PAGE budget shared across the populated
+    // sections (a fixed 14 per section let 4 supplies + 12 stats push the
+    // Standards block off the page); dense pages also get a compact class.
+    const _populated = [spurs, panels.concat(racks), svc11, hvac].filter(a => a && a.length).length;
+    const _totalRows = spurs.length + panels.length + racks.length + svc11.length + hvac.length;
+    const MAX_ROWS = Math.max(4, Math.floor(18 / Math.max(1, _populated)));
+    const _compact = _totalRows > 10 ? ' er-compact' : '';
     const _rows = (arr, fn, emptyMsg, moreLabel) => {
       if (!arr.length) return `<tr class="er-empty"><td colspan="4">${h.esc(emptyMsg)}</td></tr>`;
       let html = arr.slice(0, MAX_ROWS).map(fn).join('');
@@ -1358,7 +1382,7 @@
     // always be done by electrician") — UFH manifolds + thermostats.
     const hvacRows = _rows(hvac, r => `
       <tr>
-        <td><span class="er-kind">${h.esc(r.kind === 'manifold' ? 'MANIFOLD' : 'UFH STAT')}</span> ${h.esc(r.name || '—')}</td>
+        <td><span class="er-kind">${h.esc(r.kind === 'manifold' ? 'MANIFOLD' : 'THERMOSTAT')}</span> ${h.esc(r.name || '—')}</td>
         <td>${h.esc(r.floor || '—')}</td>
         <td>${h.esc(r.room || '—')}</td>
         <td class="er-req">${h.esc(r.supply || '240 V side — BY ELECTRICAL')}</td>
@@ -1383,11 +1407,16 @@
       'Shade / lighting panel supplies must be in place, energised and certified BEFORE second-fix commissioning. Panel locations as drawn — confirm final positions on site with the Sonor engineer.',
       'Maintain 300 mm minimum parallel separation between mains-voltage runs and all Sonor ELV cabling; cross at 90° where separation cannot be held.',
       'UFH manifold wiring centres need a local 230 V supply; stat 230 V sides and switched lives wire to the wiring centre — all BY THE ELECTRICAL CONTRACTOR (Sonor provides control/ELV integration only). Equipment racks require ventilated locations. Rack supplies must be on dedicated radials — no shared ring finals.',
-      'Coordinate containment routes with the Sonor first-fix package; electrical plans for every floor follow this sheet (a NO REQUIREMENTS watermark marks floors with nothing in electrical scope).'
+      // v5.198.0 — the watermark sentence follows the export mode (override
+      // = AS ARCHITECT SPEC stamped on every floor; the old text promised a
+      // NO REQUIREMENTS stamp the reader then couldn't find).
+      (o.planMode === 'override'
+        ? 'Coordinate containment routes with the Sonor first-fix package; electrical plans for every floor follow this sheet, stamped ' + (o.watermarkText || 'AS ARCHITECT SPEC') + ' — the 230 V works are defined by the architect / electrical designer, Sonor blocks are withheld from those sheets.'
+        : 'Coordinate containment routes with the Sonor first-fix package; electrical plans for every floor follow this sheet (a ' + (o.watermarkText || 'NO REQUIREMENTS') + ' watermark marks floors with nothing in electrical scope).')
     ].map(n => `<li>${h.esc(n)}</li>`).join('');
 
     const body = `
-  <div class="page page-elecreq" style="--accent: ${accent}">
+  <div class="page page-elecreq${_compact}" style="--accent: ${accent}">
     ${c.pageHeader(Object.assign({}, o, { sectionTitle: o.sectionTitle || 'ELECTRICAL REQUIREMENTS' }))}
     <main class="page-body page-body-elecreq">
       <div class="page-section-head">

@@ -17,7 +17,7 @@ window.__SONOR_BRAND__ = {
     trustLine:"Trusted by homeowners across the North West & Wales",
     location: "Chester, England",
     url:      "https://sonor.co.uk",
-    phone:    "01244 676 373",
+    phone:    "07933 684 000",
     email:    "projects@sonor.co.uk",
     office:   "office@sonor.co.uk",
     phoneSupport: "07933 684 000",
@@ -80,9 +80,9 @@ window.__SONOR_BRAND__ = {
 
   // ── Contact contexts (which email/phone for which purpose) ──
   contacts: [
-    { context: "Office",       usage: "Website, proposals, correspondence", phone: "01244 676 373", email: "projects@sonor.co.uk" },
-    { context: "Support",      usage: "Client support, service calls",      phone: "01244 676 373", email: "office@sonor.co.uk" },
-    { context: "General Docs", usage: "RAMS, formal documents",             phone: "01244 676 373", email: "office@sonor.co.uk" }
+    { context: "Office",       usage: "Website, proposals, correspondence", phone: "07933 684 000", email: "projects@sonor.co.uk" },
+    { context: "Support",      usage: "Client support, service calls",      phone: "07933 684 000", email: "office@sonor.co.uk" },
+    { context: "General Docs", usage: "RAMS, formal documents",             phone: "07933 684 000", email: "office@sonor.co.uk" }
   ],
 
   // ── Fonts (by context) ──────────────────────────────
@@ -133,7 +133,12 @@ window.__SONOR_BRAND__ = {
       tender:      '../APP - Tender/sonor-tender.html',
       seating:     '../APP - Seating Configurator/dashboard/sonor-seating.html',
       'cinema-aesthetic': '../APP - Cinema Aesthetic/dashboard/sonor-cinema-aesthetic.html',
-      'lighting-design': '../APP - Lighting Design/dashboard/sonor-lighting-design.html'
+      'lighting-design': '../APP - Lighting Design/dashboard/sonor-lighting-design.html',
+      'fractal-rig':     '../STUDIO - Fractal Rig/web/index.html',
+      'pixel-conductor': '../STUDIO - Pixel Conductor/web/index.html',
+      cbus:              '../APP - C-Bus/index.html',
+      'cinema-tools': '../APP - Cinema Tools/dashboard/sonor-cinema-tools.html',
+      'service-contracts': '../APP - Service Contracts/dashboard/sonor-service-contracts.html'
     },
     hosted: {
       master:      'https://sonorltd.github.io/sonor-master/',
@@ -174,7 +179,12 @@ window.__SONOR_BRAND__ = {
       tender:      'https://sonorltd.github.io/sonor-tender/',
       seating:     'https://sonorltd.github.io/sonor-seating/',
       'cinema-aesthetic': 'https://sonorltd.github.io/sonor-cinema-aesthetic/',
-      'lighting-design': 'https://sonorltd.github.io/sonor-lighting-design/'
+      'lighting-design': 'https://sonorltd.github.io/sonor-lighting-design/',
+      'fractal-rig':     'https://sonorltd.github.io/sonor-fractal-rig/',
+      'pixel-conductor': 'https://sonorltd.github.io/sonor-pixel-conductor/',
+      cbus:              'https://sonorltd.github.io/sonor-cbus/',
+      'cinema-tools': 'https://sonorltd.github.io/sonor-cinema-tools/',
+      'service-contracts': 'https://sonorltd.github.io/sonor-service-contracts/'
     }
   },
 

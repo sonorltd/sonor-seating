@@ -215,7 +215,7 @@
     H.drawText(page, 'Chester, England  ·  sonor.co.uk', {
       x: c1x, y: fbY + 22, font: fonts.reg, size: 6.5, color: T.BASE.muted,
     });
-    H.drawText(page, 'projects@sonor.co.uk  ·  01244 676 373', {
+    H.drawText(page, 'projects@sonor.co.uk  ·  07933 684 000', {
       x: c1x, y: fbY + 12, font: fonts.reg, size: 6.5, color: T.BASE.muted,
     });
 

@@ -157,7 +157,7 @@ const SonorPdf = (function () {
     name:     _rawCompany.name     || 'Sonor Smart Homes',
     web:      String(_rawCompany.url || 'https://sonor.co.uk').replace(/^https?:\/\//, ''),
     email:    _rawCompany.email    || 'projects@sonor.co.uk',
-    phone:    _rawCompany.phone    || '01244 676 373',
+    phone:    _rawCompany.phone    || '07933 684 000',
     location: _rawCompany.location || 'Chester, England',
     tagline:  _rawCompany.tagline  || 'Smart homes, beautifully done'
   };
@@ -2078,12 +2078,16 @@ const SonorPdf = (function () {
   // conservative counts. REGULAR = everything else: rows are single-line,
   // so nearly twice as many fit before the footer is at risk.
   // v5.66.2 — re-measured for the 8px table font.
-  const SCHEDULE_BUDGET_FIRST_CHIPLESS = 38;
-  const SCHEDULE_BUDGET_FIRST_CHIPS    = 35;
-  const SCHEDULE_BUDGET_CONT           = 42;
-  const SCHEDULE_BUDGET_DENSE_FIRST_CHIPLESS = 24;
-  const SCHEDULE_BUDGET_DENSE_FIRST_CHIPS    = 22;
-  const SCHEDULE_BUDGET_DENSE_CONT           = 28;
+  // v5.198.0 — budgets are now an UPPER bound only: every page is measured
+  // (scheduleMeasuredPages) and trimmed to what really fits, so the old
+  // "conservative" dense budgets (22/28 — half-empty cable pages) can sit
+  // nearer the true capacity. Keep-together decisions use these too.
+  const SCHEDULE_BUDGET_FIRST_CHIPLESS = 41;
+  const SCHEDULE_BUDGET_FIRST_CHIPS    = 38;
+  const SCHEDULE_BUDGET_CONT           = 46;
+  const SCHEDULE_BUDGET_DENSE_FIRST_CHIPLESS = 32;
+  const SCHEDULE_BUDGET_DENSE_FIRST_CHIPS    = 30;
+  const SCHEDULE_BUDGET_DENSE_CONT           = 36;
 
   function scheduleItemsFor(a) {
     const groupCol = (typeof a.groupBy === 'number' && a.groupBy >= 0) ? a.groupBy : -1;
@@ -2161,6 +2165,80 @@ const SonorPdf = (function () {
       }
       pages.push({ items: chunk, lastGroup: lastGroupBeforeBoundary });
     }
+    return pages;
+  }
+
+  // ===========================================================================
+  // v5.198.0 — MEASURED SCHEDULE PAGINATION (Bryn 2026-09-15 PDF review:
+  // rows vanished at page breaks — Utility/WC devices, the Study PIRs,
+  // three shades with NO continuation page). The budget paginator counts
+  // items; the HTML renderer clips at `.page-table-wrap` (overflow:hidden),
+  // and taller rows (sub-banners, wrapped cells) blew the budget by 2-4 rows
+  // per page. Now every budgeted page is LAID OUT (no rasterising) via
+  // SonorPdfHtmlCover.measureSchedule; rows that don't fit are carried onto
+  // the next page (with a "(continued)" banner when mid-group), a page is
+  // appended when the last page overflows, and a total row that no longer
+  // fits takes its last two rows along. The same rebalance runs at emit
+  // time as a safety net, so a row can NEVER be clipped again.
+  // ===========================================================================
+  function _rebalanceSchedulePages(pages, pi, measure) {
+    if (!Array.isArray(pages) || !pages[pi] || !measure || !measure.overflow) return false;
+    const items = pages[pi].items || [];
+    let fit = Number(measure.fitCount);
+    if (!isFinite(fit)) return false;
+    if (fit >= items.length) fit = Math.max(0, items.length - 2);   // only the TOTAL overflowed — carry two rows with it
+    if (items.length <= 1) return false;                              // nothing to move
+    if (fit <= 0) fit = 1;
+    while (fit > 1 && items[fit - 1] && items[fit - 1].group === true) fit--;   // never strand a banner as the last row
+    if (fit >= items.length) return false;
+    const tail = items.slice(fit);
+    pages[pi].items = items.slice(0, fit);
+    let g = null;
+    for (let k = pages[pi].items.length - 1; k >= 0; k--) {
+      const it = pages[pi].items[k];
+      if (it && it.group === true) { g = it; break; }
+    }
+    if (!g) g = pages[pi].lastGroup || null;
+    const carry = [];
+    if (tail[0] && tail[0].group !== true && g) {
+      carry.push({ group: true, label: String(g.label || '').replace(/ \(continued\)$/i, '') + ' (continued)',
+                   accent: g.accent, _groupKey: g._groupKey, kind: g.kind });
+    }
+    if (pi + 1 < pages.length) {
+      const nxt = (pages[pi + 1].items || []).slice();
+      if (nxt[0] && nxt[0].group === true && /\(continued\)$/i.test(String(nxt[0].label || ''))) nxt.shift();
+      pages[pi + 1].items = carry.concat(tail, nxt);
+    } else {
+      pages.push({ items: carry.concat(tail), lastGroup: g });
+    }
+    return true;
+  }
+
+  // pageOptsFor(rows, { isFirst, isLast }) → the same opts renderSchedule gets.
+  async function scheduleMeasuredPages(a, pageOptsFor) {
+    if (a && Array.isArray(a._measuredPages)) return a._measuredPages;
+    const items = scheduleItemsFor(a);
+    const pages = schedulePaginate(items, {
+      hasChips: !!(a && Array.isArray(a.summary) && a.summary.length),
+      dense: !!(a && a.denseSchedule)
+    });
+    const HC = (typeof window !== 'undefined') ? window.SonorPdfHtmlCover : null;
+    const canMeasure = !!(HC && typeof HC.measureSchedule === 'function'
+      && typeof HC.available === 'function' && HC.available() && typeof pageOptsFor === 'function');
+    if (canMeasure) {
+      let guard = 0;
+      for (let pi = 0; pi < pages.length && guard++ < 400; pi++) {
+        let m = null;
+        try {
+          m = await HC.measureSchedule(pageOptsFor(pages[pi].items, { isFirst: pi === 0, isLast: pi === pages.length - 1 }));
+        } catch (e) { console.warn('[scheduleMeasuredPages] measure failed — budget pages kept:', e && e.message); break; }
+        if (!m || !m.overflow) continue;
+        if (!_rebalanceSchedulePages(pages, pi, m)) continue;
+        // re-measure this page (it shrank) before moving on
+        pi--;
+      }
+    }
+    if (a) a._measuredPages = pages;
     return pages;
   }
 
@@ -2246,11 +2324,20 @@ const SonorPdf = (function () {
         return null;
       };
       const summary = { headline: null, chips: [] };
-      const first = _norm(a.summary[0]);
+      // v5.198.0 — the HEADLINE is the aspect's TOTAL, not whichever chip
+      // happens to be listed first (Heybridge export: "DOORBELL 1" headed
+      // the Cable Schedule, "CINEMA 0" the Zones, "BED4 2" the Audio
+      // schedule). Collectors push the TOTAL last; find it by label, fall
+      // back to the first row for collectors that lead with their total.
+      const _norms = a.summary.map(_norm);
+      let hi = _norms.findIndex(r => r && /^total\b/i.test(String(r.label || '')));
+      if (hi < 0) hi = _norms.findIndex(r => !!r);
+      const first = hi >= 0 ? _norms[hi] : null;
       if (first) summary.headline = { label: first.label, value: first.value };
       const accent = (ASPECT_ACCENT && ASPECT_ACCENT[a.aspect]) || COLOURS.accent || '#6b4a8a';
-      for (let si = 1; si < a.summary.length; si++) {
-        const r = _norm(a.summary[si]);
+      for (let si = 0; si < _norms.length; si++) {
+        if (si === hi) continue;
+        const r = _norms[si];
         if (r) summary.chips.push({ label: r.label, value: r.value, accent: r.accent || accent });
       }
       return summary;
@@ -5135,7 +5222,13 @@ const SonorPdf = (function () {
       // painting, so the ACTIVE floor IS the page's floor — resolve its
       // perFloor entry instead. Grand stays only as the final fallback when
       // no active floor resolves (never during the walk).
-      if (!totals && typeof computeProjectTotals === 'function') {
+      // v5.198.0 — the summary-parse branch above only ever learns "Blocks"
+      // (legend rows carry no rooms / cable / shades), so every plan page
+      // printed "Rooms — · Cable measured — · Shades —". Backfill whatever is
+      // still missing from the ACTIVE floor's totals (the walk switches floor
+      // before painting, so that is this page's floor).
+      const _needBackfill = !totals || ['rooms', 'blocks', 'cableM', 'ledM', 'shades'].some(k => totals[k] == null);
+      if (_needBackfill && typeof computeProjectTotals === 'function') {
         try {
           const t = computeProjectTotals();
           let _af = null;
@@ -5151,13 +5244,15 @@ const SonorPdf = (function () {
             ? t.perFloor.find(pf => pf && pf.id === _af.id) : null;
           const src = fEntry || (t && t.grand) || null;
           if (src) {
-            totals = {
+            const full = {
               rooms: src.rooms,
               blocks: (src.symbols || 0) + (src.shades || 0),   // v5.145.0 — + drawn shades
               cableM: src.cableM,
               ledM: src.ledM,
               shades: src.shades
             };
+            if (!totals) totals = full;
+            else Object.keys(full).forEach(k => { if (totals[k] == null && full[k] != null) totals[k] = full[k]; });
           }
         } catch (_) { /* fall through */ }
       }
@@ -6526,6 +6621,48 @@ const SonorPdf = (function () {
     } catch (_) {}
     return { snapMult: 4.0, snapQ: 0.9, htmlScale: 4 };
   }
+  // v5.199.0 — bbox of the BUILDING on the live canvas: room polygons
+  // (visible or not — they are hidden during capture) + the building
+  // outline, padded by padM metres (scalePxPerM; falls back to 6 % of the
+  // footprint when the floor is unscaled) and clamped to the architect
+  // underlay when one is present. Returns null when the floor has no room
+  // ≥ 80×80 px so unscaled / room-less floors keep the legacy framing.
+  const _PLAN_FRAME_PAD_M = 1.5;
+  function _buildingFrame(padM) {
+    if (typeof canvas === 'undefined' || !canvas) return null;
+    let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity, n = 0, plan = null;
+    canvas.getObjects().forEach(o => {
+      if (!o || o.temp === true) return;
+      if (o.sonorPlan === true) { if (!plan) plan = o; return; }
+      const isRoom = !!(o.sonorMeasure && o.sonorMeasure.kind === 'area');
+      const isOutline = !!o.sonorBuildingOutline;
+      if (!isRoom && !isOutline) return;
+      let br = null;
+      try { br = o.getBoundingRect ? o.getBoundingRect(true, true) : null; } catch (_) { br = null; }
+      if (!br || !(br.width > 0) || !(br.height > 0)) return;
+      if (isRoom && (br.width < 80 || br.height < 80)) return;   // degenerate trace (v5.4.33 filter)
+      l = Math.min(l, br.left); t = Math.min(t, br.top);
+      r = Math.max(r, br.left + br.width); b = Math.max(b, br.top + br.height);
+      n++;
+    });
+    if (!n || !isFinite(l) || !isFinite(r) || (r - l) < 10 || (b - t) < 10) return null;
+    const scale = (typeof scalePxPerM !== 'undefined' && scalePxPerM > 0) ? scalePxPerM : 0;
+    const pm = (typeof padM === 'number' && padM >= 0) ? padM : _PLAN_FRAME_PAD_M;
+    const pad = scale ? pm * scale : Math.max(20, Math.max(r - l, b - t) * 0.06);
+    let out = { left: l - pad, top: t - pad, width: (r - l) + 2 * pad, height: (b - t) + 2 * pad };
+    if (plan) {
+      try {
+        const pr = plan.getBoundingRect(true, true);
+        if (pr && pr.width > 10 && pr.height > 10) {
+          const L = Math.max(out.left, pr.left), T = Math.max(out.top, pr.top);
+          const R = Math.min(out.left + out.width, pr.left + pr.width), B = Math.min(out.top + out.height, pr.top + pr.height);
+          if (R - L > 10 && B - T > 10) out = { left: L, top: T, width: R - L, height: B - T };
+        }
+      } catch (_) {}
+    }
+    return out;
+  }
+
   function _snapshotCanvas(opts) {
     if (typeof canvas === 'undefined' || !canvas) return null;
     canvas.discardActiveObject();
@@ -6582,6 +6719,20 @@ const SonorPdf = (function () {
       // (_snapshotCanvasByService) opt in, combined paths stay
       // backward-compatible.
       const skipPlanInBbox = opts && opts.skipPlanInBbox === true;
+      // v5.199.0 — BUILDING FRAME (Bryn: "can plans fill the viewport width
+      // more"). The architect underlay is a whole A3 sheet — wide white
+      // margins + title block — so framing to the underlay left the
+      // building small in the page. Frame to the BUILDING instead: the
+      // union of the room polygons (hidden for the capture, but they still
+      // define the footprint) + the building outline, padded by
+      // framePadM metres (default 1.5 m — keeps the external walls and the
+      // architect's dimension strings) and clamped to the underlay. The
+      // frame replaces the underlay as the "whole floor" reference below:
+      // combined pages crop to it, the slice max-fraction guard expands to
+      // it (not the sheet), and the sparse-content fallback uses it (not
+      // the full canvas). Floors with no rooms behave exactly as before.
+      // Opt out per call with { frameToBuilding: false }.
+      const frame = (opts && opts.frameToBuilding === false) ? null : _buildingFrame(opts && opts.framePadM);
       canvas.getObjects().forEach(o => {
         if (!o || o.temp === true) return;  // skip transient drawing helpers
         // v1.57.0 — also skip invisible objects so any wrapper that hid
@@ -6589,7 +6740,13 @@ const SonorPdf = (function () {
         // gets a tight crop that doesn't extend into the would-be cone
         // area. Belt-and-braces for the cone-bleed Bryn report.
         if (o.visible === false) return;
-        if (skipPlanInBbox && o.sonorPlan === true) return;
+        // v5.199.0 — never let on-canvas chrome drive the crop: the export
+        // frame rect / label (excludeFromExport) is the WHOLE sheet + margin,
+        // so counting it framed every plan to the sheet (masked pre-v5.198.0
+        // by the canvas-element clamp). _withIdentityViewport hides it for
+        // the capture but the bbox loop runs before that wrapper.
+        if (o.excludeFromExport === true || o._sonorExportFrame === true || o._sonorExportFrameLabel === true || o.__sonorMirrorBadge === true) return;
+        if ((skipPlanInBbox || frame) && o.sonorPlan === true) return;
         try {
           const r = o.getBoundingRect ? o.getBoundingRect(true, true) : null;
           if (!r) return;
@@ -6631,11 +6788,20 @@ const SonorPdf = (function () {
       // axis, expand the bbox to include the whole plan → clean full-floor
       // framing (same as Combined). Compact footprints (a cinema room)
       // still zoom exactly as before. Opt-in — slice path passes 0.6.
+      // v5.199.0 — combined pages (no plan-skip) frame to the building.
+      if (frame && !skipPlanInBbox) {
+        minX = hasContent ? Math.min(minX, frame.left) : frame.left;
+        minY = hasContent ? Math.min(minY, frame.top)  : frame.top;
+        maxX = hasContent ? Math.max(maxX, frame.left + frame.width)  : frame.left + frame.width;
+        maxY = hasContent ? Math.max(maxY, frame.top  + frame.height) : frame.top  + frame.height;
+        hasContent = true;
+      }
       const maxFracOfPlan = (opts && typeof opts.maxBboxFracOfPlan === 'number') ? opts.maxBboxFracOfPlan : 0;
       if (hasContent && maxFracOfPlan > 0) {
         try {
           const planObj = canvas.getObjects().find(o => o && o.sonorPlan === true && o.visible !== false);
-          const pr = planObj && planObj.getBoundingRect ? planObj.getBoundingRect(true, true) : null;
+          // v5.199.0 — the building frame is the "whole floor" reference when present.
+          const pr = frame || (planObj && planObj.getBoundingRect ? planObj.getBoundingRect(true, true) : null);
           if (pr && pr.width > 10 && pr.height > 10 &&
               ((maxX - minX) > pr.width * maxFracOfPlan || (maxY - minY) > pr.height * maxFracOfPlan)) {
             minX = Math.min(minX, pr.left);
@@ -6653,8 +6819,13 @@ const SonorPdf = (function () {
         bboxW < fullW * minBboxFracW ||
         bboxH < fullH * minBboxFracH
       );
-      if (!hasContent || !isFinite(minX) || !isFinite(maxX) ||
-          bboxW < 10 || bboxH < 10 || bboxTooSmall) {
+      // v5.199.0 — sparse / empty content on a floor WITH rooms: frame the
+      // building rather than the whole canvas (which is the whole sheet).
+      const sparse = !hasContent || !isFinite(minX) || !isFinite(maxX) || bboxW < 10 || bboxH < 10 || bboxTooSmall;
+      if (sparse && frame) {
+        minX = frame.left; minY = frame.top; maxX = frame.left + frame.width; maxY = frame.top + frame.height;
+      }
+      if (sparse && !frame) {
         // v1.99.1 — Compression hedge. Step DOWN from v1.66's 4.5× / q1.0
         // baseline to 3.0× / q0.85 — engineering plans look visually
         // identical at this setting (test prints unchanged), 56% fewer
@@ -6675,10 +6846,15 @@ const SonorPdf = (function () {
         // 4% padding around content so labels/strokes near edges aren't clipped
         const padX = Math.max(20, (maxX - minX) * 0.04);
         const padY = Math.max(20, (maxY - minY) * 0.04);
-        let cropL = Math.max(0, minX - padX);
-        let cropT = Math.max(0, minY - padY);
-        let cropW = Math.min(fullW - cropL, (maxX - minX) + 2 * padX);
-        let cropH = Math.min(fullH - cropT, (maxY - minY) + 2 * padY);
+        // v5.198.0 — no longer clamped to the live canvas ELEMENT: fabric
+        // renders any world region into the export canvas, and clamping to
+        // the element size cut plans off at the window height (a 560 px-tall
+        // canvas lost the bottom of every floor; the same export on a taller
+        // window was complete — captures must not depend on window size).
+        let cropL = minX - padX;
+        let cropT = minY - padY;
+        let cropW = (maxX - minX) + 2 * padX;
+        let cropH = (maxY - minY) + 2 * padY;
         // v5.78.1 (sweep C-P1) — capture inside the identity-viewport wrapper
         // (frame chrome + pair links hidden; VT forced identity). The vt maths
         // below reads viewportTransform LIVE inside the wrapper, so screen
@@ -7896,6 +8072,35 @@ const SonorPdf = (function () {
     }
     return t;
   }
+  // v5.198.0 — re-order top-level sections by their first page, keeping
+  // each section's children (and grandchildren) attached; parentIdx remapped.
+  function _sortContentsEntries(entries) {
+    if (!Array.isArray(entries) || !entries.length) return entries;
+    const tops = [];
+    entries.forEach((en, i) => { if (en && en.parentIdx == null) tops.push({ i, en }); });
+    const subtreeOf = (rootI) => {
+      const out = []; const stack = [rootI];
+      while (stack.length) {
+        const cur = stack.shift();
+        entries.forEach((en, j) => { if (en && en.parentIdx === cur) { out.push(j); stack.push(j); } });
+      }
+      return out;
+    };
+    const firstPage = (t) => {
+      let pg = Number(t.en.page) || 0;
+      subtreeOf(t.i).forEach(j => { const q = Number(entries[j].page) || 0; if (q && (!pg || q < pg)) pg = q; });
+      return pg;
+    };
+    const ordered = tops.map(t => ({ t, pg: firstPage(t) })).sort((a, b) => a.pg - b.pg || a.t.i - b.t.i);
+    const out = [], map = new Map();
+    ordered.forEach(({ t }) => {
+      map.set(t.i, out.length); out.push(Object.assign({}, t.en));
+      subtreeOf(t.i).forEach(j => { map.set(j, out.length); out.push(Object.assign({}, entries[j])); });
+    });
+    out.forEach(en => { if (en.parentIdx != null) en.parentIdx = map.has(en.parentIdx) ? map.get(en.parentIdx) : null; });
+    return out;
+  }
+
   function _contentsRowsAndLayout(entries) {
     const M = (typeof window !== 'undefined' && window.SonorPdfHtmlTemplates
         && window.SonorPdfHtmlTemplates.CONTENTS_METRICS)
@@ -10955,6 +11160,13 @@ const SonorPdf = (function () {
     const _incLkpPlan   = _secOn('lkpplan');        // v5.69.0
     const _incExternal = _secOn('external');   // v5.42.0 — External Areas plan page
     const _incDividers = _secOn('dividers', 'takeoffs-fullpdf-dividers');
+    // v5.198.0 — the "Cinema Construction" cross-app divider is meaningless
+    // on a project with no cinema (Heybridge: 0 × service 01) — drop it.
+    const _cinemaPresent = (() => {
+      try { return (collectTakeoffAllFloors().symbols || []).some(s => s && String(s.service_nn || s.nn || '').padStart(2, '0') === '01'); }
+      catch (_) { return true; }
+    })();
+    const _dividerCount = () => (_cinemaPresent ? 3 : 2);
     const _incSlices   = _secOn('slices',   'takeoffs-fullpdf-svcslices');
     // v5.157.0 (Bryn: "need a subsection of service slices ticks in case we
     // dont want every one") — per-service slice tick, default ON. Host hook
@@ -11086,6 +11298,45 @@ const SonorPdf = (function () {
     // same deck). Native pages get restamped by _finalisePagination at the
     // end, but HTML chrome is baked into the image — restamping isn't
     // possible. Pre-counting solves it.
+    // v5.198.0 — ONE builder for a schedule page's render/measure opts. Both
+    // emit sites and the measured paginator use it, so what is measured is
+    // exactly what is rendered. `pgPageNum` 0 = measurement (numbers don't
+    // affect layout).
+    const _schedPageOptsFor = (a, rows, fl, pgPageNum) => {
+      const isFirst = !!(fl && fl.isFirst), isLast = !!(fl && fl.isLast);
+      const _svcChrome = (typeof SERVICES !== 'undefined' && Array.isArray(SERVICES))
+        ? SERVICES.slice(0, 10).map(s => ({ nn: s.nn, key: s.key, name: s.name, colour: s.colour }))
+        : null;
+      if (!a._schedParts) {
+        a._schedParts = { headers: scheduleHeadersFor(a), totalRow: scheduleTotalRowFor(a), summary: scheduleSummaryFor(a) };
+      }
+      const P = a._schedParts;
+      return {
+        accentHex: (ASPECT_ACCENT[a.aspect] || COLOURS.accent || '#6b4a8a'),   // inline: _aspectAccentHex is declared later in this scope (TDZ)
+        status: meta.status,
+        sectionTitle: isFirst ? a.title : (a.title + '  (continued)'),
+        reference: meta.ref || '',
+        projectName: meta.name,
+        client: meta.client,
+        address: meta.address,
+        revision: meta.revision,
+        issueDate: meta.dateUk || meta.date,
+        pageNum: pgPageNum,
+        pageTotal: (typeof _planFinalTotal === 'number' ? _planFinalTotal : 0),
+        serviceNotes: (isFirst && /^svc_(\d{2})$/.test(String(a.aspect || '')))
+          ? _svcNotesFor(String(a.aspect).slice(4), 'schedule') : null,
+        services: _svcChrome,
+        appName: 'Takeoffs',
+        revAdded:   meta.revAdded   || 0,
+        revMoved:   meta.revMoved   || 0,
+        revRemoved: meta.revRemoved || 0,
+        revRfi:     meta.revRfi     || 0,
+        revNote:    meta.revNote    || 0,
+        headerBadge: (isFirst && a.headerBadge) ? a.headerBadge : null,
+        summary: isFirst ? P.summary : { headline: null, chips: [] },
+        table: Object.assign({ headers: P.headers, rows, total: isLast ? P.totalRow : null }, scheduleTableOptsFor(a))
+      };
+    };
     let _planFinalTotal = pageTotalEstimate;
     try {
       // v5.4.51 — info ref pages = REF_PAGES_COUNT (5 base + 1 conditional
@@ -11160,24 +11411,22 @@ const SonorPdf = (function () {
         }
       } catch (_) {}
       // Section dividers (3 hardcoded — Rack Build, Schematics, Cinema Construction)
-      if (_incDividers) total += 3;  // v5.18.0 — honour the dividers ticklist flag
+      if (_incDividers) total += _dividerCount();  // v5.18.0 — honour the dividers ticklist flag (v5.198.0: Cinema divider only when 01 blocks exist)
       // v5.70.0 — Schedules counted EXACTLY: the paginator is deterministic
       // and cheap, so run it per aspect up-front (was 1-page-per-aspect —
       // every multi-page schedule broke "PAGE x OF y" from that point on).
-      filtered.forEach(a => {
+      // v5.198.0 — MEASURED pages (real row heights; see scheduleMeasuredPages)
+      // so the precount and the emit loop agree AND nothing is clipped.
+      for (const a of filtered) {
         try {
           // v5.168.0 — per-service schedule tick: unticked services' schedule
           // pages don't count (matches the emit gate exactly).
           const _svcM = /^svc_(\d{2})$/.exec(String((a && a.aspect) || ''));
-          if (_svcM && !_svcSchedOn(_svcM[1])) return;
-          const _items = scheduleItemsFor(a);
-          const _pages = schedulePaginate(_items, {
-            hasChips: !!(a && Array.isArray(a.summary) && a.summary.length),
-            dense: !!(a && a.denseSchedule)
-          });
+          if (_svcM && !_svcSchedOn(_svcM[1])) continue;
+          const _pages = await scheduleMeasuredPages(a, (rows, fl) => _schedPageOptsFor(a, rows, fl, 0));
           total += Math.max(1, _pages.length);
         } catch (_) { total += 1; }
-      });
+      }
       _planFinalTotal = total;
     } catch (_) { _planFinalTotal = pageTotalEstimate + 5; /* defensive bump */ }
 
@@ -12059,6 +12308,12 @@ const SonorPdf = (function () {
               pageNum: _reqPage || 0, pageTotal: _planFinalTotal,
               services: _servicesForChrome,
               revAdded: meta.revAdded || 0, revMoved: meta.revMoved || 0, revRemoved: meta.revRemoved || 0, revRfi: meta.revRfi || 0, revNote: meta.revNote || 0,
+              // v5.198.0 — the standards note describes the plan-page stamp that
+              // will actually follow (override mode → AS ARCHITECT SPEC).
+              planMode: _elecOverride ? 'override' : 'blocks',
+              watermarkText: (typeof window !== 'undefined' && typeof window._sonorElecWatermarkText === 'function')
+                ? (window._sonorElecWatermarkText() || (_elecOverride ? 'AS ARCHITECT SPEC' : 'NO REQUIREMENTS'))
+                : (_elecOverride ? 'AS ARCHITECT SPEC' : 'NO REQUIREMENTS'),
               elec
             });
             if (_res && _res.dataUrl) {
@@ -12453,8 +12708,8 @@ const SonorPdf = (function () {
       let useHtml = false;
       let pages = null;
       if (htmlSchedEnabled && _isHtmlEligibleSchedule(a)) {
-        const items = _buildHtmlScheduleItems(a);
-        pages = _paginateScheduleItems(items, a);
+        // v5.198.0 — measured pages (cached from the precount when it ran).
+        pages = await scheduleMeasuredPages(a, (rows, fl) => _schedPageOptsFor(a, rows, fl, 0));
         useHtml = true;
       }
       // HTML render+commit (was PASS 2 inline)
@@ -12463,62 +12718,28 @@ const SonorPdf = (function () {
         let failed = false;
         try {
           if (typeof setStatus === 'function') setStatus('Rendering ' + a.title + ' (HTML/CSS) …');
-                    // v5.47.1 — SHARED assembly (headers/total/summary) — one place.
-          const headers = scheduleHeadersFor(a);
-          const totalRow = scheduleTotalRowFor(a);
-          const summary = scheduleSummaryFor(a);
           for (let pi = 0; pi < pages.length; pi++) {
             const isFirst = pi === 0;
             const isLast  = pi === pages.length - 1;
             const pgPageNum = curr + 1 + pi;
-            // v5.39.0 (B-350) — record floor-banner pages for outline children.
-            if (pi === 0) a._floorBookmarks = [];
-            try {
-              (pages[pi].items || []).forEach(it => {
-                if (it && it.group === true && it.kind !== 'sub' && it.label && !/\(continued\)$/i.test(String(it.label))) {
-                  a._floorBookmarks.push({ label: String(it.label), page: pgPageNum });
-                }
-              });
-            } catch (_) {}
-            const pageOpts = {
-              accentHex: _aspectAccentHex(a.aspect),
-              status: meta.status,
-              sectionTitle: isFirst ? a.title : (a.title + '  (continued)'),
-              reference: meta.ref || '',
-              projectName: meta.name,
-              client: meta.client,
-              address: meta.address,
-              revision: meta.revision,
-              issueDate: meta.dateUk || meta.date,
-              pageNum: pgPageNum,
-              pageTotal: _planFinalTotal,
-              // v5.151.0 — service-tagged notes strip (first page only)
-              serviceNotes: (isFirst && /^svc_(\d{2})$/.test(String(a.aspect || '')))
-                ? _svcNotesFor(String(a.aspect).slice(4), 'schedule') : null,
-              services: _emitInline_servicesForChrome,
-              appName: 'Takeoffs',
-              // v5.4.59 — revision-cloud counts → footer "REVISIONS" col
-              revAdded:   meta.revAdded   || 0,
-              revMoved:   meta.revMoved   || 0,
-              revRemoved: meta.revRemoved || 0,
-              revRfi:     meta.revRfi     || 0,
-              revNote:    meta.revNote    || 0,
-              // v5.4.75 — forward optional per-aspect headerBadge (e.g.
-              // "Total cables: 88" on the Cable Estimate). Only the first
-              // page of a multi-page aspect carries the badge so it
-              // doesn't look like the count resets every page.
-              headerBadge: (isFirst && a.headerBadge) ? a.headerBadge : null,
-              summary: isFirst ? summary : { headline: null, chips: [] },
-              // v5.55.0 (B-361) — per-aspect render opts via the ONE builder.
-              table: Object.assign(
-                { headers, rows: pages[pi].items, total: isLast ? totalRow : null },
-                scheduleTableOptsFor(a)
-              )
-            };
+            const pageOpts = _schedPageOptsFor(a, pages[pi].items, { isFirst, isLast }, pgPageNum);
             const result = await window.SonorPdfHtmlCover.renderSchedule(pageOpts);
             if (!result || !result.dataUrl) throw new Error('renderSchedule returned no dataUrl');
+            // v5.198.0 — safety net: if the renderer still had to hide rows,
+            // carry them forward rather than lose them (re-render this page).
+            if (result.overflow && _rebalanceSchedulePages(pages, pi, result)) { pi--; continue; }
             aspectImages.push(result.dataUrl);
           }
+          // v5.39.0 (B-350) — floor-banner pages for outline children (v5.198.0:
+          // computed from the FINAL pages, after any measured carry-forward).
+          a._floorBookmarks = [];
+          try {
+            pages.forEach((pg, pi) => (pg.items || []).forEach(it => {
+              if (it && it.group === true && it.kind !== 'sub' && it.label && !/\(continued\)$/i.test(String(it.label))) {
+                a._floorBookmarks.push({ label: String(it.label), page: curr + 1 + pi });
+              }
+            }));
+          } catch (_) {}
         } catch (e) {
           console.warn('[fullDocument v5.4.58] HTML schedule failed for ' + a.aspect + ' — falling back to native:', e);
           aspectImages = null;
@@ -12589,15 +12810,14 @@ const SonorPdf = (function () {
     // if so, count its HTML page count. This gives us the exact final
     // pageTotal so HTML chrome bakes the correct "Page X of Y".
     let htmlPlannedPageCount = 0;
-    const aspectPlans = filteredGeneral.map(a => {
-      if (!htmlSchedEnabled || !_isHtmlEligibleSchedule(a)) {
-        return { a, useHtml: false, pages: null };
-      }
-      const items = _buildHtmlScheduleItems(a);
-      const pages = _paginateScheduleItems(items, a);
+    const aspectPlans = [];
+    for (const a of filteredGeneral) {
+      if (!htmlSchedEnabled || !_isHtmlEligibleSchedule(a)) { aspectPlans.push({ a, useHtml: false, pages: null }); continue; }
+      // v5.198.0 — measured pages (cached from the precount).
+      const pages = await scheduleMeasuredPages(a, (rows, fl) => _schedPageOptsFor(a, rows, fl, 0));
       htmlPlannedPageCount += pages.length;
-      return { a, useHtml: true, pages };
-    });
+      aspectPlans.push({ a, useHtml: true, pages });
+    }
     // pageTotalEstimate (pre-computed earlier) assumed each aspect = 1 page.
     // If HTML plans give a different count, fix the estimate now so chrome
     // and footer stamps stay in sync.
@@ -12639,67 +12859,29 @@ const SonorPdf = (function () {
           // Build the summary chip + total once per aspect (not per page);
           // first page gets the summary, last page gets the total row.
                     // v5.47.1 — SHARED assembly (headers/total/summary) — one place.
-          const headers = scheduleHeadersFor(a);
-          const totalRow = scheduleTotalRowFor(a);
-          const summary = scheduleSummaryFor(a);
           for (let pi = 0; pi < plan.pages.length; pi++) {
             const isFirst = pi === 0;
             const isLast  = pi === plan.pages.length - 1;
             const pgPageNum = currentPageNum + 1 + pi;  // pageNum AFTER addPage
-            // v5.39.2 (B-350 fix) — record floor-banner pages for outline
-            // children (v5.39.0 read `pages[pi]` — undefined in THIS loop's
-            // scope, silently caught → no bookmarks; Gwyndy export proved it).
-            // Also stamp the aspect's first page so the Schedules outline
-            // entry points at the real page (pre-existing gap: every child
-            // fell back to the section-start page).
-            if (pi === 0) { a._floorBookmarks = []; a._pageNumStart = pgPageNum; }
-            try {
-              (plan.pages[pi].items || []).forEach(it => {
-                if (it && it.group === true && it.kind !== 'sub' && it.label && !/\(continued\)$/i.test(String(it.label))) {
-                  a._floorBookmarks.push({ label: String(it.label), page: pgPageNum });
-                }
-              });
-            } catch (_) {}
-            const pageOpts = {
-              accentHex: _aspectAccentHex(a.aspect),
-              status: meta.status,
-              sectionTitle: isFirst ? a.title : (a.title + '  (continued)'),
-              reference: meta.ref || '',
-              projectName: meta.name,
-              client: meta.client,
-              address: meta.address,
-              revision: meta.revision,
-              issueDate: meta.dateUk || meta.date,
-              pageNum: pgPageNum,
-              // v5.144.0 (Bryn export: Blocks Schedule read "PAGE 12 OF 18"
-              // in a 41-page deck) — finalPageTotal only counted pages up to
-              // the end of the general schedules; everything after (special
-              // plans, per-service blocks, dividers) was missing. The HTML
-              // footer is baked into the image so _finalisePagination can't
-              // rescue it — use the deck-wide precount like every other page.
-              pageTotal: _planFinalTotal,
-              services: servicesForChrome,
-              appName: 'Takeoffs',
-              // v5.4.59 — revision-cloud counts → footer "REVISIONS" col
-              revAdded:   meta.revAdded   || 0,
-              revMoved:   meta.revMoved   || 0,
-              revRemoved: meta.revRemoved || 0,
-              revRfi:     meta.revRfi     || 0,
-              revNote:    meta.revNote    || 0,
-              // v5.4.75 — forward optional per-aspect headerBadge
-              // (first page only — matches the bundle-emission site).
-              headerBadge: (isFirst && a.headerBadge) ? a.headerBadge : null,
-              summary: isFirst ? summary : { headline: null, chips: [] },
-              // v5.55.0 (B-361) — per-aspect render opts via the ONE builder.
-              table: Object.assign(
-                { headers, rows: plan.pages[pi].items, total: isLast ? totalRow : null },
-                scheduleTableOptsFor(a)
-              )
-            };
+            if (pi === 0) a._pageNumStart = pgPageNum;
+            // v5.198.0 — shared opts builder (what was measured is what renders).
+            const pageOpts = _schedPageOptsFor(a, plan.pages[pi].items, { isFirst, isLast }, pgPageNum);
             const result = await window.SonorPdfHtmlCover.renderSchedule(pageOpts);
             if (!result || !result.dataUrl) throw new Error('renderSchedule returned no dataUrl');
+            // v5.198.0 — safety net: carry hidden-overflow rows forward, never lose them.
+            if (result.overflow && _rebalanceSchedulePages(plan.pages, pi, result)) { pi--; continue; }
             aspectImages.push(result.dataUrl);
           }
+          // v5.39.2 (B-350) — floor-banner pages for outline children, from the
+          // FINAL pages (v5.198.0: after any measured carry-forward).
+          a._floorBookmarks = [];
+          try {
+            plan.pages.forEach((pg, pi) => (pg.items || []).forEach(it => {
+              if (it && it.group === true && it.kind !== 'sub' && it.label && !/\(continued\)$/i.test(String(it.label))) {
+                a._floorBookmarks.push({ label: String(it.label), page: currentPageNum + 1 + pi });
+              }
+            }));
+          } catch (_) {}
         } catch (e) {
           console.warn('[fullDocument v5.4.32] HTML schedule failed for ' + a.aspect + ' — falling back to native:', e);
           aspectImages = null;
@@ -13043,6 +13225,7 @@ const SonorPdf = (function () {
             wipBadge: true
           }
         ];
+        if (!_cinemaPresent) dividers.pop();   // v5.198.0 — no cinema, no Cinema Construction divider
         // v5.4.37 — Section dividers go through HTML pipeline for full
         // chrome consistency. Native fallback if HTML render fails.
         const _htmlDividerEnabled = (typeof window !== 'undefined') &&
@@ -13122,7 +13305,7 @@ const SonorPdf = (function () {
     // schedules. Aspect schedules can span multiple pages so we use
     // _pageNumStart from the captured aspect spec.
     try {
-      const entries = [];
+      let entries = [];   // v5.198.0 — reassigned by _sortContentsEntries
       let p = 1;
       // Cover
       entries.push({ title: 'Cover · ' + (meta.name || 'Take-Off'), page: p });
@@ -13142,9 +13325,12 @@ const SonorPdf = (function () {
       // otherwise, so p must NOT advance here).
       if (_incInfo && REF_PAGES_COUNT > 0) {   // v5.170.0 — bookmarks follow the ticked pages
         const refIdx = entries.length;
-        entries.push({ title: 'Reference', page: p });
+        entries.push({ title: 'Information & Standards', page: p });
         if (_cablingSectionPages > 0) {
-          entries.push({ title: 'Project Information', page: p, parentIdx: refIdx });
+          // v5.198.0 — one child per FRONT info page (was a single "Project
+          // Information" row pointing at page 3 for three pages).
+          const _INFO_TITLES = { 0: 'Revision History', 1: 'Taxonomy & Conventions', 2: 'Key & Annotations', 3: 'Cable ID Format & Types', 4: 'Install Notes & Tails', 5: 'Revision Table' };
+          _infoIdxList.forEach((idx, k) => entries.push({ title: _INFO_TITLES[idx] || ('Information ' + (k + 1)), page: p + k, parentIdx: refIdx }));
           p += _cablingSectionPages;
         }
         // v5.185.0 — bend radius rides the CABLING STANDARDS pack now
@@ -13205,6 +13391,10 @@ const SonorPdf = (function () {
       if (_cablePackPageStart) {
         const packIdx = entries.length;
         entries.push({ title: 'Cabling Standards', page: _cablePackPageStart });
+        // v5.198.0 — every pack page is listed (Cable ID format / install
+        // notes were unlisted; only the bend page had a row).
+        const _PACK_TITLES = { 3: 'Cable ID Format & Types', 4: 'Install Notes & Tails' };
+        _packIdxListResolved.forEach((idx, k) => entries.push({ title: _PACK_TITLES[idx] || ('Cabling ' + (k + 1)), page: _cablePackPageStart + k, parentIdx: packIdx }));
         if (_bendPageReal) {
           entries.push({ title: 'Bend Radius Reference', page: _bendPageReal, parentIdx: packIdx });
         }
@@ -13288,6 +13478,9 @@ const SonorPdf = (function () {
           });
         }
       }
+      // v5.198.0 — contents + outline in PAGE order (Cabling Standards was
+      // listed before Schedules while sitting on page 23 vs 11).
+      entries = _sortContentsEntries(entries);
       _buildOutlineTree(pdf, entries);
       // v5.87.0 — paint the reserved CONTENTS page (page 2) from the SAME
       // entries that drive the outline sidebar — one source, no drift.

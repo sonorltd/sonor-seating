@@ -54,11 +54,13 @@
 //         Falls back to splitting when a single room is bigger than a
 //         whole page (acceptable degradation).
 //     Both opts default to no-op (matches v1.0.0 behaviour).
+//   v1.1.2 (2026-09-15) — floor banners soft-break only when the page is
+//     ≥ 50% full (no more six-row pages before a new floor).
 
 (function () {
   'use strict';
 
-  const MODULE_VERSION = '1.1.0';
+  const MODULE_VERSION = '1.1.2';
   const DEFAULT_FIRST_PAGE_BUDGET = 22;
   const DEFAULT_CONT_PAGE_BUDGET  = 28;
 
@@ -154,7 +156,12 @@
           const roomEnd = _softBreakEnd(items, i, isSoftBreakBanner);
           const roomLen = roomEnd - i;
           const remaining = budget - chunk.length;
-          if (roomLen > remaining && roomLen <= budget) {
+          // v1.1.2 (Takeoffs v5.198.0) — a FLOOR banner only forces a fresh
+          // page when the current page is at least half full; otherwise a
+          // whole floor was pushed off a page holding six rows (Heybridge
+          // Blocks Schedule p12). Room banners keep the strict rule.
+          const isFloorBanner = it.kind === 'floor';
+          if (roomLen > remaining && roomLen <= budget && (!isFloorBanner || chunk.length >= budget * 0.5)) {
             break;   // start new page first
           }
         }

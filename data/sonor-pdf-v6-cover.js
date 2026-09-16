@@ -286,7 +286,7 @@
       font: fonts.med, size: 11, color: T.BASE.muted,
       align: 'center', letterSpacing: 3,
     });
-    H.drawText(page, 'projects@sonor.co.uk  ·  01244 676 373', {
+    H.drawText(page, 'projects@sonor.co.uk  ·  07933 684 000', {
       x: w - 50, y: 21,
       font: fonts.reg, size: 11, color: T.BASE.muted,
       align: 'right',
