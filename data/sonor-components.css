@@ -1,4 +1,4 @@
-/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.14.0 2026-09-29: sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
+/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.15.0 2026-09-29: .s-paper; sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
    Synced to every "APP - {slug}"/data/sonor-components.css via sync-everything.sh.
    Edit here ONLY — never edit a per-app copy.
 
@@ -841,6 +841,18 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
 .s-bar-3 { background: var(--bar-3); border-bottom: 1px solid var(--bar-line); }
 .s-bar-4 { background: var(--bar-4); border-bottom: 1px solid var(--bar-line); }
 [data-theme='graphite'] .tab-bar { background: var(--bar-2); border-bottom: 1px solid var(--bar-line); }
+
+/* ── SERVICE COLOUR AS INK (sonor-platform §12): a service/category colour used as TEXT on a tint is mixed towards the
+   theme's ink so dark services (10 Infrastructure #302f2e, 09 #b7b1a7) stay readable. Use color-mix(in srgb, <hex> 70%, var(--ink-mix)). ── */
+:root { --ink-mix: #0F172A; --ink-on-bright: #0B1A22; }   /* ink for text sitting ON a bright service fill (aqua, green, yellow) — never white */
+[data-theme='graphite'] { --ink-mix: #FFFFFF; }
+
+/* ── PAPER (sonor-platform §11, 2026-09-29): a DOCUMENT preview — pack page, PDF cover, print sheet — is a sheet of paper in
+   every theme. It re-declares the ink/surface tokens locally so the app's components render on it unchanged. ── */
+.s-paper { --text-primary: #15202D; --text-secondary: #3A4553; --text-muted: #5A6472; --text-faint: #A0A8B2; --border: rgba(20,30,50,.12); --border-strong: rgba(20,30,50,.22);
+  --card: #FFFFFF; --surface: #F1F5F9; --tint: #E2E8F0; --bg-0: #FFFFFF; --bg-1: #FFFFFF; --bg-2: #F1F5F9; --bg-3: #E2E8F0; --body: #FFFFFF; --text: #15202D; --muted: #5A6472; --line: rgba(20,30,50,.12);
+  background: #FFFFFF; color: #15202D; color-scheme: light; box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 12px 32px rgba(0,0,0,.35); }
+[data-theme='graphite'] .s-paper { border-color: rgba(0,0,0,.2); }
 
 /* ── LOCKED = RED, everywhere (Bryn 2026-09-29: "locks should go red on layers when locked, and throughout everywhere").
    Any lock control in its locked state — layers, columns, project bar, theme lock — takes --lock (service-06 red).

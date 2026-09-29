@@ -201,28 +201,30 @@
     if (document.getElementById('sonor-project-bar-styles')) return;
     const css = `
       .sonor-project-bar {
-        background: var(--footer-bg, #141008);
-        color: var(--body, #F4F1EC);
+        /* v2.x 2026-09-29 (sonor-platform §9): ladder step 3 under the header; text is --surface-text — NEVER --body,
+           which is a BACKGROUND alias in the app vocabularies (graphite turned the bar's text invisible) */
+        background: var(--bar-3, var(--footer-bg, #141008));
+        color: var(--surface-text, #F4F1EC);
         padding: 10px 16px;
         display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
         font-family: 'DM Sans', -apple-system, sans-serif; font-size: 12.5px;
-        border-bottom: 1px solid rgba(244, 241, 236, 0.10);
+        border-bottom: 1px solid var(--bar-line, rgba(244, 241, 236, 0.10));
       }
       .sonor-project-bar .label {
         font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
         opacity: 0.55; font-weight: 600;
       }
       .sonor-project-bar select {
-        background: transparent;
-        color: var(--body, #F4F1EC);
-        border: 1px solid rgba(244, 241, 236, 0.22);
+        background: var(--bar-4, transparent);
+        color: var(--surface-text, #F4F1EC);
+        border: 1px solid var(--border-strong, rgba(244, 241, 236, 0.22));
         border-radius: 4px;
         padding: 5px 10px;
         font-family: 'DM Mono', SF Mono, monospace; font-size: 12px;
         min-width: 220px; cursor: pointer;
       }
       .sonor-project-bar select:focus { outline: 1px solid var(--accent, #6b4a8a); outline-offset: 1px; }
-      .sonor-project-bar select option { background: #2a1f15; color: #F4F1EC; }
+      .sonor-project-bar select option { background: var(--bar-4, #2a1f15); color: var(--surface-text, #F4F1EC); }
       .sonor-project-bar .meta {
         display: inline-flex; align-items: center; gap: 14px;
         font-family: 'DM Mono', SF Mono, monospace; font-size: 11px;
@@ -234,11 +236,11 @@
       }
       .sonor-project-bar .brief-link {
         font-size: 11.5px; font-weight: 600; text-decoration: none;
-        color: #F4F1EC; background: rgba(107, 74, 138, 0.55);
-        border: 1px solid rgba(107, 74, 138, 0.9);
+        color: var(--surface-text, #F4F1EC); background: color-mix(in srgb, var(--s01, #8058a1) 35%, transparent);
+        border: 1px solid color-mix(in srgb, var(--s01, #8058a1) 70%, transparent);
         padding: 2px 9px; border-radius: 999px; white-space: nowrap;
       }
-      .sonor-project-bar .brief-link:hover { background: rgba(107, 74, 138, 0.85); }
+      .sonor-project-bar .brief-link:hover { background: color-mix(in srgb, var(--s01, #8058a1) 60%, transparent); }
       .sonor-project-bar .status-pill {
         display: inline-flex; align-items: center; gap: 4px;
         padding: 2px 9px; border-radius: 10px;
@@ -246,18 +248,18 @@
       }
       .sonor-project-bar .actions { margin-left: auto; display: inline-flex; gap: 6px; }
       .sonor-project-bar button {
-        background: transparent; color: var(--body, #F4F1EC);
-        border: 1px solid rgba(244, 241, 236, 0.22);
+        background: transparent; color: var(--surface-text, #F4F1EC);
+        border: 1px solid var(--border-strong, rgba(244, 241, 236, 0.22));
         border-radius: 4px; padding: 5px 11px;
         font-family: 'DM Mono', SF Mono, monospace; font-size: 11px;
         cursor: pointer; transition: background 0.12s;
       }
-      .sonor-project-bar button:hover { background: rgba(244, 241, 236, 0.07); }
+      .sonor-project-bar button:hover { background: var(--surface-hover, rgba(244, 241, 236, 0.07)); }
       .sonor-project-bar button.primary {
-        background: var(--accent, #6b4a8a); border-color: var(--accent, #6b4a8a);
+        background: var(--cta-bg, var(--accent, #6b4a8a)); border-color: var(--cta-bg, var(--accent, #6b4a8a)); color: var(--cta-text, #fff);
       }
       .sonor-project-bar button.primary:hover {
-        background: rgba(107, 74, 138, 0.85);
+        background: var(--cta-hover, rgba(107, 74, 138, 0.85));
       }
       .sonor-project-bar .note {
         font-size: 10.5px; opacity: 0.55; font-style: italic;

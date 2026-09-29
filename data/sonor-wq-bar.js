@@ -35,7 +35,7 @@
 //                  app actions, ↻. Dark (project bar) and light (Takeoffs header) via CSS vars — no cream anywhere.
 (function (global) {
   'use strict';
-  var VERSION = '1.4.3';
+  var VERSION = '1.4.4';
   var WQ_QUOTE_URL = 'https://app.wequote.cloud/sonor-ltd/quote/';   // + <id>/editor
   var LOCK_STAGES = { sent: 1, accepted: 1, complete: 1 };
   var STAGE_LABEL = { in_progress: 'in progress', sent: 'sent', accepted: 'accepted', complete: 'complete', cancelled: 'cancelled', declined: 'declined', draft: 'draft' };
@@ -65,7 +65,7 @@
     var css = [
       '.sonor-wq-bar{position:relative;display:inline-flex;align-items:center;gap:6px;font:12px/1.3 "DM Mono",SF Mono,Menlo,monospace;color:inherit}',
       '.sonor-wq-bar .swq-btn{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;border:1px solid var(--swq-border,var(--border,rgba(148,163,184,.45)));background:var(--swq-bg,var(--card,rgba(255,255,255,.06)));color:inherit;cursor:pointer;white-space:nowrap;font:inherit;font-weight:600}',
-      '.sonor-wq-bar .swq-btn:hover{border-color:#6b4a8a}',
+      '.sonor-wq-bar .swq-btn:hover{border-color:var(--s01,#8058a1)}',
       '.sonor-wq-bar .swq-btn .swq-caret{opacity:.6;font-size:10px;display:inline-flex}.sonor-wq-bar .swq-lbl{display:inline-flex;align-items:center;gap:5px}.sonor-wq-bar .swq-warn .s-icon,.sonor-wq-bar .swq-pill .s-icon{vertical-align:-0.1em}',
       '.sonor-wq-bar .swq-pill{display:inline-flex;align-items:center;gap:5px;font-weight:600}',
       '.sonor-wq-bar .swq-pill.swq-none{opacity:.55;font-weight:500}',
@@ -82,7 +82,7 @@
       '.sonor-wq-bar .swq-item:hover{background:var(--surface,#F1F5F9);border-color:var(--border,#CBD5E1)}',
       '.sonor-wq-bar .swq-item:disabled{opacity:.45;cursor:default}',
       '.sonor-wq-bar .swq-item .swq-grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.sonor-wq-bar .swq-slot{font-size:10px;padding:0 6px;border-radius:8px;background:#E2E8F0;color:#334155;font-weight:700;text-transform:uppercase}',
+      '.sonor-wq-bar .swq-slot{font-size:10px;padding:0 6px;border-radius:8px;background:var(--tint,#E2E8F0);color:var(--text,#334155);font-weight:700;text-transform:uppercase}',
       '.sonor-wq-bar .swq-ev{font-size:11px;padding:2px 8px;opacity:.85}',
       '.sonor-wq-bar .swq-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px;padding-top:6px;border-top:1px solid var(--border,#CBD5E1)}',
       '.sonor-wq-bar .swq-mini{padding:2px 8px;font-size:11px;border-radius:4px;border:1px solid var(--border,#CBD5E1);background:var(--card,#fff);color:inherit;cursor:pointer}',
@@ -94,7 +94,7 @@
       '.sonor-wq-bar .swq-doc.swq-dead{opacity:.5}.sonor-wq-bar .swq-doc .swq-grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}',
       '.sonor-wq-bar .swq-danger{background:#DC2626;border-color:#DC2626;color:#fff}',
       '.sonor-project-bar .sonor-wq-bar{--swq-bg:rgba(107,74,138,.35);--swq-border:rgba(107,74,138,.9)}',
-      '.sonor-project-bar .sonor-wq-bar .swq-menu{color:#0F172A}'
+      '.sonor-project-bar .sonor-wq-bar .swq-menu{color:var(--text,#0F172A)}'   /* v1.4.4: the menu sits on --card, so its ink is --text (graphite made it dark-on-dark) */
     ].join('\n');
     var st = document.createElement('style'); st.id = 'sonor-wq-bar-styles'; st.textContent = css; document.head.appendChild(st);
   }

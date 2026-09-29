@@ -140,18 +140,19 @@
   --text-primary: #F5F5F7;
   --text-secondary: #C7C7CC;
   --text-muted: #98989D;
-  --text-faint: #5E5E62;
+  --text-faint: #7C7C82;
   --border: rgba(255,255,255,0.10);
   --border-strong: rgba(255,255,255,0.18);
   --surface-deep: #141416;
   --surface-bar: rgba(28,28,30,0.97);
   --surface-text: #F5F5F7;
   --surface-hover: #3A3A3C;
-  --cta-bg: #2D718B;
+  --cta-bg: #3A8AA8;
   --cta-text: #F5F5F7;
-  --cta-hover: #3A8AA8;
+  --cta-hover: #4BA3C2;
   --scrim: rgba(20,20,22,0.85);
   --wordmark: #F5F5F7;
+  --accent: #3A8AA8;
   --nav-chrome-deep: #141416;
   --nav-chrome-mid: #1C1C1E;
   --nav-chrome-mix-pct: 10%;  /* Aqua-into-navy mix % override */
