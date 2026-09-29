@@ -1,4 +1,4 @@
-/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.15.0 2026-09-29: .s-paper; sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
+/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.17.0 2026-09-29: §18 hover/focus law — one wash, no lifts; v0.16.0 2026-09-29: .s-pill; .s-paper; sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
    Synced to every "APP - {slug}"/data/sonor-components.css via sync-everything.sh.
    Edit here ONLY — never edit a per-app copy.
 
@@ -847,10 +847,22 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
 :root { --ink-mix: #0F172A; --ink-on-bright: #0B1A22; }   /* ink for text sitting ON a bright service fill (aqua, green, yellow) — never white */
 [data-theme='graphite'] { --ink-mix: #FFFFFF; }
 
+/* ── SEMANTIC PILLS (sonor-platform §15): give it a colour, it works in every theme. No app writes pill CSS again.
+     <span class="s-pill" style="--c:#8058a1">01 Cinema</span>       tinted pill, ink mixed to the theme ink
+     <span class="s-pill s-pill-solid" style="--c:#4bb9d3">LIVE</span> solid fill, ink picked for a bright/deep fill via --c-l (0/1)
+     <span class="s-pill s-pill-status" data-tone="ok|warn|bad|info"> semantic tones (service-independent)                     ── */
+.s-pill { --c: var(--accent); display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; line-height: 16px; white-space: nowrap;
+  background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); color: color-mix(in srgb, var(--c) 70%, var(--ink-mix)); }
+.s-pill-solid { background: var(--c); border-color: var(--c); color: var(--ink-on-bright); }
+.s-pill-solid[data-deep] { color: #fff; }
+.s-pill-status[data-tone="ok"]   { --c: #22C55E; } .s-pill-status[data-tone="warn"] { --c: #E8892B; }
+.s-pill-status[data-tone="bad"]  { --c: #DC2626; } .s-pill-status[data-tone="info"] { --c: #4bb9d3; } .s-pill-status[data-tone="dim"] { --c: #98989D; }
+.s-pill .s-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+
 /* ── PAPER (sonor-platform §11, 2026-09-29): a DOCUMENT preview — pack page, PDF cover, print sheet — is a sheet of paper in
    every theme. It re-declares the ink/surface tokens locally so the app's components render on it unchanged. ── */
 .s-paper { --text-primary: #15202D; --text-secondary: #3A4553; --text-muted: #5A6472; --text-faint: #A0A8B2; --border: rgba(20,30,50,.12); --border-strong: rgba(20,30,50,.22);
-  --card: #FFFFFF; --surface: #F1F5F9; --tint: #E2E8F0; --bg-0: #FFFFFF; --bg-1: #FFFFFF; --bg-2: #F1F5F9; --bg-3: #E2E8F0; --body: #FFFFFF; --text: #15202D; --muted: #5A6472; --line: rgba(20,30,50,.12);
+  --card: #FFFFFF; --surface: #F1F5F9; --tint: #E2E8F0; --ink-mix: #0F172A; --ink-on-bright: #0B1A22; --bg-0: #FFFFFF; --bg-1: #FFFFFF; --bg-2: #F1F5F9; --bg-3: #E2E8F0; --body: #FFFFFF; --text: #15202D; --muted: #5A6472; --line: rgba(20,30,50,.12);
   background: #FFFFFF; color: #15202D; color-scheme: light; box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 12px 32px rgba(0,0,0,.35); }
 [data-theme='graphite'] .s-paper { border-color: rgba(0,0,0,.2); }
 
@@ -874,3 +886,27 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
 body.s-sorting { user-select: none; cursor: grabbing; }
 body.s-sorting * { cursor: grabbing !important; }
 [data-sort-input] { display: none !important; }
+
+/* ══ §18 HOVER / FOCUS LAW (sonor-platform, 2026-09-29 23:00 — Bryn: "same jazziness for mouse overs etc") ══
+   ONE interaction language for every control in every app:
+   · hover  = a quiet wash (7% of the ink over the surface) + border to --border-strong; filled controls brighten 8%
+   · active = 12% wash        · focus-visible = 2px accent ring (keyboard only)        · disabled = 55% opacity, no hover
+   · motion = 120 ms ease on colour/border/shadow only — NO translateY lifts, NO opacity flicker, NO scale, NO per-app glow.
+   Apps get this for free on <button>, [role=button], .btn*, .ctrl-btn, .f-btn, .s-btn-mini, .app-card, .snap-card, .card-link,
+   .s-menu-item, .tab-bar > button, .table tr / tr[data-id]. Inline onmouseover/onmouseout handlers are banned. */
+:root { --hover-wash: color-mix(in srgb, var(--text-primary) 7%, transparent); --active-wash: color-mix(in srgb, var(--text-primary) 12%, transparent); --motion: 120ms ease; --focus-ring: var(--accent); }
+button, [role="button"], .btn, .ctrl-btn, .f-btn, .s-btn-mini, .app-card, .snap-card, .card-link, .s-menu-item, .tab-bar > button, .tab-bar .tab-btn, .sidebar-nav > button {
+  transition: background-color var(--motion), border-color var(--motion), color var(--motion), box-shadow var(--motion);
+  transform: none;
+}
+button:not(:disabled):not(.tab-btn):not(.btn-primary):not(.f-btn.on):hover, [role="button"]:not([aria-disabled="true"]):hover, .btn:not(.btn-primary):hover, .ctrl-btn:not(:disabled):hover, .s-btn-mini:not(:disabled):hover, .card-link:hover, .s-menu-item:hover {
+  background-color: var(--hover-wash); border-color: var(--border-strong);
+}
+.btn-primary:hover, .f-btn.on:hover, button.primary:hover { filter: brightness(1.08); }
+button:not(:disabled):active, [role="button"]:active, .btn:active, .ctrl-btn:active, .s-btn-mini:active { background-color: var(--active-wash); transform: none; }
+.app-card:hover, .snap-card:hover { border-color: var(--border-strong); box-shadow: 0 4px 16px rgba(0,0,0,.25); transform: none; }
+.table tr:hover td, tr[data-id]:hover td { background-color: var(--hover-wash); }
+button:disabled, [aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+:where(button, [role="button"], a, input, select, textarea, [tabindex]):focus { outline: none; }
+:where(button, [role="button"], a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { :root { --motion: 0ms; } }

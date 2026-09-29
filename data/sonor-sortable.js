@@ -34,7 +34,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '0.1.0';
+  var VERSION = '0.2.0';
   var doc = global.document;
   var HANDLE_SVG = '<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true"><circle cx="3" cy="3" r="1.3" fill="currentColor"/><circle cx="7" cy="3" r="1.3" fill="currentColor"/><circle cx="3" cy="8" r="1.3" fill="currentColor"/><circle cx="7" cy="8" r="1.3" fill="currentColor"/><circle cx="3" cy="13" r="1.3" fill="currentColor"/><circle cx="7" cy="13" r="1.3" fill="currentColor"/></svg>';
 
@@ -148,5 +148,43 @@
     return { destroy: function () { container.removeEventListener('pointerdown', onDown); container.removeEventListener('keydown', onKey); }, refresh: refresh, order: order, renumber: function () { drag = { group: null }; var c = []; var groups = {}; items().forEach(function (el) { (groups[opts.group(el)] = groups[opts.group(el)] || []).push(el); }); Object.keys(groups).forEach(function (g) { var m = renumber(groups[g].map(opts.key), opts.step); groups[g].forEach(function (el) { var n = m.get(opts.key(el)); if (opts.getSort(el) !== n) { el.dataset.sort = String(n); c.push({ key: opts.key(el), sort: n, el: el }); } }); }); drag = null; if (c.length && opts.onReorder) opts.onReorder(c, order(), null); return c; } };
   }
 
-  global.SonorSortable = { VERSION: VERSION, attach: attach, renumber: renumber, gapAfter: gapAfter, diffNumbers: diffNumbers, HANDLE_SVG: HANDLE_SVG };
+  // ── DECLARATIVE MODE (v0.2.0, sonor-platform §10/§16): no JS in the app at all ─────────────────────────────────────
+  //   <tbody data-sortable="wq_scaffold_lines" data-sort-col="sort" data-sort-id="id" data-sort-item="tr[data-id]"
+  //          data-sort-group="data-group" data-sort-axis="y" data-sort-handle="td:first-child">
+  //   Every [data-sortable] in the page (now or later — MutationObserver) is attached; rows carry data-id + data-sort.
+  //   Persistence: SonorSortable.persist(table, idCol, sortCol, changes) → default = UPDATE per changed row through the
+  //   first Supabase client it can find (SonorSortable.client() resolver — override per app if yours lives elsewhere).
+  //   The container still gets 'sonor:reorder' so an app can refresh its own in-memory rows.
+  function findClient() {
+    var cands = [global.SonorSortable && global.SonorSortable._client, global.SonorDB && global.SonorDB.client, global.sonorDb && global.sonorDb.client, global.db && global.db.client, global._supaDb && global._supaDb.client, global.supabaseClient, global.supa, global.S && global.S.db && global.S.db.client];
+    for (var i = 0; i < cands.length; i++) if (cands[i] && typeof cands[i].from === 'function') return cands[i];
+    return null;
+  }
+  async function persist(table, idCol, sortCol, changes) {
+    var c = findClient(); if (!c) throw new Error('SonorSortable: no Supabase client found — set SonorSortable._client');
+    var results = await Promise.all(changes.map(function (ch) { var patch = {}; patch[sortCol] = ch.sort; return c.from(table).update(patch).eq(idCol, ch.key); }));
+    var bad = results.find(function (r) { return r && r.error; }); if (bad) throw bad.error;
+    return changes.length;
+  }
+  var _declared = new WeakMap();
+  function attachDeclared(el) {
+    if (_declared.has(el)) { _declared.get(el).refresh(); return; }
+    var d = el.dataset, table = d.sortable, idCol = d.sortId || 'id', sortCol = d.sortCol || 'sort', groupAttr = d.sortGroup;
+    var inst = attach(el, {
+      item: d.sortItem || '[data-id]', mountHandle: d.sortHandle || (el.tagName === 'TBODY' || el.tagName === 'TABLE' ? 'td:first-child' : 'self'), axis: d.sortAxis || (el.tagName === 'TBODY' ? 'y' : 'grid'), step: Number(d.sortStep) || 10,
+      group: groupAttr ? function (it) { return it.getAttribute(groupAttr) || ''; } : function () { return ''; },
+      onReorder: async function (changes) {
+        try { await (global.SonorSortable.persist || persist)(table, idCol, sortCol, changes); el.dispatchEvent(new CustomEvent('sonor:reorder-saved', { detail: { table: table, changes: changes } })); if (global.SonorShell && global.SonorShell.toast) global.SonorShell.toast(changes.length === 1 ? 'Order saved' : 'Order saved · ' + changes.length + ' renumbered', { kind: 'ok' }); }
+        catch (e) { console.warn('[SonorSortable] persist failed', e); el.dispatchEvent(new CustomEvent('sonor:reorder-failed', { detail: { table: table, error: e } })); if (global.SonorShell && global.SonorShell.toast) global.SonorShell.toast('Order not saved: ' + (e.message || e), { kind: 'error' }); }
+      }
+    });
+    if (inst) _declared.set(el, inst);
+  }
+  function scan(root) { (root || doc).querySelectorAll('[data-sortable]').forEach(attachDeclared); }
+  if (doc) {
+    var boot = function () { scan(); try { new MutationObserver(function (muts) { muts.forEach(function (m) { m.addedNodes.forEach(function (n) { if (n.nodeType !== 1) return; if (n.matches && n.matches('[data-sortable]')) attachDeclared(n); else if (n.querySelectorAll) scan(n); }); if (m.target && m.target.matches && m.target.matches('[data-sortable]')) attachDeclared(m.target); }); }).observe(doc.documentElement, { childList: true, subtree: true }); } catch (_) {} };
+    if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', boot); else boot();
+  }
+
+  global.SonorSortable = { VERSION: VERSION, attach: attach, renumber: renumber, gapAfter: gapAfter, diffNumbers: diffNumbers, HANDLE_SVG: HANDLE_SVG, persist: persist, client: findClient, scan: scan, _client: null };
 })(typeof window !== 'undefined' ? window : globalThis);

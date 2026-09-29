@@ -478,4 +478,18 @@
     global.sonorDevicePlacement      = sonorDevicePlacement;
   }
 
+  // 2026-09-29 (sonor-platform §12, spec sweep) — INK BY LUMINANCE, shared. Text/glyph on a computed fill (a service
+  // colour, a status hex) is dark on bright fills and white on deep ones. Was Master Hub-only (_inkFor); now every
+  // app: sonorInkFor('#f5d05c') → '#0B1A22', sonorInkFor('#8058a1') → '#fff'. Accepts #rgb/#rrggbb/rgb().
+  function sonorInkFor(colour) {
+    var s = String(colour || '').trim(), r, g, b, m;
+    if ((m = s.match(/^#?([0-9a-f]{3})$/i))) { r = parseInt(m[1][0] + m[1][0], 16); g = parseInt(m[1][1] + m[1][1], 16); b = parseInt(m[1][2] + m[1][2], 16); }
+    else if ((m = s.match(/^#?([0-9a-f]{6})/i))) { r = parseInt(m[1].slice(0, 2), 16); g = parseInt(m[1].slice(2, 4), 16); b = parseInt(m[1].slice(4, 6), 16); }
+    else if ((m = s.match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/))) { r = +m[1]; g = +m[2]; b = +m[3]; }
+    else return '#fff';
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#0B1A22' : '#fff';
+  }
+  if (typeof global.sonorInkFor === 'undefined') global.sonorInkFor = sonorInkFor;
+  if (global.SonorApp && !global.SonorApp.inkFor) global.SonorApp.inkFor = sonorInkFor;
+
 })(typeof window !== 'undefined' ? window : this);

@@ -1,4 +1,4 @@
-/* Sonor Shared Styles — base theme + header layout
+/* Sonor Shared Styles — base theme + header layout (2026-09-29: ≤480px phone rules)
    Source of truth for CSS across all apps.
    Import via <link rel="stylesheet" href="data/sonor-header.css">
    Copy into each repo's data/ directory for GitHub Pages.
@@ -46,33 +46,9 @@
   --s06: #ec6061; --s07: #e67eb1; --s08: #ad9978; --s09: #b7b1a7; --s10: #302f2e;
 }
 
-/* ── Theme-aware legacy-token bridge ──
-   The earthy :root block above is a fallback for apps without data-theme.
-   When a theme IS active (slate or nocturne), remap the legacy palette tokens
-   (--body, --section-1/2, --clay, --footer-bg, --cta-bg, --border*) to
-   theme-appropriate values so existing apps and components stop rendering
-   earthy cream on a cool/dark body. Values mirror brand-core.xml theme
-   definitions. Source-order wins over the earthy :root above. */
-[data-theme='nocturne'] {
-  --body:          #090807;                  /* bg-0 */
-  --section-1:     #1a1814;                  /* bg-2 */
-  --section-2:     #222018;                  /* bg-3 */
-  --clay:          #222018;                  /* bg-3 */
-  --footer-bg:     #050403;                  /* surface-deep */
-  --cta-bg:        #151310;
-  --border:        rgba(255,255,255,0.07);
-  --border-strong: rgba(255,255,255,0.13);
-}
-[data-theme='slate'] {
-  --body:          #D1D6DD;                  /* bg-0 */
-  --section-1:     #DDE1E7;                  /* bg-1 */
-  --section-2:     #BEC4CD;                  /* bg-2 */
-  --clay:          #AAB1BC;                  /* bg-3 */
-  --footer-bg:     #151A22;                  /* surface-deep */
-  --cta-bg:        #1C222B;
-  --border:        rgba(20,30,50,0.10);
-  --border-strong: rgba(20,30,50,0.18);
-}
+/* ── Legacy-token bridge: REMOVED 2026-09-29 (sonor-platform §14). Every app colour name is now an alias of a brand
+   token in Branding - CORE/brand-core.xml <vocab>, generated to dist/sonor-vocab.css and injected by sonor-theme.js —
+   one file, every theme, no hand-typed hex tables. ── */
 
 /* ── Header bar ──
    Chrome-vs-body polarity rule (B-171a lesson, 2026-04-21):
@@ -148,4 +124,14 @@
   .header .app-name { font-size: 15px; }
   .header .badge-row { display: none; }
   .header-links { gap: 4px; }
+  .header .header-right { gap: 8px; }
+}
+/* phone (2026-09-29, Board on the Monday push): keep the header inside the viewport — the DB dot + LIVE badge
+   carry the state, so the "Supabase" word and the GH / Supabase quick-links are dropped, version stays. */
+@media (max-width: 480px) {
+  .header { overflow: hidden; }
+  .header .app-name { letter-spacing: 1px; }
+  .header .db-label { display: none; }
+  .header .header-links { display: none; }
+  .header .header-right { gap: 6px; }
 }

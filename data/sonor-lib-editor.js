@@ -38,7 +38,7 @@
 //   refresh()     — re-read from SonorLibrary and re-render
 //   destroy()     — unwire and remove the editor DOM
 
-window.SONOR_LIB_EDITOR_VERSION = '1.0.0';
+window.SONOR_LIB_EDITOR_VERSION = '1.0.1';   // 2026-09-29 — CSV import/export controls hidden (sonor-platform §4)
 window.SonorLibEditor = window.SonorLibEditor || {};
 
 (function (LE) {
@@ -85,8 +85,8 @@ window.SonorLibEditor = window.SonorLibEditor || {};
       <input type="checkbox" class="ed-show-disc"> Show discontinued
     </label>
     <span style="flex:1;"></span>
-    <button class="ed-import">Import CSV…</button>
-    <button class="ed-export">Export CSV</button>
+    <button hidden data-csv-tool class="ed-import">Import CSV…</button>
+    <button hidden data-csv-tool class="ed-export">Export CSV</button>
     <button class="ed-refresh">Refresh from Supabase</button>
     <span class="ed-count" style="color:var(--muted); font-size:12px; margin-left:8px;"></span>
     <span class="ed-state" style="color:var(--muted); font-size:12px; margin-left:8px;"></span>
