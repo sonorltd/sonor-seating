@@ -1,6 +1,6 @@
 /**
  * Sonor Smart Homes — Brand CSS Custom Properties
- * Auto-generated from brand-core.xml on 2026-09-10
+ * Auto-generated from brand-core.xml on 2026-09-29
  * Do NOT edit — run: python3 generate-brand.py
  */
 
@@ -126,5 +126,91 @@
   --cta-hover: #4B5668;
   --scrim: rgba(21,26,34,0.85);
   --wordmark: #1A1F28;
+}
+
+/* ═══ Graphite Theme ═══ */
+[data-theme='graphite'] {
+  --bg-0: #1C1C1E;
+  --bg-1: #242426;
+  --bg-2: #2C2C2E;
+  --bg-3: #3A3A3C;
+  --bg-4: #48484A;
+  --bg-5: #636366;
+  --bg-6: #F5F5F7;
+  --text-primary: #F5F5F7;
+  --text-secondary: #C7C7CC;
+  --text-muted: #98989D;
+  --text-faint: #5E5E62;
+  --border: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.18);
+  --surface-deep: #141416;
+  --surface-bar: rgba(28,28,30,0.97);
+  --surface-text: #F5F5F7;
+  --surface-hover: #3A3A3C;
+  --cta-bg: #2D718B;
+  --cta-text: #F5F5F7;
+  --cta-hover: #3A8AA8;
+  --scrim: rgba(20,20,22,0.85);
+  --wordmark: #F5F5F7;
+}
+
+/* ═══ UI Scale — type · space · radius · motion · z · shadow (B-478 / B-479) ═══ */
+/* Reference these in apps and the shared kit instead of hard-coded px. */
+:root {
+  /* type — Gilroy / DM Sans UI sizes — 13px is the app base, 11px the smallest legible chrome */
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-base: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 34px;
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-body: 1.5;
+  --tracking-caps: .08em;
+  --font-ui: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'SF Mono', Menlo, monospace;
+  --font-brand: 'Gilroy', 'DM Sans', system-ui, sans-serif;
+  /* space — 4px base grid */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  /* radius */
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+  --r-2xl: 16px;
+  --r-pill: 999px;
+  /* motion — fast = hover/focus, base = menus/modals, slow = page-level; zeroed under prefers-reduced-motion */
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+  --ease: cubic-bezier(.2,.7,.2,1);
+  --ease-in: cubic-bezier(.4,0,1,1);
+  /* z — stacking — keep every app inside this ladder */
+  --z-bar: 100;
+  --z-menu: 120;
+  --z-sticky: 150;
+  --z-modal: 1000;
+  --z-toast: 1100;
+  /* shadow */
+  --shadow-sm: 0 1px 2px rgba(15,23,42,.08);
+  --shadow-md: 0 6px 18px rgba(15,23,42,.14);
+  --shadow-lg: 0 12px 32px rgba(15,23,42,.22);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }
 }
 

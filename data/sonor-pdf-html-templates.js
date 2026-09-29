@@ -284,7 +284,8 @@
   // opts shape: {
   //   accentHex, status, sectionTitle, reference, projectName, client, address,
   //   revision, issueDate, pageNum, pageTotal, services,
-  //   summary: { headline?: {label,value}, chips?: [{label,value,accent}] },
+  //   summary: { headline?: {label,value}, chips?: [{label,value,accent}] },   — per-floor card (top right)
+  //   summaryEnd?: same shape — PROJECT TOTAL card after the table (v1.15.0, last page of a floor-grouped schedule)
   //   table:   { headers, rows, total }   — see scheduleTable
   // }
   function buildSchedule(opts, css) {
@@ -324,6 +325,9 @@
       <div class="page-table-wrap">
         ${c.scheduleTable(o.table || {})}
       </div>
+      ${(o.summaryEnd && (o.summaryEnd.headline || (o.summaryEnd.chips && o.summaryEnd.chips.length)))
+        ? `<div class="page-section-foot">${c.summaryChip(o.summaryEnd)}</div>`   /* v1.15.0 — PROJECT TOTAL card after the last floor */
+        : ''}
       ${(Array.isArray(o.legend) && o.legend.length && typeof c.legendPanel === 'function')
         ? `<div class="schedule-legend-block">${c.legendPanel(o.legend)}</div>`
         : ''}
@@ -1275,9 +1279,27 @@
         </div>`;
     }).join('');
 
+    // v1.16.0 (Takeoffs v5.201.0, B-468) — HEAD END (ESTIMATE): the kit the takeoff never places, sized by the
+    // Library's derived rules from this plan's metrics (o.headEnd = window._headEndEstimate()). Every row carries
+    // its basis so the reader sees WHY ("52 lighting.circuits.dimmed +20% @ 8/unit"). Absent → page unchanged.
+    const he = o.headEnd || null;
+    const heRows = (he && Array.isArray(he.rows)) ? he.rows : [];
+    const heMetrics = (he && Array.isArray(he.metricRows)) ? he.metricRows : [];
+    const headEndHtml = heRows.length ? `
+      <section class="oc-headend">
+        <header class="oc-headend-head">HEAD END (${he.source === 'engineered' ? 'ENGINEERED' : 'ESTIMATE'}) <span class="oc-headend-sub">${h.esc(String(he.totals ? he.totals.lines : heRows.length))} items · ${h.esc(String((he.totals && he.totals.u_used) || 0))}U · ${h.esc(String((he.totals && he.totals.power_w) || 0))} W${he.racks && he.racks.length ? ' · ' + h.esc(he.racks.map(r => r.basis).join('; ')) : ''}</span></header>
+        <div class="oc-headend-body">
+          <div class="oc-headend-metrics">${heMetrics.map(mr => `<div class="oc-he-metric"><span class="oc-he-metric-val">${h.esc(String(mr.value))}</span><span class="oc-he-metric-cap">${h.esc(mr.label)}</span></div>`).join('')}</div>
+          <table class="oc-headend-table"><thead><tr><th>Item</th><th>Qty</th><th>Basis</th><th>Pass</th></tr></thead><tbody>
+            ${heRows.map(r => `<tr class="${r.priced ? '' : 'oc-he-unpriced'}"><td>${h.esc(r.label)}${r.priced ? '' : ' <span class="oc-he-tag">no WQ product</span>'}</td><td class="oc-he-qty">${h.esc(String(r.qty))}</td><td class="oc-he-basis">${h.esc(r.basis || '')}</td><td class="oc-he-pass">${h.esc(r.pass || '')}</td></tr>`).join('')}
+          </tbody></table>
+          <p class="oc-headend-foot">${he.source === 'engineered' ? 'From the Engineering schematic racks (' + h.esc((he.racks || []).map(r => r.basis).join(', ')) + ') — replaces the rules estimate.' : 'Estimate only — sized by the Library\'s derived-item rules from the placements on this plan. The engineered list comes from the Engineering schematic and replaces these rows in the next quote revision.'}</p>
+        </div>
+      </section>` : '';
+
     const sectionTitle = o.sectionTitle || 'OVERALL COUNTS';
     const body = `
-  <div class="page page-counts" style="--accent: ${accent}">
+  <div class="page page-counts${headEndHtml ? ' page-counts-he' : ''}" style="--accent: ${accent}">
     ${c.pageHeader(Object.assign({}, o, { sectionTitle }))}
     <main class="page-body page-body-counts">
       <div class="page-section-head">
@@ -1291,11 +1313,12 @@
         <header class="oc-grand-head">PROJECT TOTALS</header>
         <div class="oc-grand-strip">${grandStripHtml}</div>
       </section>
-      <section class="oc-services">
+      <section class="oc-services${headEndHtml ? ' oc-services-with-he' : ''}">
         <header class="oc-services-head">PER SERVICE</header>
         <div class="oc-services-list">${svcRowsHtml}</div>
         <p class="oc-services-foot">Service rows ordered canonically 01 → 10 → 11. A "0 Blocks" row means no placements yet on this project for that service. Cable / LED metres aggregate across all floors.</p>
       </section>
+      ${headEndHtml}
     </main>
     ${c.pageFooter(o)}
   </div>
@@ -1646,7 +1669,7 @@
 
   if (typeof window !== 'undefined') {
     window.SonorPdfHtmlTemplates = {
-      __version: '1.13.0',
+      __version: '1.16.1',   // v1.16.x — OVERALL COUNTS head-end estimate / engineered section (B-468)
       buildCover, buildSectionDivider, buildSchedule, buildPlanPage,
       buildContents, CONTENTS_METRICS,   // v5.146.0 — contents through the HTML pipeline
       buildCablingInfoPage, buildBendRadiusPage, buildOverallCountsPage,

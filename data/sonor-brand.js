@@ -136,6 +136,7 @@ window.__SONOR_BRAND__ = {
       'lighting-design': '../APP - Lighting Design/dashboard/sonor-lighting-design.html',
       'fractal-rig':     '../STUDIO - Fractal Rig/web/index.html',
       'pixel-conductor': '../STUDIO - Pixel Conductor/web/index.html',
+      'artnet-node':     '../STUDIO - ArtNet Node/index.html',
       cbus:              '../APP - C-Bus/index.html',
       'cinema-tools': '../APP - Cinema Tools/dashboard/sonor-cinema-tools.html',
       'service-contracts': '../APP - Service Contracts/dashboard/sonor-service-contracts.html'
@@ -182,6 +183,7 @@ window.__SONOR_BRAND__ = {
       'lighting-design': 'https://sonorltd.github.io/sonor-lighting-design/',
       'fractal-rig':     'https://sonorltd.github.io/sonor-fractal-rig/',
       'pixel-conductor': 'https://sonorltd.github.io/sonor-pixel-conductor/',
+      'artnet-node':     'https://sonorltd.github.io/sonor-artnet-node/',
       cbus:              'https://sonorltd.github.io/sonor-cbus/',
       'cinema-tools': 'https://sonorltd.github.io/sonor-cinema-tools/',
       'service-contracts': 'https://sonorltd.github.io/sonor-service-contracts/'

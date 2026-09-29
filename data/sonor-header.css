@@ -17,8 +17,12 @@
    Signal Blue (#2d718b) when the nav_chrome gradient was baked into
    brand-core. Signal Blue is the 50/50 mix of nav_chrome_mid (#0f2a44)
    and service 02 aqua (#4bb9d3) — sits in the gradient family, not a
-   service colour, works on both light and dark bodies. */
-:root {
+   service colour, works on both light and dark bodies.
+
+   2026-09-29 (B-487): scoped to :root:not([data-theme]) — this block used to load AFTER brand.css and silently
+   overrode every theme's text / border tokens with the earthy values (why slate text was #2C2218 and graphite text
+   came out dark on dark). Themed apps now get their palette purely from brand.css; unthemed pages keep the net. */
+:root:not([data-theme]) {
   --body: #F2EDE5;
   --section-1: #EDE6D9;
   --section-2: #CFC5B2;
@@ -99,10 +103,12 @@
     color-mix(in srgb, var(--s02, #4bb9d3) var(--nav-chrome-mix-pct, 22%), var(--nav-chrome-mid, #0f2a44)) 100%
   );
   color: var(--surface-text, #F2EDE5);
-  padding: 16px 32px;
+  padding: 7px 24px;              /* 2026-09-29: compact header (was 16px 32px) — more room for the app itself */
+  min-height: 46px;
+  box-sizing: border-box;        /* Library etc. have content-box resets — keep the 46px the same everywhere */
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -111,9 +117,9 @@
 .header .logo { display: flex; align-items: center; gap: 12px; }
 .header .logo-link { display: flex; align-items: center; text-decoration: none; color: inherit; transition: opacity .2s; }
 .header .logo-link:hover { opacity: 0.85; }
-.header .app-name { font-size: 18px; font-weight: 300; letter-spacing: 1.5px; color: color-mix(in srgb, var(--surface-text, #F2EDE5) 55%, transparent); text-transform: uppercase; }
+.header .app-name { font-size: 16px; font-weight: 300; letter-spacing: 1.5px; color: color-mix(in srgb, var(--surface-text, #F2EDE5) 55%, transparent); text-transform: uppercase; }
 
-/* ── Right-aligned group: version, DB status, links, dots ── */
+/* ── Right-aligned group: version, DB status, links (service dots are opt-in via SonorHeader.init({showDots:true})) ── */
 .header .header-right { display: flex; align-items: center; gap: 14px; margin-left: auto; }
 .header .badge-row { display: flex; gap: 4px; }
 .header .svc-dot { width: 10px; height: 10px; border-radius: 50%; }
@@ -138,7 +144,7 @@
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .header { padding: 12px 16px; gap: 12px; }
+  .header { padding: 6px 12px; gap: 10px; }
   .header .app-name { font-size: 15px; }
   .header .badge-row { display: none; }
   .header-links { gap: 4px; }

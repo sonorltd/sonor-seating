@@ -28,6 +28,14 @@
 //
 // Namespace: window.SonorProjectBar
 //
+// Version: 1.11.0 — Lucide icons (B-478): chrome emoji on the Blueprint / Brief / Costs links and the bar buttons become
+//                  SVG icons when root sonor-icons.js is on the page (the WeQuote control loads it beside itself).
+// Version: 1.10.0 — 🧾 WeQuote status (2026-09-28, B-470). The bar mounts the shared
+//                  `sonor-wq-bar.js` control (live quote № · rev · stage · 🔒 for the
+//                  active project, fed by the wq-webhook edge fn + realtime) into its
+//                  meta strip. Zero-touch for apps: if SonorWqBar is not on the page the
+//                  bar loads data/sonor-wq-bar.js from beside its own script. Opt out
+//                  with init({ wqBar: false }).
 // Version: 1.5.0 — 📄 Brief link (2026-07-16, B-398). When the active project
 //                  has a structured client brief (projects.metadata.brief —
 //                  the pattern established on 1387 Andy Bell), the bar shows a
@@ -88,6 +96,9 @@
   function _bus() {
     return (typeof window !== 'undefined' && window.SonorProjectBus) || null;
   }
+
+  // v1.10.0 — remember where this script was loaded from so the WeQuote control can be loaded from beside it.
+  const _OWN_SRC = (typeof document !== 'undefined' && document.currentScript && document.currentScript.src) || '';
 
   const LS_KEY = 'sonor_active_project_id';
   // v1.5.0 — per-project client-brief page (repo-slug URL form per the
@@ -288,6 +299,7 @@
           ` : '<span class="note">No project selected in the host app yet.</span>'}
         </div>
       `;
+      _iconify();   // v1.11.0
       return;   // no select / refresh / +New wiring in host mode
     }
     _hostEl.innerHTML = `
@@ -309,6 +321,7 @@
         </span>
       </div>
     `;
+    _iconify();   // v1.11.0
     // Wire the selector
     const sel = document.getElementById('sonorProjectPicker');
     // v1.2.0 — delegate grouping/ordering to the workspace SSOT when loaded
@@ -548,6 +561,22 @@
   }
 
   // ---- Public init ----
+  // v1.11.0 — swap leading chrome emoji (🧭 📄 💷 ↻) for Lucide icons once sonor-icons.js is present
+  function _iconify() { try { if (window.SonorIcons && _hostEl) window.SonorIcons.replaceEmoji(_hostEl, { selector: '.brief-link, .sonor-project-bar button', size: 14 }); } catch (_) {} }
+  // v1.10.0 — shared WeQuote status control (root sonor-wq-bar.js). Loaded from beside this script when absent.
+  let _wqBar = true, _wqBarStarted = false;
+  function _mountWqBar() {
+    if (!_wqBar || _wqBarStarted || typeof window === 'undefined') return;
+    _wqBarStarted = true;
+    const start = () => { try { if (window.SonorWqBar && !window.SonorWqBar.state().loadedAt && !window.SonorWqBar.__mountedByBar) { window.SonorWqBar.__mountedByBar = true; window.SonorWqBar.init({ supa: _supa, appKey: _appKey || undefined }); } if (!window.SonorIcons) { const t = setInterval(() => { if (window.SonorIcons) { clearInterval(t); _iconify(); } }, 300); setTimeout(() => clearInterval(t), 8000); } else _iconify(); } catch (e) { console.warn('[ProjectBar] WeQuote control failed', e && e.message); } };
+    if (window.SonorWqBar) { start(); return; }
+    if (!_OWN_SRC) return;
+    const sc = document.createElement('script');
+    sc.src = _OWN_SRC.replace(/sonor-project-bar\.js(\?.*)?$/, 'sonor-wq-bar.js');
+    sc.async = true; sc.onload = start; sc.onerror = () => { /* app without the synced file — no control, no error */ };
+    document.head.appendChild(sc);
+  }
+
   async function init(opts) {
     if (_initialised) {
       console.warn('[ProjectBar] already initialised — call refresh() instead.');
@@ -583,8 +612,10 @@
         if (_appKey) _write(_lsKeyFor(), _pid);
       }
     } catch (e) {}
+    _wqBar = !(opts && opts.wqBar === false);   // v1.10.0
     _render();   // initial empty render so the bar shows immediately
     if (_supa) await loadProjects();
+    _mountWqBar();   // v1.10.0 — shared 🧾 WeQuote control (auto-mounts into .meta, follows sonor:project-changed)
     // If we have an active id but the project isn't in the list, render anyway
     // (consumer can detect missing project via getProject() returning null)
     _render();
@@ -605,7 +636,7 @@
   const api = {
     init, refresh, loadProjects,
     getActiveId, getProject, getProjects, setActive,
-    __version: '1.9.0',
+    __version: '1.11.0',
     __ls_key: LS_KEY
   };
   if (typeof window !== 'undefined') window.SonorProjectBar = api;

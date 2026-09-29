@@ -1,4 +1,4 @@
-/* sonor-components.css — shared component styles per Spine rule S-4.4.
+/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.12.0 2026-09-29: locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
    Synced to every "APP - {slug}"/data/sonor-components.css via sync-everything.sh.
    Edit here ONLY — never edit a per-app copy.
 
@@ -713,3 +713,128 @@
 .cc-pill--no_answer,
 .cc-pill--no-answer     { background: var(--cc-no-answer, var(--yellow, #f5d05c)); color: #2C2218; }
 .cc-pill--declined      { background: var(--cc-declined,  var(--red,    #ec6061)); }
+
+/* ── v0.8.0 (2026-09-28, B-478) UI KIT ADDITIONS — icons, popover menus, stage chips ───────────────────────────
+   .s-icon              — inline Lucide SVG from data/sonor-icons.js (16 px, currentColor); .s-icon-sm 14 / .s-icon-lg 20
+   .s-menu              — popover menu shell (absolute, below trigger); .s-menu-item rows; .s-menu-h section heading
+   .chip                — small rounded status chip; .chip-stage-{in-progress|sent|accepted|complete|cancelled|draft}
+                          = the WeQuote stage palette used by sonor-wq-bar.js / Takeoffs; .chip-warn / .chip-ok
+   .s-btn-mini          — tiny bordered action (▲▼ ↻ copy) — replaces per-app .wqp-mini / .swq-mini
+   All colours are tokens (--card/--border/--text/--surface + fixed semantic stage colours). Slate, never cream. */
+.s-icon { display: inline-block; vertical-align: -0.15em; flex: none; width: 16px; height: 16px; }
+.s-icon-sm { width: 14px; height: 14px; }
+.s-icon-lg { width: 20px; height: 20px; }
+button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-child { margin-right: 6px; }
+.s-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 120; min-width: 240px; padding: 6px; border-radius: 8px;
+  background: var(--card, #fff); color: var(--text, var(--text-primary, #0F172A)); border: 1px solid var(--border, #CBD5E1);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .22); display: none; flex-direction: column; gap: 4px; font-size: 12px; }
+.s-menu.open { display: flex; }
+.s-menu-h { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; opacity: .6; margin: 4px 2px 0; font-weight: 700; }
+.s-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 5px; border: 1px solid transparent;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.s-menu-item:hover { background: var(--surface, var(--tint, #F1F5F9)); border-color: var(--border, #CBD5E1); }
+.s-menu-item:disabled { opacity: .45; cursor: default; }
+.chip { display: inline-block; padding: 0 7px; border-radius: 9px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  line-height: 16px; color: #fff; background: #64748B; white-space: nowrap; }
+.chip-stage-in-progress, .chip-stage-in_progress { background: #2F6FD6; }
+.chip-stage-sent { background: #E8892B; }
+.chip-stage-accepted { background: #1F9D55; }
+.chip-stage-complete { background: #0F766E; }
+.chip-stage-cancelled, .chip-stage-declined { background: #B91C1C; }
+.chip-stage-draft { background: #64748B; }
+.chip-warn { background: #DC2626; }
+.chip-ok { background: #16A34A; }
+.s-btn-mini { padding: 1px 7px; font-size: 11px; line-height: 18px; border-radius: 4px; border: 1px solid var(--border, #CBD5E1);
+  background: var(--card, #fff); color: inherit; cursor: pointer; }
+.s-btn-mini:hover:not(:disabled) { border-color: var(--accent, #6b4a8a); }
+
+/* ── v0.9.0 (2026-09-29, B-478 phase 2) WQ MODAL KIT — the 🧾 WeQuote push / head end / spec check / proposal-copy ──
+   modals (Takeoffs data/sonor-takeoffs-wqpush.js) used to inject this as an inline <style> string; it now lives HERE so
+   every app that opens a SonorModal with these classes looks the same. Sizes / spacing / radii / motion come from the
+   brand scale tokens (dist/brand.css → --fs-* --sp-* --r-* --dur-*); status colours stay explicit (traffic lights are
+   semantic, not themed). `.wqp-wrap{--wqp-kit:1}` is the probe wqpush reads to know the kit is loaded.
+   Takeoffs loads this file with `@import url(...) layer(sonor-kit)` so its own unlayered rules always win on a clash. */
+.wqp-wrap { --wqp-kit: 1; min-width: min(900px, 94vw); font-size: var(--fs-md, 13px); display: flex; flex-direction: column; gap: var(--sp-2, 8px); }
+.wqp-row { display: flex; gap: var(--sp-2, 8px); align-items: center; flex-wrap: wrap; }
+.wqp-row select { font: inherit; padding: var(--sp-1, 4px) 6px; max-width: 520px; }
+.wqp-tbl { width: 100%; border-collapse: collapse; max-height: 44vh; display: block; overflow: auto; }
+.wqp-tbl th, .wqp-tbl td { padding: var(--sp-1, 4px) 6px; border-bottom: 1px solid var(--border, #CBD5E1); text-align: left; white-space: nowrap; }
+.wqp-tbl.wqp-he { max-height: 58vh; }
+.wqp-bad { color: #a33; } .wqp-ok { color: #1F9D55; } .wqp-note { opacity: .8; }
+.wqp-tot { padding: var(--sp-2, 8px) 10px; border-radius: var(--r-lg, 8px); background: var(--tint, var(--surface, #E2E8F0)); }
+.wqp-sub { font-size: var(--fs-2xs, 10px); opacity: .75; }
+.wqp-room { background: var(--tint, var(--surface, #E2E8F0)); font-weight: 700; }
+.wqp-kind { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fff; padding: 1px 5px; border-radius: var(--r-xs, 3px); }
+.wqp-kind-device { background: var(--purple, #8058a1); } .wqp-kind-firstfix { background: var(--charcoal, #302f2e); } .wqp-kind-counter { background: var(--aqua, #4bb9d3); }
+.wqp-kind-wq { background: #9aa0a8; } .wqp-kind-manual, .wqp-kind-custom { background: #6b4a8a; }
+.wqp-kind-derived { background: #e8892b; } .wqp-kind-engineered { background: #1f9d55; } .wqp-kind-estimate { background: var(--terracotta, #e37c59); } .wqp-kind-scaffold { background: var(--gold, #ad9978); }
+.wqp-g td { background: #eef0f3; font-weight: 700; padding: 6px 8px; border-top: 2px solid #d9dde3; }
+.wqp-a td { background: #f7f8fa; font-weight: 600; padding: 4px 8px 4px 18px; }
+.wqp-r td:first-child { width: 22px; text-align: center; } .wqp-r td:nth-child(3) { padding-left: 26px; }
+.wqp-excl td { color: #9aa0a8; text-decoration: line-through; } .wqp-excl td:first-child, .wqp-excl td:nth-child(6) { text-decoration: none; }
+.wqp-wq td { color: #6b7280; font-style: italic; } .wqp-dim td { color: #8a8f98; }
+.wqp-st { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: var(--fs-2xs, 10px); font-weight: 700; letter-spacing: .03em; text-transform: uppercase; line-height: 16px; }
+.wqp-st-new { background: #1f9d55; color: #fff; } .wqp-st-on { background: #2f6fd6; color: #fff; } .wqp-st-wq { background: #e5e7eb; color: #374151; } .wqp-st-dim { background: #f3f4f6; color: #9aa0a8; }
+.wqp-st-bad { background: #fde8e8; color: #8a1f1f; } .wqp-st-move { background: #e8892b; color: #fff; } .wqp-st-edit, .wqp-st-manual { background: #6b4a8a; color: #fff; } .wqp-st-eng { background: #1f9d55; color: #fff; } .wqp-st-est { background: #e8892b; color: #fff; }
+.wqp-mini { padding: 0 6px; font-size: var(--fs-xs, 11px); line-height: 16px; border: 1px solid var(--border, #CBD5E1); background: var(--card, #fff); border-radius: var(--r-xs, 3px); cursor: pointer; color: inherit; }
+.wqp-mv { white-space: nowrap; }
+.wqp-lay select, .wqp-lay input[type=number] { font-size: var(--fs-xs, 11px); padding: 1px 3px; border: 1px solid var(--border, #CBD5E1); border-radius: var(--r-xs, 3px); background: var(--card, #fff); color: inherit; max-width: 150px; }
+.wqp-lay td:nth-child(3) { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wqp-lay input.wqp-edited { border-color: #6b4a8a; }
+.wqp-todo { padding: var(--sp-2, 8px) 10px; border-radius: var(--r-lg, 8px); background: #fff7ed; border: 1px solid #fed7aa; font-size: var(--fs-sm, 12px); }
+.wqp-todo ol { margin: 4px 0 0 18px; } .wqp-todo li { margin: 2px 0; }
+.wqp-pick { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; padding: 2px 7px; border: 1px solid var(--border, #CBD5E1); border-radius: var(--r-sm, 4px); background: var(--card, #fff); color: inherit; cursor: pointer; font-size: var(--fs-sm, 12px); }
+.wqp-pick-none { color: #9aa0a8; font-style: italic; } .wqp-pick:hover:not(:disabled) { border-color: #6b4a8a; }
+.wqp-he input { font-size: var(--fs-sm, 12px); padding: 2px 5px; border: 1px solid var(--border, #CBD5E1); border-radius: var(--r-sm, 4px); background: var(--card, #fff); color: inherit; }
+.wqp-he tr.wqp-manual td:nth-child(2) { color: #6b4a8a; }
+.wqp-viewbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wqp-metrics { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 0 10px; }
+.wqp-metric { font-size: var(--fs-xs, 11px); color: var(--text-muted, #555); } .wqp-metric b { font-size: var(--fs-md, 13px); color: var(--text-primary, #111); }
+.wqp-spec-row { padding: 5px 8px; border-radius: 5px; margin: 3px 0; background: var(--surface, #F1F5F9); font-size: var(--fs-sm, 12px); }
+.wqp-spec-row.miss { background: #FEE2E2; } .wqp-spec-row.diff { background: #FFEDD5; } .wqp-spec-head { font-weight: 700; margin: 6px 0; }
+.wqp-pushlog { margin: 8px 0; padding: 8px 10px; border-radius: var(--r-lg, 8px); background: #0F172A; color: #E2E8F0; font: 11px/1.5 var(--font-mono, ui-monospace, Menlo, monospace); max-height: 180px; overflow: auto; white-space: pre-wrap; display: none; }
+.wqp-pushlog.on { display: block; }
+.wqp-pushbar { height: 4px; border-radius: 2px; background: #1E293B; margin: 6px 0 0; overflow: hidden; } .wqp-pushbar i { display: block; height: 100%; width: 0; background: #22C55E; transition: width var(--dur-slow, 300ms) var(--ease, ease); }
+.wqp-lock { font-size: var(--fs-xs, 11px); font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--tint, var(--surface, #E2E8F0)); } .wqp-lock-on { background: #fde8e8; color: #8a1f1f; }
+.wqp-btn { font: inherit; padding: var(--sp-1, 4px) 8px; border-radius: var(--r-md, 6px); border: 1px solid var(--border, #cfd6dd); background: var(--card, #fff); cursor: pointer; }
+
+/* ── v0.9.0 (2026-09-29, B-479) SKELETON · EMPTY STATE · MOTION on the brand tokens ────────────────────────────── */
+.s-skeleton { display: block; border-radius: var(--r-sm, 4px); background: linear-gradient(90deg, var(--surface, #E2E8F0) 25%, var(--card, #fff) 50%, var(--surface, #E2E8F0) 75%); background-size: 200% 100%; animation: s-shimmer 1.2s var(--ease, ease) infinite; min-height: 1em; }
+.s-skeleton-text { height: .85em; margin: .35em 0; } .s-skeleton-text.w-60 { width: 60%; } .s-skeleton-text.w-40 { width: 40%; } .s-skeleton-text.w-80 { width: 80%; }
+.s-skeleton-row { height: 28px; margin: 6px 0; } .s-skeleton-card { height: 96px; border-radius: var(--r-lg, 8px); }
+@keyframes s-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.s-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-2, 8px); padding: var(--sp-8, 32px) var(--sp-4, 16px); text-align: center; color: var(--text-muted, #64748B); border: 1px dashed var(--border, #CBD5E1); border-radius: var(--r-xl, 12px); font-size: var(--fs-md, 13px); }
+.s-empty .s-icon { width: 28px; height: 28px; opacity: .55; } .s-empty b { color: var(--text-primary, #0F172A); font-size: var(--fs-base, 14px); }
+.s-empty .s-empty-cta { margin-top: var(--sp-1, 4px); }
+.s-fade-in { animation: s-fade var(--dur, 200ms) var(--ease, ease) both; } .s-rise-in { animation: s-rise var(--dur, 200ms) var(--ease, ease) both; }
+@keyframes s-fade { from { opacity: 0; } to { opacity: 1; } } @keyframes s-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.s-menu, .sonor-modal { animation: s-rise var(--dur-fast, 120ms) var(--ease, ease) both; }
+@media (prefers-reduced-motion: reduce) { .s-skeleton, .s-fade-in, .s-rise-in, .s-menu, .sonor-modal { animation: none; } }
+
+/* ── v0.10.0 (2026-09-29, B-487) GRAPHITE — the back-end dark theme. Kit chrome reads brand tokens; these lines give
+   the kit its app-vocabulary aliases (apps that define their own win — this file sits in the sonor-kit layer) and
+   re-tint the few fixed light surfaces for [data-theme='graphite']. Service colours untouched. ────────────────────── */
+:root { --card: var(--bg-1, #fff); --surface: var(--bg-2, #F1F5F9); --tint: var(--bg-3, #E2E8F0); --line: var(--border, #CBD5E1); --text: var(--text-primary, #0F172A); --muted: var(--text-muted, #64748B); }
+[data-theme='graphite'] { color-scheme: dark; }
+[data-theme='graphite'] .wqp-g td { background: #2C2C2E; border-top-color: #48484A; }
+[data-theme='graphite'] .wqp-a td { background: #242426; }
+[data-theme='graphite'] .wqp-todo { background: rgba(232,137,43,.12); border-color: rgba(232,137,43,.4); }
+[data-theme='graphite'] .wqp-st-wq { background: #3A3A3C; color: #E5E5EA; } [data-theme='graphite'] .wqp-st-dim { background: #2C2C2E; color: #98989D; } [data-theme='graphite'] .wqp-st-bad { background: rgba(220,38,38,.2); color: #FCA5A5; }
+[data-theme='graphite'] .wqp-spec-row.miss { background: rgba(220,38,38,.18); } [data-theme='graphite'] .wqp-spec-row.diff { background: rgba(232,137,43,.18); }
+[data-theme='graphite'] .wqp-metric { color: #C7C7CC; } [data-theme='graphite'] .wqp-metric b { color: #F5F5F7; }
+[data-theme='graphite'] .swq-slot { background: #3A3A3C; color: #E5E5EA; }
+[data-theme='graphite'] .s-skeleton { background: linear-gradient(90deg, #2C2C2E 25%, #3A3A3C 50%, #2C2C2E 75%); background-size: 200% 100%; }
+[data-theme='graphite'] .pill, [data-theme='graphite'] .badge { border-color: rgba(255,255,255,.14); }
+[data-theme='graphite'] input, [data-theme='graphite'] select, [data-theme='graphite'] textarea { color-scheme: dark; }
+
+/* CSV import/export is retired (Bryn 2026-09-29, sonor-platform §4): controls stay in the code, never on screen.
+   `hidden` alone loses to display:flex on .btn, so this wins outright. */
+[data-csv-tool] { display: none !important; }
+
+/* ── LOCKED = RED, everywhere (Bryn 2026-09-29: "locks should go red on layers when locked, and throughout everywhere").
+   Any lock control in its locked state — layers, columns, project bar, theme lock — takes --lock (service-06 red).
+   Opt in with .lock-btn.locked, .s-lock[aria-pressed=true] or [data-locked=true]; unlocked stays muted. ── */
+:root { --lock: #ec6061; --lock-ink: #fff; }
+.lock-btn.locked, .s-lock[aria-pressed="true"], [data-locked="true"] { background: var(--lock) !important; color: var(--lock-ink) !important; border-color: var(--lock) !important; box-shadow: 0 0 0 1px color-mix(in srgb, var(--lock) 35%, transparent); }
+.lock-btn.locked svg, .s-lock[aria-pressed="true"] svg { stroke: var(--lock-ink); }
+[data-theme='graphite'] :is(.lock-btn.locked, .s-lock[aria-pressed="true"], [data-locked="true"]) { box-shadow: 0 0 0 1px rgba(236,96,97,.35), 0 0 8px rgba(236,96,97,.25); }

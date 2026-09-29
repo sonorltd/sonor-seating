@@ -91,11 +91,19 @@
   --on-slate-muted:var(--theme-text-muted);
   --on-slate-faint:var(--theme-text-faint);
 
-  /* ---- Earthy / paper ---- */
+  /* ---- Paper / panel tints — NEUTRAL GREYS (v1.15.0, Takeoffs v5.200.7, Bryn 2026-09-27: "the accent change
+     should be shades of grey, blue doesn't work with every service colour … make sure all card styles are
+     consistent in the whole PDF"). The old earthy cream set (#f7f4ee / #f0ece4 / #d4cec2) is gone: every card,
+     chip, banner and rule in the deck now shares these four greys, with the per-page --accent doing the colour. */
   --paper:         #ffffff;
-  --paper-tint:    #f7f4ee;
-  --paper-rule:    #f0ece4;
-  --paper-edge:    #d4cec2;
+  --paper-tint:    #f4f5f7;   /* cards / summary chips */
+  --paper-rule:    #eceef1;   /* floor banners */
+  --paper-soft:    #f7f8fa;   /* room / sub banners, sub-rows */
+  --paper-edge:    #d9dde3;   /* every rule / border */
+  --slate-tint:      var(--paper-rule);
+  --slate-tint-soft: var(--paper-soft);
+  --slate-tint-edge: var(--paper-edge);
+  --slate-tint-total:#e2e5ea;   /* per-floor total row */
 
   /* ---- Brand accent (overridable via inline style on .page wrapper) ---- */
   --accent:        var(--theme-bright);
@@ -880,7 +888,7 @@ body {
   border: 1px solid rgba(44,34,24,0.12);
   border-radius: 8px;
   padding: 8px 12px;
-  background: #fbf9f5;
+  background: var(--paper-tint, #f4f5f7);
   display: flex; align-items: baseline; gap: 8px;
 }
 .cover-stat-card .csc-v { font-size: 17px; font-weight: 800; color: #2C2218; }
@@ -1036,14 +1044,18 @@ body {
 
 /* ----- Summary chip ----- */
 .summary-chip {
-  background: var(--paper-tint, #f7f8fa);
-  border: 1px solid var(--paper-edge, #e5e7eb);
+  background: var(--paper-tint, #f4f5f7);
+  border: 1px solid var(--paper-edge, #d9dde3);
   border-left: 4px solid var(--accent);
   border-radius: 4px;
   padding: 12px 16px;
   min-width: 200px; max-width: 480px;
   display: flex; flex-direction: column; gap: 8px;
 }
+/* v1.15.0 — PROJECT TOTAL card at the end of a schedule (after the last floor's table) */
+.page-section-foot { display: flex; justify-content: flex-end; padding: 14px 0 0; }
+.page-section-foot .summary-chip { border-left-color: var(--chrome-solid-deep, #0a1929); }
+.page-section-foot .sum-chip-headline-label { color: var(--slate-text, #1a1f28); }
 .sum-chip-headline {
   display: flex; align-items: baseline; gap: 10px;
   border-bottom: 1px solid var(--paper-edge, #e5e7eb);
@@ -1221,8 +1233,8 @@ body {
    Result: schedule reads as quiet rows with strong accent stripes
    rather than 6 dark gradient bands. */
 .schedule-table tbody tr.sch-group td {
-  background: #f0ece4;            /* paper-rule fallback */
-  background: var(--paper-rule, #f0ece4);
+  background: #e4ebf2;            /* v1.14.0 — slate tint (was the cream earthy token) */
+  background: var(--slate-tint, #e4ebf2);
   color: var(--slate-text, #1a1f28);
   font-weight: 800;
   font-size: 9.5px;   /* v5.178.0 */
@@ -1230,8 +1242,8 @@ body {
   text-transform: uppercase;
   padding: 4px 10px;
   border-left: 3px solid var(--accent);
-  border-bottom: 1px solid var(--paper-edge, #d4cec2);
-  border-top: 1px solid var(--paper-edge, #d4cec2);
+  border-bottom: 1px solid var(--slate-tint-edge, #c9d5e0);
+  border-top: 1px solid var(--slate-tint-edge, #c9d5e0);
 }
 /* v5.4.75 — Aspect colour pill (Cable Estimate Aspect column).
    Renders a small coloured chip with white text — matches the
@@ -1297,34 +1309,47 @@ body {
    than full data rows. `sch-row-sub-total` caps the cluster with the
    "↳ Total 6 lc" line in heavier weight. */
 .schedule-table tbody tr.sch-row-sub td {
-  background: #fbf8f1;
-  color: #6b5f50;
+  background: #f7f9fb;            /* v1.14.0 — slate tint (was cream) */
+  color: var(--slate-muted, #5a5750);
   font-size: 9.5px;
   font-style: italic;
   font-weight: 500;
   padding-top: 3px;
   padding-bottom: 3px;
-  border-bottom: 1px dashed rgba(212, 206, 194, 0.4);
+  border-bottom: 1px dashed rgba(201, 213, 224, 0.6);
 }
 .schedule-table tbody tr.sch-row-sub-total td {
   font-weight: 800;
   font-style: normal;
-  color: #2c2218;
-  border-bottom: 1px solid var(--paper-edge, #d4cec2);
+  color: var(--slate-text, #1a1f28);
+  border-bottom: 1px solid var(--slate-tint-edge, #c9d5e0);
+}
+/* v1.14.0 — PER-FLOOR TOTAL row (Bryn: "schedules should be more separated per floors … totals per floor").
+   Emitted by Takeoffs _groupAspectByFloor after each floor's rows; sits above the next floor's page break. */
+.schedule-table tbody tr.sch-floor-total td {
+  background: var(--slate-tint-total, #d6e0ea);
+  color: var(--slate-text, #1a1f28);
+  font-weight: 800;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-top: 2px solid var(--accent);
+  border-bottom: 1px solid var(--slate-tint-edge, #c9d5e0);
 }
 /* v5.4.75 — Sub-banner rows (Floor → Room nesting on Cable Estimate).
    Lighter background, smaller text, indented stripe, no upper-case. */
 .schedule-table tbody tr.sch-group.sch-group-sub td {
-  background: #f7f4ec;
-  background: var(--paper-soft, #f7f4ec);
-  color: #2c2218;      /* v5.178.0 — was #4a4338: room banners read as structure, not decoration */
+  background: #f1f5f8;            /* v1.14.0 — slate tint soft (was the cream earthy token) */
+  background: var(--slate-tint-soft, #f1f5f8);
+  color: var(--slate-text, #1a1f28);
   font-weight: 800;
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: none;
   padding: 4px 12px 4px 26px;     /* extra left-pad → visual indent under floor banner */
   border-left: 4px solid transparent;
-  border-bottom: 1px dashed var(--paper-edge, #d4cec2);
+  border-bottom: 1px dashed var(--slate-tint-edge, #c9d5e0);
   border-top: 0;
 }
 /* Total row stays dark — it's the schedule's terminal summary, the
@@ -2262,7 +2287,7 @@ body {
   padding-right: 8px;
 }
 .oc-svc-row:last-child { border-bottom: 0; }
-.oc-svc-row:nth-child(2n) { background: #faf8f4; }
+.oc-svc-row:nth-child(2n) { background: var(--paper-soft, #f7f8fa); }
 .oc-svc-row-zero { opacity: 0.45; }
 .oc-svc-bar {
   width: 6px;
@@ -2329,7 +2354,7 @@ body {
   gap: 10px;
   padding: 8px 12px;
   /* Pale tint band so the numbered head reads as a banner above the body */
-  background: #f0ece4;  /* hex fallback */
+  background: #eceef1;  /* hex fallback */
   background: var(--paper-rule, #f0ece4);
   border-bottom: 1px solid var(--paper-edge, #d4cec2);
 }
@@ -2554,7 +2579,7 @@ body {
   padding: 0 12px;
   gap: 6px;
   text-align: left;
-  background: #f4f1ec;
+  background: var(--paper-tint, #f4f5f7);
   background: var(--paper-rule, #f0ece4);
   height: 40px;
   border: 1px solid var(--paper-edge, #d4cec2);
@@ -2985,7 +3010,7 @@ body {
    width. Removed the negative-margin break-out (page-body-bend now
    flex-column so head stacks naturally). */
 .info-section-head-row-bend {
-  background: #f0ece4;
+  background: #eceef1;
   background: var(--paper-rule, #f0ece4);
   border: 1px solid var(--paper-edge, #d4cec2);
   border-radius: 3px;
@@ -3141,7 +3166,7 @@ body {
 .panel-svcnotes .svc-notes-list li { font-size: 8.5px; line-height: 1.45; padding-bottom: 3px; color: var(--slate-text, #1a1f28); }
 .sched-svcnotes {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
-  background: #faf7f0; border: 1px solid var(--paper-edge, #d4cec2);
+  background: var(--paper-tint, #f4f5f7); border: 1px solid var(--paper-edge, #d4cec2);
   border-left: 3px solid var(--accent, #ad9978);
   border-radius: 4px; padding: 5px 10px; margin: 0 0 8px;
 }
@@ -3158,3 +3183,53 @@ body {
 /* v5.151.0 — rev number before the date in every slim footer */
 .page-footer-slim .page-footer-slim-right b { font-weight: 800; color: rgba(255,255,255,0.9); }
 .page-footer-slim-sep { margin: 0 6px; color: rgba(255,255,255,0.35); }
+
+/* v1.16.0 (Takeoffs v5.201.0, B-468) — HEAD END (ESTIMATE) section on the OVERALL COUNTS page. When present the
+   service list gives up its stretch so the estimate table fits on the same A3 page; rows without a WQ product are
+   muted (they show in the estimate, never push). Same chrome heads as PROJECT TOTALS / PER SERVICE. */
+.page-counts-he .oc-services { flex: 0 0 auto; }
+.page-counts-he .oc-services-list { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; column-gap: 0; }
+.page-counts-he .oc-services-list .oc-svc-row:nth-child(odd) { border-right: 1px solid var(--paper-rule, #eceef1); }
+.page-counts-he .oc-svc-row { padding-top: 2px; padding-bottom: 2px; min-height: 0; }
+.page-counts-he .oc-services-foot { display: none; }
+.oc-headend {
+  background: #ffffff;
+  border: 1px solid var(--paper-edge, #d9dde3);
+  border-radius: 5px;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex; flex-direction: column;
+}
+.oc-headend-head {
+  background: #0a1929;
+  background: var(--chrome-solid-deep);
+  color: #ffffff;
+  font-size: 10px; font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  border-left: 3px solid #e8892b;
+  flex-shrink: 0;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+}
+.oc-headend-sub { font-weight: 600; letter-spacing: 0.04em; text-transform: none; font-size: 9px; opacity: 0.85; }
+.oc-headend-body { display: grid; grid-template-columns: 150px 1fr; gap: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+.oc-headend-metrics {
+  background: var(--paper-soft, #f7f8fa);
+  border-right: 1px solid var(--paper-rule, #eceef1);
+  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+  overflow: hidden;
+}
+.oc-he-metric { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 8.5px; color: var(--slate-muted, #5a5750); }
+.oc-he-metric-val { font-weight: 800; font-size: 10px; color: var(--slate-ink, #1e2430); font-variant-numeric: tabular-nums; }
+.oc-headend-table { width: 100%; border-collapse: collapse; font-size: 8px; }
+.oc-headend-table th { text-align: left; font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate-muted, #5a5750); padding: 5px 10px 4px; border-bottom: 1px solid var(--paper-edge, #d9dde3); background: var(--paper-tint, #f4f5f7); }
+.oc-headend-table td { padding: 1.5px 10px; border-bottom: 1px solid var(--paper-rule, #eceef1); vertical-align: top; line-height: 1.25; }
+.oc-headend-table td.oc-he-qty { font-weight: 800; text-align: right; width: 34px; font-variant-numeric: tabular-nums; }
+.oc-headend-table td.oc-he-basis { color: var(--slate-muted, #5a5750); font-size: 8px; }
+.oc-headend-table td.oc-he-pass { width: 44px; font-size: 7.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate-muted, #5a5750); }
+.oc-headend-table tr.oc-he-unpriced td { color: #6b7280; }
+.oc-he-tag { display: inline-block; font-size: 7px; letter-spacing: 0.06em; text-transform: uppercase; color: #e8892b; border: 1px solid #e8892b; border-radius: 3px; padding: 0 4px; margin-left: 4px; vertical-align: middle; }
+.oc-headend-foot { grid-column: 1 / -1; font-size: 8px; font-style: italic; color: var(--slate-muted, #5a5750); padding: 5px 12px; border-top: 1px solid var(--paper-rule, #eceef1); margin: 0; }

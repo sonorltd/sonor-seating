@@ -19,6 +19,8 @@
 //   totalsPanel(totals)                      — totals dl-list panel
 //   revisionTimeline(history, latestCode)    — connected dots strip
 //   ownerCard(owner)                         — section-divider OWNED BY card
+//   scheduleTable(opts)                      — v1.13.0: + opts.textColourRules [{col, re, hex}] (cell text colour)
+//                                              v1.14.0: rows may carry { floorTotal: true, values } → .sch-floor-total band
 //
 // Each function returns a String of HTML. Pure — no DOM, no side effects.
 
@@ -405,6 +407,15 @@
       // to expand LC Estimate mix breakdowns ("↳ Mix · Est. Switched ×1"
       // etc.). `total: true` sub-rows get a heavier weight for the
       // terminal "↳ Total 6 lc" line.
+      // v1.14.0 — per-floor total row ({ floorTotal: true, values }) — bold slate band, numeric sums per column
+      if (r && !Array.isArray(r) && r.floorTotal === true) {
+        const cells = headers.map((col, ci) => {
+          const v = (Array.isArray(r.values) && r.values[ci] != null) ? r.values[ci] : '';
+          const align = col.align ? ` style="text-align:${h.esc(col.align)}"` : '';
+          return `<td${align}>${h.esc(String(v))}</td>`;
+        }).join('');
+        return `<tr class="sch-floor-total">${cells}</tr>`;
+      }
       const isSubRow = !!(r && r.subRow);
       const isSubTotal = isSubRow && !!r.total;
       const stripe = isSubRow ? '' : ((i % 2) === 1 ? ' sch-row-alt' : '');
@@ -495,6 +506,14 @@
             || null;
           if (hex) {
             return `<td${align}><span class="sch-cell-pill" style="background:${h.esc(hex)}">${h.esc(String(v))}</span></td>`;
+          }
+        }
+        // v5.200.3 — TEXT-COLOUR rules: `o.textColourRules = [{ col, re, hex }]` paints a matching cell's
+        // text (e.g. Origin "GF LKP RING" in orange — keypad ring, not a home run). Plain text otherwise.
+        if (Array.isArray(o.textColourRules) && v != null && String(v).trim() !== '') {
+          const _rule = o.textColourRules.find(rl => rl && rl.col === ci && rl.re && rl.re.test(String(v).trim()));
+          if (_rule && _rule.hex) {
+            return `<td${align} style="color:${h.esc(_rule.hex)};font-weight:600">${h.esc(String(v))}</td>`;
           }
         }
         // v5.5.9 — Colour-dot render for a configured column (e.g. Colour

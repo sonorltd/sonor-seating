@@ -12,7 +12,7 @@ window.SonorHeader = (function() {
   const svcs = B.services || [];
 
   // ── SONOR wordmark SVG (compact, inline for instant render) ──
-  const WORDMARK_SVG = `<svg width="220" height="40" viewBox="0 0 332 95" xmlns="http://www.w3.org/2000/svg">
+  const WORDMARK_SVG = `<svg width="112" height="32" viewBox="0 0 332 95" xmlns="http://www.w3.org/2000/svg">
     <path fill="#F2EDE5" d="M92.02,38.41v51.4c0,2.63-2.13,4.75-4.75,4.75h-3.34c-2.62,0-4.75-2.12-4.75-4.75v-45.34c0-2.45-1.11-4.77-3.01-6.31l-25.23-20.41c-2.8-2.27-6.76-2.42-9.73-.36l-23.15,16.05.45,1.55c22.38,9.5,40.47,30.05,47.71,53.39.95,3.06-1.32,6.18-4.53,6.18h-5.36c-2.08,0-3.9-1.37-4.54-3.35-6.96-21.83-24.83-38.23-46.17-46.13-1.31-.49-2.31-1.5-2.79-2.75-.2-.51-.31-1.06-.32-1.64l-.12-9.11c-.02-1.58.75-3.06,2.05-3.96L28.74,10.74,42.11,1.45c.16-.11.32-.22.49-.31,2.35-1.4,5.22-1.5,7.64-.34.57.26,1.12.61,1.63,1.03l37.16,30.29c1.89,1.54,2.99,3.85,2.99,6.29Z"/>
     <path fill="#F2EDE5" d="M34.59,94.55h-5.25c-1.6,0-3.09-.81-3.97-2.15-5.47-8.37-11.98-15.35-20.72-20.32-1.5-.85-2.45-2.42-2.45-4.15v-5.58c0-3.52,3.68-5.79,6.85-4.26,12.79,6.15,23.95,16.91,29.85,29.73,1.45,3.14-.86,6.73-4.32,6.73h0Z"/>
     <path fill="#F2EDE5" d="M4.26,83.39c7.65-1.71,9.39,9.06,4.03,10.83-8.9,2.94-11.25-9.22-4.03-10.83Z"/>
@@ -79,12 +79,14 @@ window.SonorHeader = (function() {
       ? (B.appUrls && B.appUrls.local ? B.appUrls.local.master : '../sonor-master/index.html')
       : (B.appUrls && B.appUrls.hosted ? B.appUrls.hosted.master : 'https://sonorltd.github.io/sonor-master/'));
 
-    const dots = DOT_COLOURS.map((hex, i) =>
+    // 2026-09-29 (Bryn): the 10 service dots are GONE from the header by default — they ate right-hand space and said
+    // nothing the app needed. Opt back in per app with opts.showDots === true (nothing does today).
+    const dots = opts.showDots === true ? DOT_COLOURS.map((hex, i) =>
       `<div class="svc-dot" style="background:${hex}" title="${DOT_LABELS[i] || ''}"></div>`
-    ).join('');
+    ).join('') : '';
 
     // showLinks: only Master Hub renders the GH + Supabase quicklinks.
-    // Apps show version + DB status + 10 service dots only.
+    // Apps show version + DB status (+ the ◐ theme toggle the kit mounts into .header-right).
     const showLinks = opts.showLinks === true;
     const linksHtml = showLinks ? `
         <div class="header-links">
@@ -103,8 +105,8 @@ window.SonorHeader = (function() {
           <div class="db-dot" id="dbDot"></div>
           <span class="db-label" id="dbLabel">Connecting…</span>
           <span class="live-badge">LIVE</span>
-        </div>${linksHtml}
-        <div class="badge-row">${dots}</div>
+        </div>${linksHtml}${dots ? `
+        <div class="badge-row">${dots}</div>` : ''}
       </div>`;
 
     const el = document.getElementById(targetId);

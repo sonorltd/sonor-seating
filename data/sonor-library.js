@@ -114,6 +114,10 @@
 // Add-panel NOT NULL failures). (2) Sub-group management API: getSubgroups /
 // createSubgroup / renameSubgroup / reorderSubgroups, backed by new table
 // sonor_block_subgroups. See CONSUMER-API.md §Subgroups.
+// v3.9.0 — LABOUR seam (Library v2.11.0, 2026-09-27; Bryn: "build labour elements in to the library so we can
+//   use in future … wherever we use we can toggle labour displays on and off"): getSetting(key) / setSetting(key,
+//   value) on library_settings ('show_labour' = the GLOBAL display toggle), getLabourTypes(), and labourFor(row)
+//   → { phases, block_mins, by } from sonor_blocks.metadata.labour (minutes only; rates/prices stay in WeQuote).
 // v3.8.0 — AV device seam for consumers (CONSUMER-API §26): getAvCatalogue
 // (the §0 canonical deduped product view, cached), getDeviceAliases /
 // resolveDeviceId (§25 device clone-merge renames), deviceMatchesBlock (the
@@ -123,7 +127,7 @@
 // getAllProductAccessories / getProductAccessories (§20 parent-linked
 // accessory options). First consumer: Takeoffs v5.174.0 device dropdowns +
 // Device Schedule.
-window.SONOR_LIBRARY_VERSION = '3.8.0';
+window.SONOR_LIBRARY_VERSION = '3.9.0';
 window.SonorLibrary = window.SonorLibrary || {};
 
 (function (SL) {
@@ -1843,6 +1847,40 @@ window.SonorLibrary = window.SonorLibrary || {};
     const { data, error } = await q;
     if (error) throw error;
     return data || [];
+  };
+
+  // ── v3.9.0 — LABOUR seam ────────────────────────────────────────────────
+  SL.LABOUR_PHASES = ['first_fix', 'second_fix', 'commission', 'programming'];
+  SL.getSetting = async function (key, fallback) {
+    _ensureInit();
+    if (!state.client) return fallback;
+    const { data, error } = await state.client.from('library_settings').select('value').eq('key', key).maybeSingle();
+    if (error || !data) return fallback;
+    return data.value;
+  };
+  SL.setSetting = async function (key, value, updatedBy) {
+    _ensureInit();
+    if (!state.client) throw new Error('setSetting: Supabase client not initialised');
+    const { error } = await state.client.from('library_settings').upsert({ key, value, updated_by: updatedBy || null, updated_at: new Date().toISOString() });
+    if (error) throw error;
+  };
+  SL.getLabourTypes = async function (opts) {
+    _ensureInit();
+    if (!state.client) return [];
+    let q = state.client.from('labour_types').select('*').order('sort_order');
+    if (!(opts && opts.includeInactive)) q = q.eq('active', true);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  };
+  // Pure: block row (any tier — metadata or block_metadata) → labour minutes per phase.
+  // Cable-pull minutes are NOT included: read them from the first-fix package (expandPackage / install_mins).
+  SL.labourFor = function (row) {
+    const meta = (row && (row.metadata || row.block_metadata)) || {};
+    const lab = meta.labour || {};
+    const phases = {}; let block_mins = 0;
+    SL.LABOUR_PHASES.forEach(p => { const n = Number(lab[p + '_mins']); phases[p] = (isFinite(n) && n > 0) ? n : 0; block_mins += phases[p]; });
+    return { phases, block_mins, by: lab.by || 'sonor' };
   };
 
   // v3.1.0 (Library v1.34.0 R136) — port kind styles. Fetches pm_port_kind_styles
