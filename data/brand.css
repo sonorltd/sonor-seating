@@ -152,6 +152,9 @@
   --cta-hover: #3A8AA8;
   --scrim: rgba(20,20,22,0.85);
   --wordmark: #F5F5F7;
+  --nav-chrome-deep: #141416;
+  --nav-chrome-mid: #1C1C1E;
+  --nav-chrome-mix-pct: 10%;  /* Aqua-into-navy mix % override */
 }
 
 /* ═══ UI Scale — type · space · radius · motion · z · shadow (B-478 / B-479) ═══ */

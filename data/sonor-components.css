@@ -1,4 +1,4 @@
-/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.12.0 2026-09-29: locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
+/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.14.0 2026-09-29: sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
    Synced to every "APP - {slug}"/data/sonor-components.css via sync-everything.sh.
    Edit here ONLY — never edit a per-app copy.
 
@@ -831,6 +831,17 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
    `hidden` alone loses to display:flex on .btn, so this wins outright. */
 [data-csv-tool] { display: none !important; }
 
+/* ── BAR LADDER (Bryn 2026-09-29: "everything below the main header should be dark mode, 2nd, 3rd headers etc slightly
+   different shades — get it right everywhere"). Row 1 = the shared header chrome (--nav-chrome-*). Every bar under it
+   takes the next step of the ladder: --bar-2 tabs · --bar-3 sub-tabs / project bar · --bar-4 filter / stats / toolbar.
+   Apps use the tokens (or .s-bar-2/3/4) and never invent a bar colour. In slate the ladder steps the light greys. ── */
+:root { --bar-1: var(--nav-chrome-deep, #0a1929); --bar-2: var(--bg-1, #DDE1E7); --bar-3: var(--bg-0, #D1D6DD); --bar-4: var(--bg-2, #C8CFD7); --bar-line: var(--border, rgba(20,30,50,.10)); }
+[data-theme='graphite'] { --bar-2: #1C1C1E; --bar-3: #242426; --bar-4: #2C2C2E; --bar-line: rgba(255,255,255,.08); }
+.s-bar-2 { background: var(--bar-2); border-bottom: 1px solid var(--bar-line); }
+.s-bar-3 { background: var(--bar-3); border-bottom: 1px solid var(--bar-line); }
+.s-bar-4 { background: var(--bar-4); border-bottom: 1px solid var(--bar-line); }
+[data-theme='graphite'] .tab-bar { background: var(--bar-2); border-bottom: 1px solid var(--bar-line); }
+
 /* ── LOCKED = RED, everywhere (Bryn 2026-09-29: "locks should go red on layers when locked, and throughout everywhere").
    Any lock control in its locked state — layers, columns, project bar, theme lock — takes --lock (service-06 red).
    Opt in with .lock-btn.locked, .s-lock[aria-pressed=true] or [data-locked=true]; unlocked stays muted. ── */
@@ -838,3 +849,16 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
 .lock-btn.locked, .s-lock[aria-pressed="true"], [data-locked="true"] { background: var(--lock) !important; color: var(--lock-ink) !important; border-color: var(--lock) !important; box-shadow: 0 0 0 1px color-mix(in srgb, var(--lock) 35%, transparent); }
 .lock-btn.locked svg, .s-lock[aria-pressed="true"] svg { stroke: var(--lock-ink); }
 [data-theme='graphite'] :is(.lock-btn.locked, .s-lock[aria-pressed="true"], [data-locked="true"]) { box-shadow: 0 0 0 1px rgba(236,96,97,.35), 0 0 8px rgba(236,96,97,.25); }
+
+/* ── SORTABLE (sonor-sortable.js, B-491): ordering is a drag, never a typed number. ── */
+.s-drag { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 22px; padding: 0; margin-right: 4px; border: 0; border-radius: 4px; background: transparent; color: var(--text-muted, #98989D); cursor: grab; touch-action: none; opacity: .55; vertical-align: middle; }
+.s-drag:hover, .s-drag:focus-visible { opacity: 1; background: var(--surface-hover, rgba(255,255,255,.08)); color: var(--text-primary); outline: none; }
+.s-drag:active { cursor: grabbing; }
+.s-dragging { opacity: .35; }
+.s-dropped { animation: s-dropped .6s var(--ease, ease); }
+@keyframes s-dropped { from { background-color: color-mix(in srgb, var(--s02, #4bb9d3) 28%, transparent); } to { background-color: transparent; } }
+.s-drag-ghost, .s-drag-ghost-table { background: var(--card, #2C2C2E); color: var(--text-primary); border: 1px solid var(--border-strong, rgba(255,255,255,.18)); border-radius: 6px; border-collapse: separate; }
+.s-drag-ghost-table td { padding: 4px 6px; white-space: nowrap; }
+body.s-sorting { user-select: none; cursor: grabbing; }
+body.s-sorting * { cursor: grabbing !important; }
+[data-sort-input] { display: none !important; }
