@@ -50,6 +50,9 @@ class SonorDB {
     this.anon = anonKey || SONOR_SUPABASE_ANON;
     this.client = _initClient();
     this.SERVICES = SERVICES;
+    // 2026-09-30 (sonor-platform §16/§18): register the live instance so kit modules (SonorSortable, SonorRackData…)
+    // can find ONE Supabase client without every app wiring it by hand. Apps keep their own variable as before.
+    try { SonorDB.current = this; if (typeof window !== 'undefined' && !window.sonorDb) window.sonorDb = this; } catch (_) {}
 
     // Sub-modules
     this.projects       = new ProjectsAPI(this.client);

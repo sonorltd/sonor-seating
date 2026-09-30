@@ -1,0 +1,17 @@
+{
+  "version": "0.7.0",
+  "built": "2026-09-30T13:23:21.335Z",
+  "modules": [
+    "sonor-theme.js",
+    "sonor-icons.js",
+    "sonor-takeoffs-modal.js",
+    "sonor-project-bar.js",
+    "sonor-wq-bar.js",
+    "sonor-slot-grid.js",
+    "sonor-rack-calc.js",
+    "sonor-sortable.js",
+    "sonor-catalogue-picker.js",
+    "sonor-rack-data.js"
+  ],
+  "css": "kit.css"
+}
