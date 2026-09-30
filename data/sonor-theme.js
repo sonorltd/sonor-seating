@@ -25,7 +25,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '0.3.3';
+  var VERSION = '0.3.4';
   var KEY = 'sonor-theme', COOKIE = 'sonor_theme';
   var DARK = 'graphite', LIGHT = 'slate';
   var doc = global.document; if (!doc) { global.SonorTheme = { VERSION: VERSION }; return; }
@@ -97,7 +97,7 @@
         var cs = getComputedStyle(el); if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position === 'fixed' && !el.hasAttribute('data-bar')) return false;
         var r = el.getBoundingClientRect(); var top = r.top + global.scrollY;
         if (top < top0 - 2 || top > top0 + 320 || r.height < 18 || r.height > 120) return false;
-        if (el.hasAttribute('data-bar')) return r.width >= vw * 0.6 && opaque(el);
+        if (el.hasAttribute('data-bar')) return r.width >= vw * 0.6;   // v0.3.4 — an opt-in bar needs no background of its own: the ladder paints it
         return r.left <= 8 && r.width >= vw * 0.95 && opaque(el);
       });
       var outer = all.filter(function (el) { return !all.some(function (o) { return o !== el && o.contains(el); }); })
