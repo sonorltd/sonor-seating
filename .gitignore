@@ -5,3 +5,6 @@ __pycache__/
 *.log
 archive/
 _to_delete/
+
+# 2026-09-30 root sweep: the 35 MB Supabase JS snapshot must never be committed/served (B-501)
+data/backups/

@@ -1,5 +1,7 @@
 # Seating Configurator — Claude Code Context (v0.24.0)
 
+> **Active theme: locked custom / slate canvas** — client-facing surface, `data-theme-lock` (sonor-platform §2 exemption); the cross-app ◐ cookie never flips it.
+
 > **v0.24.0 — FrontRow's own diagrams + a seats-per-row selector.** The 70 Serenity
 > configuration drawings and 14 module tiles that were scraped in July were sitting in
 > `WQ - API/FrontRow-Serenity-images` and had never reached the SSOT. All 85 objects are

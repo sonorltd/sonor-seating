@@ -39,7 +39,7 @@
  *   .fetchActiveAsBuiltRevision(projectId)
  *
  *   APP VERSION REPORTING
- *   .reportAppVersion({ appKey, version, name, repo })
+ *   .reportAppVersion({ appKey, version, name, repo })  → app_versions(app_key, version, app_name, repo)
  *
  * All methods are async (Promise<...>) and return either the data or a
  * documented shape on failure. Failures are logged via console.warn and
@@ -478,7 +478,7 @@
         .upsert({
           app_key: opts.appKey,
           version: opts.version,
-          name: opts.name || opts.appKey,
+          app_name: opts.name || opts.appKey,   // 2026-09-30 db-schema-check: column is app_name (was `name` → upsert 400 for months)
           repo: opts.repo || null,
           updated_at: new Date().toISOString()
         }, { onConflict: 'app_key' });
