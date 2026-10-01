@@ -214,11 +214,11 @@
   --shadow-md: 0 6px 18px rgba(15,23,42,.14);
   --shadow-lg: 0 12px 32px rgba(15,23,42,.22);
   /* status — TRAFFIC LIGHT (sonor-platform §23, Bryn 2026-10-01: 'you're using yellow but this should be amber') — ok · amber · bad · info. Status is NEVER the 04 Lighting service yellow (#f5d05c); amber is its own token. Every app's --warn/--warning/--danger/--ok alias resolves here via vocab. */
-  --status-ok: #78ba57;
-  --status-amber: #E8A317;
-  --status-bad: #ec6061;
-  --status-info: #4bb9d3;
-  --amber: #E8A317;
+  --status-ok: #3DB56F;
+  --status-amber: #E0922F;
+  --status-bad: #E2524F;
+  --status-info: #3B9DD8;
+  --amber: #E0922F;
 }
 @media (prefers-reduced-motion: reduce) {
   :root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }

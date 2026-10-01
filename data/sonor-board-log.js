@@ -1,5 +1,6 @@
 /**
  * sonor-board-log.js — CANONICAL MASTER (sonor-platform §22 — the client-interaction contract)
+ * v1.0.1 · 2026-10-01 — touchedAt ignores WeQuote sync writes (metadata.wequote_synced_at + wequote_touched_before)
  * v1.0.0 · 2026-09-30
  *
  * ONE place every Sonor app reads and writes "where is this project with the client":
@@ -10,6 +11,7 @@
  *     contact_on, contact_kind, contact_note,        — LAST client interaction (v1.6)
  *     contacts: [{ on, kind, note, source }],        — history, last 12
  *     saved_at, touched_before                       — so Board writes don't count as a human "touch"
+ *   (projects.metadata.wequote_synced_at + wequote_touched_before do the same for WeQuote sync writes — v1.0.1)
  *   }
  * Written ONLY through sonor_merge_project_metadata (merge-only law) via SonorBoardLog.* — never a
  * metadata rewrite, never a per-app copy of these rules. Sources that know a client was contacted
@@ -32,9 +34,9 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.0.1';
   var CONTACT_KINDS = { call: '📞', email: '✉️', whatsapp: '💬', site: '🏠', meeting: '🤝' };
-  var DONE = ['accepted', 'won', 'approved', 'declined', 'lost', 'expired'];
+  var DONE = ['accepted', 'won', 'approved', 'complete', 'declined', 'lost', 'expired', 'cancelled'];   // WeQuote stage vocabulary + older mirror names
 
   function isoDay(v) { if (!v) return null; var d = new Date(v); return isNaN(d) ? null : d.toISOString().slice(0, 10); }
   function boardOf(p) { return (p && p.metadata && p.metadata.board && typeof p.metadata.board === 'object') ? p.metadata.board : {}; }
@@ -66,8 +68,10 @@
     return { on: isoDay(p.created_at), src: 'project created' };
   }
   function touchedAt(p) {
-    var b = boardOf(p);
+    var b = boardOf(p), m = (p && p.metadata) || {};
     if (b.saved_at && b.touched_before && Math.abs(new Date(p.updated_at) - new Date(b.saved_at)) < 15000) return b.touched_before;
+    // v1.0.1 — a WeQuote sync (sonor-wq-sync.js v1.1.0) is not a human touch either: it stamps wequote_touched_before
+    if (m.wequote_synced_at && m.wequote_touched_before && Math.abs(new Date(p.updated_at) - new Date(m.wequote_synced_at)) < 120000) return m.wequote_touched_before;
     return p.updated_at;
   }
 

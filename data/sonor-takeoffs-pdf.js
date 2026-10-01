@@ -3421,7 +3421,7 @@ const SonorPdf = (function () {
           // signalling consistent with the title-block status pill.
           if (isLatest && /AS[- ]BUILT/i.test(meta.status || '')) dotFill = '#4bb9d3';
           else if (isLatest && /FINAL/i.test(meta.status || '') && !/INSTALL/i.test(meta.status || '')) dotFill = '#78ba57';
-          else if (isLatest && /REVIEW/i.test(meta.status || '')) dotFill = '#E8A317';
+          else if (isLatest && /REVIEW/i.test(meta.status || '')) dotFill = '#E0922F';
           else if (isLatest && /DRAFT/i.test(meta.status || '')) dotFill = COLOURS.draftSlate;
           _setFill(pdf, dotFill);
           pdf.circle(cx, tlMidY, dotR, 'F');

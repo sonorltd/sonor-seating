@@ -1,4 +1,4 @@
-/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.18.0 2026-10-01: §23 traffic light — warn/no-answer pills on --status-amber, .pill-amber alias; v0.17.1 2026-09-30: dark ladder for legacy dark theme names; v0.17.0 2026-09-29: §18 hover/focus law — one wash, no lifts; v0.18.0 2026-09-30: rack view; catalogue picker; v0.16.0: .s-pill; .s-paper; sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
+/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.18.1 2026-10-01: status tones retuned; v0.18.0 2026-10-01: §23 traffic light — warn/no-answer pills on --status-amber, .pill-amber alias; v0.17.1 2026-09-30: dark ladder for legacy dark theme names; v0.17.0 2026-09-29: §18 hover/focus law — one wash, no lifts; v0.18.0 2026-09-30: rack view; catalogue picker; v0.16.0: .s-pill; .s-paper; sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
    Synced to every "APP - {slug}"/data/sonor-components.css via sync-everything.sh.
    Edit here ONLY — never edit a per-app copy.
 
@@ -711,7 +711,7 @@
 .cc-pill--pending       { background: var(--cc-pending,   var(--silver, #b7b1a7)); color: #2C2218; }
 .cc-pill--called        { background: var(--cc-called,    var(--green,  #78ba57)); }
 .cc-pill--no_answer,
-.cc-pill--no-answer     { background: var(--cc-no-answer, var(--status-amber, #E8A317)); color: #2C2218; }   /* §23 amber, not the 04 yellow */
+.cc-pill--no-answer     { background: var(--cc-no-answer, var(--status-amber, #E0922F)); color: #2C2218; }   /* §23 amber, not the 04 yellow */
 .cc-pill--declined      { background: var(--cc-declined,  var(--red,    #ec6061)); }
 
 /* ── v0.8.0 (2026-09-28, B-478) UI KIT ADDITIONS — icons, popover menus, stage chips ───────────────────────────
