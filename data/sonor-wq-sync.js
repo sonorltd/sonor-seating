@@ -1,5 +1,8 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.2.0 · 2026-10-01 — QUOTE INDEX: every WQ quote fetched once (/quote/get) and kept by WQ project_id / customer_id in the
+ *   `wq_quote_index` table (B-506) or this browser's localStorage; a project's quotes are then a lookup, not a name guess (1192
+ *   Linkside etc. had quotes whose descriptions never mentioned the project). Incremental after the first build.
  * v1.1.0 · 2026-10-01 — quotes matched on the FRESH WQ project / customer names (+ one /quote/list walk per run, not 3 pages per
  *   project); stores wequote_created_at / wequote_modified_at / wequote_activity_at (+ per-quote created_at / updated_at / accepted_date)
  *   so the Board can rank by WeQuote activity (Active · 90+ · Completed). API: quotesFor(client, row, internalId, customerId, names?, run?)
@@ -16,7 +19,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -55,25 +58,88 @@
   // candidates = quotes whose description / title mentions the WQ project name, the Sonor name, the customer or the WQ number;
   // each is verified with /quote/get (project_id = this WQ project, or customer_id = this customer). v1.0.0 only matched the
   // STALE row names (first sync: "Marian Horrocks" vs quote "TV Upgrades" → 0 quotes) — now the fresh WQ names are used too.
-  async function quotesFor(client, row, internalId, customerId, names, run) {
-    var m = row.metadata || {};
-    var keys = [].concat(names || [], [m.wequote_name, row.name, row.client_name, m.wequote_customer, wqNoOf(row)]).map(norm).filter(function (n) { return n && n.length >= 3; });
-    keys = keys.filter(function (n, i) { return keys.indexOf(n) === i; });
-    if (!keys.length) return null;
+  function compact(q) {
+    return { id: q.id, quote_no: q.quote_no, description: q.description, title: q.title, stage: q.stage, subtotal: q.subtotal, total: q.total, margin: q['total_margin_%'],
+      quote_date: q.quote_date, expiry_date: q.expiry_date, accepted_date: q.accepted_date || null, created_at: q.created_datetime || null, updated_at: q.updated_datetime || null,
+      project_id: q.project_id || null, customer_id: q.customer_id || null, revision: q.revision || null, is_latest: q.is_latest_revision !== false, archived: !!q.archived,
+      subsystems: (q.subsystems || []).map(function (s) { return s.description; }),
+      address: [q.address_line_1, q.address_line_2, q.address_line_3, q.posttown, q.county].filter(Boolean).join(', '), postcode: q.postcode || '' };
+  }
+  // ── v1.2.0 QUOTE INDEX — every WeQuote quote, keyed by WQ project / customer, so "which quotes belong to project N" is a
+  // lookup instead of a name guess (WQ's /quote/list has no project filter and carries only id / no / description). Lives in
+  // the `wq_quote_index` table when it exists (B-506 — shared by every device) and otherwise in localStorage on this
+  // browser (Hub + Board share it: same origin). Built once (one /quote/get per quote), then only NEW quote ids are fetched
+  // and the quotes of the projects being synced are re-fetched so stage changes land.
+  var IDX_KEY = 'sonor:wq-quote-index';
+  async function loadIndex(client, run) {
+    if (run && run.index) return run.index;
+    var idx = { quotes: {}, built_at: null, store: 'local' };
     try {
-      var list = await listAllQuotes(client, run);
-      var candidates = list.filter(function (q) { var d = norm((q.description || '') + ' ' + (q.quote_title || '')); return keys.some(function (n) { return d.indexOf(n) >= 0; }); });
-      var out = [];
-      for (var i = 0; i < Math.min(candidates.length, 8); i++) {
-        var q = await apiFetch(client, '/quote/get', { id: candidates[i].id });
-        if (!q || !q.id) continue;
-        if (!(q.project_id === internalId || (customerId && q.customer_id === customerId))) continue;
-        out.push({ id: q.id, quote_no: q.quote_no, description: q.description, title: q.title, stage: q.stage, subtotal: q.subtotal, total: q.total, margin: q['total_margin_%'],
-          quote_date: q.quote_date, expiry_date: q.expiry_date, accepted_date: q.accepted_date || null, created_at: q.created_datetime || null, updated_at: q.updated_datetime || null,
-          subsystems: (q.subsystems || []).map(function (s) { return s.description; }),
-          address: [q.address_line_1, q.address_line_2, q.address_line_3, q.posttown, q.county].filter(Boolean).join(', '), postcode: q.postcode || '' });
+      var r = await client.from('wq_quote_index').select('*');
+      if (!r.error && Array.isArray(r.data)) {
+        idx.store = 'table';
+        r.data.forEach(function (row) { idx.quotes[row.quote_id] = { id: row.quote_id, quote_no: row.quote_no, description: row.description, title: row.title, stage: row.stage, subtotal: row.subtotal, total: row.total, margin: row.margin_pct,
+          quote_date: row.quote_date, expiry_date: row.expiry_date, accepted_date: row.accepted_date, created_at: row.wq_created_at, updated_at: row.wq_updated_at, project_id: row.project_id, customer_id: row.customer_id,
+          revision: row.revision, is_latest: row.is_latest !== false, archived: !!row.archived, subsystems: row.subsystems || [], address: row.address || '', postcode: row.postcode || '' }; });
+        idx.built_at = r.data.length ? 'table' : null;
       }
-      return out;
+    } catch (e) { /* no table → local */ }
+    if (idx.store === 'local') {
+      try { var j = JSON.parse(localStorage.getItem(IDX_KEY) || 'null'); if (j && j.quotes) { idx.quotes = j.quotes; idx.built_at = j.built_at; } } catch (e) {}
+    }
+    if (run) run.index = idx;
+    return idx;
+  }
+  async function saveIndex(client, idx, changedIds) {
+    if (idx.store === 'table') {
+      var rows = (changedIds || Object.keys(idx.quotes)).map(function (id) { var q = idx.quotes[id]; return q && { quote_id: q.id, quote_no: q.quote_no, project_id: q.project_id, customer_id: q.customer_id, stage: q.stage, description: q.description, title: q.title,
+        revision: q.revision, is_latest: q.is_latest, archived: q.archived, quote_date: q.quote_date, expiry_date: q.expiry_date, accepted_date: q.accepted_date, subtotal: q.subtotal, total: q.total, margin_pct: q.margin,
+        subsystems: q.subsystems, address: q.address, postcode: q.postcode, wq_created_at: wqIso(q.created_at), wq_updated_at: wqIso(q.updated_at), indexed_at: new Date().toISOString() }; }).filter(Boolean);
+      for (var i = 0; i < rows.length; i += 200) { try { await client.from('wq_quote_index').upsert(rows.slice(i, i + 200), { onConflict: 'quote_id' }); } catch (e) {} }
+    } else {
+      try { localStorage.setItem(IDX_KEY, JSON.stringify({ v: 1, built_at: idx.built_at || new Date().toISOString(), quotes: idx.quotes })); } catch (e) {}
+    }
+  }
+  // fetch every quote id not yet indexed (+ the ids in refreshIds) — one /quote/get each
+  async function updateIndex(client, run, refreshIds, onProgress) {
+    run = run || {};
+    var idx = await loadIndex(client, run);
+    var list = await listAllQuotes(client, run);
+    var want = list.filter(function (q) { return !idx.quotes[q.id]; }).map(function (q) { return q.id; });
+    (refreshIds || []).forEach(function (id) { if (want.indexOf(id) < 0 && idx.quotes[id]) want.push(id); });
+    run.fetched = run.fetched || {}; want = want.filter(function (id) { return !run.fetched[id]; });   // once per run
+    var changed = [];
+    for (var i = 0; i < want.length; i++) {
+      if (onProgress) try { onProgress(i + 1, want.length, { ref: 'WQ quote index', name: String(want[i]) }); } catch (_) {}
+      var q = await apiFetch(client, '/quote/get', { id: want[i] });
+      run.fetched[want[i]] = true;
+      if (q && q.id) { idx.quotes[q.id] = compact(q); changed.push(q.id); }
+    }
+    if (changed.length || !idx.built_at) { idx.built_at = idx.built_at || new Date().toISOString(); await saveIndex(client, idx, changed); }
+    return idx;
+  }
+  var byProject = function (idx, internalId) { return Object.keys(idx.quotes).map(function (k) { return idx.quotes[k]; }).filter(function (q) { return q.project_id === internalId && q.is_latest !== false; }); };
+  // quotes for one project: the index by WQ project id (re-fetched so the stage is current); name-match on the list
+  // only as a fallback for quotes filed under the customer without a project
+  async function quotesFor(client, row, internalId, customerId, names, run) {
+    run = run || {};
+    try {
+      var idx = await loadIndex(client, run);
+      var mine = internalId ? byProject(idx, internalId) : [];
+      if (mine.length) {
+        await updateIndex(client, run, mine.map(function (q) { return q.id; }));
+        mine = byProject(idx, internalId);
+      } else {
+        var m = row.metadata || {};
+        var keys = [].concat(names || [], [m.wequote_name, row.name, row.client_name, m.wequote_customer]).map(norm).filter(function (n) { return n && n.length >= 3; });
+        var list = await listAllQuotes(client, run);
+        var cands = list.filter(function (q) { return !idx.quotes[q.id] && keys.some(function (n) { return norm((q.description || '') + ' ' + (q.quote_title || '')).indexOf(n) >= 0; }); }).slice(0, 8);
+        for (var i = 0; i < cands.length; i++) { var q = await apiFetch(client, '/quote/get', { id: cands[i].id }); if (q && q.id) idx.quotes[q.id] = compact(q); }
+        if (cands.length) await saveIndex(client, idx, cands.map(function (c) { return c.id; }));
+        mine = internalId ? byProject(idx, internalId) : [];
+        if (!mine.length && customerId) mine = Object.keys(idx.quotes).map(function (k) { return idx.quotes[k]; }).filter(function (q) { return q.customer_id === customerId && !q.project_id && q.is_latest !== false; });
+      }
+      return mine.sort(function (a, b) { return (Number(b.quote_no) || 0) - (Number(a.quote_no) || 0); });
     } catch (e) { return null; }
   }
   // WeQuote stamps are "YYYY-MM-DD HH:MM:SS" (UK) — normalise to ISO so every app compares them the same way
@@ -83,6 +149,7 @@
     var staleBefore = Date.now() - 7 * 24 * 3600e3;
     var targets = (rows || []).filter(function (r) { var m = r.metadata || {}; if (!wqNoOf(r)) return false; if (force || !m.wequote_name || !m.wequote_id || !m.wequote_activity_at) return true;   /* v1.1.0: no activity stamp yet → pull once */ return !(m.wequote_synced_at && new Date(m.wequote_synced_at).getTime() > staleBefore); });
     var changed = 0, done = 0; var run = {};
+    if (targets.length) { try { await updateIndex(client, run, null, opts.onProgress); } catch (e) {} }   // v1.2.0 quote index (new quotes only after the first build)
     for (var ti = 0; ti < targets.length; ti++) {
       var r = targets[ti]; done++; if (opts.onProgress) try { opts.onProgress(done, targets.length, r); } catch (_) {}
       var wqNo = wqNoOf(r);
@@ -120,5 +187,5 @@
     }
     return changed;
   }
-  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
+  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, loadIndex: loadIndex, updateIndex: updateIndex, saveIndex: saveIndex, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
 })(typeof window !== 'undefined' ? window : this);
