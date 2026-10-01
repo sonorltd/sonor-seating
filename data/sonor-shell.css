@@ -53,5 +53,5 @@
 }
 #sonor-shell-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 #sonor-shell-toast.ok    { border-left-color: var(--green, #78ba57); }
-#sonor-shell-toast.warn  { border-left-color: var(--yellow, #f5d05c); }
+#sonor-shell-toast.warn  { border-left-color: var(--status-amber, #E8A317); }
 #sonor-shell-toast.error { border-left-color: var(--red, #ec6061); }

@@ -181,7 +181,7 @@
     SNAGGING:   '#ec6061',
     COMPLETE:   '#78ba57',
     COMPLETED:  '#78ba57', // legacy alias
-    ON_HOLD:    '#f5d05c',
+    ON_HOLD:    '#E8A317',
     LOST:       '#b7b1a7',
     // legacy aliases (kept so old localStorage / old rows don't crash colour lookup)
     PROPOSED:   '#e37c59',
