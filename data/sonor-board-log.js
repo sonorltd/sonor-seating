@@ -1,5 +1,8 @@
 /**
  * sonor-board-log.js — CANONICAL MASTER (sonor-platform §22 — the client-interaction contract)
+ * v1.1.0 · 2026-10-02 — NEXT ACTIONS are a list: board.actions = [{ id, text, by, set_at, done_on, done_via, done_note }] (last 30);
+ *   board.next / board.by always MIRROR the first open action so every reader of `next` keeps working. addAction · doneAction ·
+ *   openActions · logContact({ done_action: id }) ticks the action off as part of logging the contact.
  * v1.0.2 · 2026-10-02 — lastSent counts accepted / complete / expired quotes and v2+ reworks (quote_date = issue date)
  * v1.0.1 · 2026-10-01 — touchedAt ignores WeQuote sync writes (metadata.wequote_synced_at + wequote_touched_before)
  * v1.0.0 · 2026-09-30
@@ -7,7 +10,8 @@
  * ONE place every Sonor app reads and writes "where is this project with the client":
  *   projects.metadata.board = {
  *     star, priority (1|2|3), rank,                  — Board ordering (v1.3)
- *     next, by, set_at,                              — next action + chase date (v1.1)
+ *     next, by, set_at,                              — the CURRENT next action + chase date (mirror of actions[0] open — v1.1)
+ *     actions: [{ id, text, by, set_at, done_on, done_via, done_note }],  — the list (open first), last 30 kept
  *     enquiry_on,                                    — enquiry date override (v1.6)
  *     contact_on, contact_kind, contact_note,        — LAST client interaction (v1.6)
  *     contacts: [{ on, kind, note, source }],        — history, last 12
@@ -35,7 +39,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.0.2';
+  var VERSION = '1.1.0';
   var CONTACT_KINDS = { call: '📞', email: '✉️', whatsapp: '💬', site: '🏠', meeting: '🤝' };
   var DONE = ['accepted', 'won', 'approved', 'complete', 'declined', 'lost', 'expired', 'cancelled'];   // WeQuote stage vocabulary + older mirror names
 
@@ -113,8 +117,40 @@
     if (hist.some(function (h) { return h.on === on && h.kind === kind && (h.source || null) === (opts.source || null) && (h.note || null) === note; })) return cur;
     var contacts = hist.concat([entry]).slice(-12);
     var patch = { contacts: contacts };
+    if (opts.done_action) {   // v1.1.0 — the contact WAS the next action: tick it off in the same write
+      var list = actionsOf(p).map(function (x) { return x.id === opts.done_action ? Object.assign({}, x, { id: x.id === 'legacy' ? newId() : x.id, done_on: on, done_via: 'contact:' + kind, done_note: note }) : (x.id === 'legacy' ? Object.assign({}, x, { id: newId() }) : x); });
+      Object.assign(patch, mirror(list));
+    }
     if (!cur.contact_on || on >= isoDay(cur.contact_on)) { patch.contact_on = on; patch.contact_kind = kind; patch.contact_note = note; }
     return save(client, projectId, patch, p);
+  }
+  // ── v1.1.0 next actions ──
+  function actionsOf(p) { var b = boardOf(p); var a = Array.isArray(b.actions) ? b.actions : []; if (!a.length && b.next) a = [{ id: 'legacy', text: b.next, by: b.by || null, set_at: b.set_at || null }]; return a; }
+  function openActions(p) { return actionsOf(p).filter(function (a) { return !a.done_on; }).sort(function (x, y) { return String(x.by || '9999') < String(y.by || '9999') ? -1 : 1; }); }
+  function mirror(actions) { var open = actions.filter(function (a) { return !a.done_on; }).sort(function (x, y) { return String(x.by || '9999') < String(y.by || '9999') ? -1 : 1; }); var f = open[0]; return { actions: actions.slice(-30), next: f ? f.text : null, by: f ? (f.by || null) : null, set_at: f ? (f.set_at || null) : null }; }
+  function newId() { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4); }
+  async function addAction(client, projectId, a, project) {
+    var p = project && project.id === projectId ? project : await fetchProject(client, projectId); if (!p) throw new Error('project not found: ' + projectId);
+    var list = actionsOf(p).map(function (x) { return x.id === 'legacy' ? Object.assign({}, x, { id: newId() }) : x; });
+    list.push({ id: newId(), text: String(a.text || '').slice(0, 160), by: a.by ? isoDay(a.by) : null, set_at: new Date().toISOString(), source: a.source || null });
+    return save(client, projectId, mirror(list), p);
+  }
+  async function editAction(client, projectId, actionId, patch, project) {
+    var p = project && project.id === projectId ? project : await fetchProject(client, projectId); if (!p) throw new Error('project not found: ' + projectId);
+    var list = actionsOf(p).map(function (x) { return x.id === 'legacy' ? Object.assign({}, x, { id: actionId === 'legacy' ? 'legacy' : newId() }) : x; });
+    list = list.map(function (x) { return x.id === actionId ? Object.assign({}, x, { text: patch.text != null ? String(patch.text).slice(0, 160) : x.text, by: patch.by !== undefined ? (patch.by ? isoDay(patch.by) : null) : x.by }, x.id === 'legacy' ? { id: newId() } : {}) : x; });
+    return save(client, projectId, mirror(list), p);
+  }
+  async function doneAction(client, projectId, actionId, opts, project) {
+    opts = opts || {};
+    var p = project && project.id === projectId ? project : await fetchProject(client, projectId); if (!p) throw new Error('project not found: ' + projectId);
+    var list = actionsOf(p).map(function (x) { return x.id === actionId ? Object.assign({}, x, { id: x.id === 'legacy' ? newId() : x.id, done_on: isoDay(opts.on) || new Date().toISOString().slice(0, 10), done_via: opts.via || 'board', done_note: opts.note ? String(opts.note).slice(0, 120) : null }) : (x.id === 'legacy' ? Object.assign({}, x, { id: newId() }) : x); });
+    return save(client, projectId, mirror(list), p);
+  }
+  async function removeAction(client, projectId, actionId, project) {
+    var p = project && project.id === projectId ? project : await fetchProject(client, projectId); if (!p) throw new Error('project not found: ' + projectId);
+    var list = actionsOf(p).filter(function (x) { return x.id !== actionId; }).map(function (x) { return x.id === 'legacy' ? Object.assign({}, x, { id: newId() }) : x; });
+    return save(client, projectId, mirror(list), p);
   }
   async function setEnquiryDate(client, projectId, iso, project) {
     return save(client, projectId, { enquiry_on: iso ? isoDay(iso) : null }, project);
@@ -132,5 +168,5 @@
     return null;
   }
 
-  global.SonorBoardLog = { VERSION: VERSION, CONTACT_KINDS: CONTACT_KINDS, boardOf: boardOf, contactOf: contactOf, enquiryOf: enquiryOf, touchedAt: touchedAt, lastSent: lastSent, isoDay: isoDay, save: save, logContact: logContact, setEnquiryDate: setEnquiryDate, findProjectId: findProjectId };
+  global.SonorBoardLog = { VERSION: VERSION, actionsOf: actionsOf, openActions: openActions, addAction: addAction, editAction: editAction, doneAction: doneAction, removeAction: removeAction, CONTACT_KINDS: CONTACT_KINDS, boardOf: boardOf, contactOf: contactOf, enquiryOf: enquiryOf, touchedAt: touchedAt, lastSent: lastSent, isoDay: isoDay, save: save, logContact: logContact, setEnquiryDate: setEnquiryDate, findProjectId: findProjectId };
 })(typeof window !== 'undefined' ? window : this);
