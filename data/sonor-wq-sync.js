@@ -1,5 +1,10 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.5.1 · 2026-10-02 — adopt checks ownership against every project (closed ones too) + skips SONOR-internal WQ rows.
+ * v1.5.0 · 2026-10-02 — ADOPT: every sync first adopts WeQuote projects that have no Sonor project yet (created, or with a quote
+ *   touched, inside 180 days; test rows skipped) as `projects` rows — ref "<no> - <description>", status enquiry (the stage mirror
+ *   moves it on), metadata.source 'wequote'; the in-WQ = lead trigger logs the enquiry. Bryn: "Fraser Morgan… MacFadyen is a recent
+ *   not on there too — account for all this": the Board can only show what projects holds, so WeQuote feeds it.
  * v1.4.2 · 2026-10-02 — SAFETY: quick refresh needs a complete index (else builds it first) and a lookup miss never empties a
  *   project's quote list (a fresh browser's 3-page index wiped 10 projects' quotes on 2026-10-02 17:05 — repaired by a full sync).
  * v1.4.1 · 2026-10-02 — quick refresh also re-reads the WQ project row (name · customer · status · modified) — one call each.
@@ -32,7 +37,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.4.2';
+  var VERSION = '1.5.1';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -221,15 +226,49 @@
     var n = await syncProjects(client, [row], { force: true, onProgress: opts.onProgress });
     return { project: p, changed: n };
   }
+  // ── v1.5.0 adopt: WeQuote projects nobody in `projects` owns yet ──
+  var TEST_RX = /\b(test|claude|dummy|sample|tst|sonor)\b/i;   // v1.5.1: + 'sonor' (internal WQ projects like 1375 World Cup)
+  async function adoptProjects(client, rows, opts) {
+    opts = opts || {}; var days = opts.sinceDays || 180; var run = opts.run || {};
+    var owned = {}; (rows || []).forEach(function (r) { var n = wqNoOf(r); if (n) owned[String(n)] = true; });
+    // v1.5.1 — ownership is checked against EVERY project, not the (possibly filtered) rows: a closed Sonor project that owns a
+    // WQ number under a different ref (1343 → WQ 1363, title override by design) must not be adopted again
+    try { var all = await client.from('projects').select('ref,metadata'); (all.data || []).forEach(function (r) { var n = wqNoOf(r); if (n) owned[String(n)] = true; }); } catch (e) {}
+    var list = await listProjects(client, run); if (!list.length) return [];
+    var idx = null; try { idx = await loadIndex(client, run); } catch (e) {}
+    var lastQuoteTouch = {};
+    if (idx) Object.keys(idx.quotes).forEach(function (k) { var q = idx.quotes[k]; if (!q.project_id) return; var t = wqIso(q.updated_at) || wqIso(q.created_at) || ''; if (t > (lastQuoteTouch[q.project_id] || '')) lastQuoteTouch[q.project_id] = t; });
+    var cutoff = new Date(Date.now() - days * 86400000).toISOString();
+    var adopted = [];
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i]; var no = String(p.project_no || '').trim();
+      if (!/^\d{3,5}$/.test(no) || owned[no]) continue;
+      if (TEST_RX.test(p.customer_name || '') || TEST_RX.test(p.description || '')) continue;
+      var created = wqIso(p.created_datetime) || '', modified = wqIso(p.modified_datetime) || '', qt = lastQuoteTouch[p.id] || '';
+      var recent = created >= cutoff || modified >= cutoff || qt >= cutoff;
+      if (!recent) continue;
+      // double-check nothing owns it by ref prefix (rows may be a filtered list)
+      try { var ex = await client.from('projects').select('id').ilike('ref', no + ' - %').limit(1); if (ex.data && ex.data.length) { owned[no] = true; continue; } } catch (e) {}
+      var row = { ref: no + ' - ' + (p.description || 'WeQuote ' + no), name: p.description || ('WeQuote ' + no), client_name: p.customer_name || null, address: [p.address_line_1, p.address_line_2, p.address_line_3, p.posttown, p.county].filter(Boolean).join(', ') || null, postcode: p.postcode || null, status: 'enquiry',
+        notes: 'Adopted from WeQuote ' + new Date().toISOString().slice(0, 10) + ' (project existed in WeQuote with no Sonor project — ' + (qt ? 'quote activity ' + qt.slice(0, 10) : 'created ' + created.slice(0, 10)) + ').',
+        metadata: { source: 'wequote', created_by: 'wq-sync', wequote_id: no, wequote_internal_id: p.id, wequote_name: p.description || '', wequote_customer: p.customer_name || '', wequote_status: p.status || '', wequote_created_at: created || null, wequote_modified_at: modified || null, enquiry_date: (created || new Date().toISOString()).slice(0, 10), first_seen: created || null } };
+      try { var ins = await client.from('projects').insert(row).select('id,ref,name,client_name,address,postcode,status,services,value_quoted,value_agreed,start_date,target_date,notes,metadata,created_at,updated_at').single(); if (ins.data) { adopted.push(ins.data); owned[no] = true; if (rows) rows.push(ins.data); } } catch (e) {}
+    }
+    return adopted;
+  }
   async function syncProjects(client, rows, opts) {
     opts = opts || {}; var force = !!opts.force; var quick = !!opts.quick && !force;
     var staleBefore = Date.now() - 7 * 24 * 3600e3;
     var targets = (rows || []).filter(function (r) { var m = r.metadata || {}; if (!wqNoOf(r)) return false; if (quick) return !!m.wequote_internal_id; if (force || !m.wequote_name || !m.wequote_id || !m.wequote_activity_at) return true;   /* v1.1.0: no activity stamp yet → pull once */ return !(m.wequote_synced_at && new Date(m.wequote_synced_at).getTime() > staleBefore); });
-    var changed = 0, done = 0; var run = { quick: quick };
+    var run = { quick: quick };
+    var changed = 0, done = 0;
     // v1.4.2 — a quick refresh is only quick when the index is COMPLETE on this browser; a fresh browser (empty localStorage)
     // builds the whole index first, otherwise projects whose quotes sit outside the newest pages would read as "no quotes"
     if (quick) { try { var idx0 = await loadIndex(client, run); if (!idx0.built_at || Object.keys(idx0.quotes).length < 100) run.quick = false; } catch (e) { run.quick = false; } }
-    if (targets.length) { try { await updateIndex(client, run, null, opts.onProgress); } catch (e) {} }   // v1.2.0 quote index (new quotes only after the first build)
+    try { await updateIndex(client, run, null, opts.onProgress); } catch (e) {}
+    // v1.5.0 — adopt WeQuote projects nobody owns (after the index, so "a quote touched lately" counts), then sync them in this run
+    var adopted = []; try { adopted = await adoptProjects(client, rows, { run: run, sinceDays: opts.sinceDays }); } catch (e) { adopted = []; }
+    if (adopted.length) { targets = targets.concat(adopted); if (opts.onAdopted) try { opts.onAdopted(adopted); } catch (_) {} }   // v1.2.0 quote index (new quotes only after the first build)
     for (var ti = 0; ti < targets.length; ti++) {
       var r = targets[ti]; done++; if (opts.onProgress) try { opts.onProgress(done, targets.length, r); } catch (_) {}
       var wqNo = wqNoOf(r);
@@ -291,5 +330,5 @@
     }
     return changed;
   }
-  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, listProjects: listProjects, suggestProjects: suggestProjects, linkProject: linkProject, loadIndex: loadIndex, updateIndex: updateIndex, saveIndex: saveIndex, byProject: byProject, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
+  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, listProjects: listProjects, suggestProjects: suggestProjects, linkProject: linkProject, adoptProjects: adoptProjects, loadIndex: loadIndex, updateIndex: updateIndex, saveIndex: saveIndex, byProject: byProject, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
 })(typeof window !== 'undefined' ? window : this);
