@@ -1,5 +1,8 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.3.1 · 2026-10-02 — QUICK REFRESH: syncProjects(rows, { quick: true }) re-reads every known quote of every row given (stage
+ *   changes land — cancelled / accepted / new revision) + the newest 3 list pages for new quotes, skipping the project / customer
+ *   look-ups. The Board's plain ⟳ WQ is quick over the open projects; shift-click is the full force sync.
  * v1.3.0 · 2026-10-02 — LINKING: listProjects() (one /project/list_project per run), suggestProjects(row) (postcode · customer · name
  *   matches for a Sonor project with no WQ number yet, e.g. an ENQ- lead once the WQ project exists), linkProject(client, row, wqNo)
  *   (stamps wequote_id, renames an ENQ- / SITE- ref to "<no> - <WQ description>", syncs the row). Board 🔗 and Hub use it.
@@ -22,7 +25,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.3.0';
+  var VERSION = '1.3.1';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -45,10 +48,10 @@
   var wqNoOf = function (r) { var m = r.metadata || {}; if (m.wequote_id) return String(m.wequote_id); var x = String(r.ref || '').match(/^(\d{3,5})\b/); return x ? x[1] : null; };
   // v1.1.0 — one walk of /quote/list per sync run (it is paged 10/page, newest first, no project filter — see WQ-QUOTE-FORMAT.md),
   // shared by every project in the run instead of 3 pages per project. Capped at 80 pages (800 quotes).
-  async function listAllQuotes(client, run) {
+  async function listAllQuotes(client, run, maxPages) {
     if (run && run.quoteList) return run.quoteList;
-    var all = [];
-    for (var page = 1; page <= 80; page++) {
+    var all = []; maxPages = maxPages || 80;
+    for (var page = 1; page <= maxPages; page++) {
       var rows = await apiFetch(client, '/quote/list', { page: page });
       if (!Array.isArray(rows) || !rows.length) break;
       all = all.concat(rows);
@@ -107,7 +110,7 @@
   async function updateIndex(client, run, refreshIds, onProgress) {
     run = run || {};
     var idx = await loadIndex(client, run);
-    var list = await listAllQuotes(client, run);
+    var list = await listAllQuotes(client, run, run.quick ? 3 : 80);
     var want = list.filter(function (q) { return !idx.quotes[q.id]; }).map(function (q) { return q.id; });
     (refreshIds || []).forEach(function (id) { if (want.indexOf(id) < 0 && idx.quotes[id]) want.push(id); });
     run.fetched = run.fetched || {}; want = want.filter(function (id) { return !run.fetched[id]; });   // once per run
@@ -135,7 +138,7 @@
       } else {
         var m = row.metadata || {};
         var keys = [].concat(names || [], [m.wequote_name, row.name, row.client_name, m.wequote_customer]).map(norm).filter(function (n) { return n && n.length >= 3; });
-        var list = await listAllQuotes(client, run);
+        var list = await listAllQuotes(client, run, run.quick ? 3 : 80);
         var cands = list.filter(function (q) { return !idx.quotes[q.id] && keys.some(function (n) { return norm((q.description || '') + ' ' + (q.quote_title || '')).indexOf(n) >= 0; }); }).slice(0, 8);
         for (var i = 0; i < cands.length; i++) { var q = await apiFetch(client, '/quote/get', { id: cands[i].id }); if (q && q.id) idx.quotes[q.id] = compact(q); }
         if (cands.length) await saveIndex(client, idx, cands.map(function (c) { return c.id; }));
@@ -192,14 +195,34 @@
     return { project: p, changed: n };
   }
   async function syncProjects(client, rows, opts) {
-    opts = opts || {}; var force = !!opts.force;
+    opts = opts || {}; var force = !!opts.force; var quick = !!opts.quick && !force;
     var staleBefore = Date.now() - 7 * 24 * 3600e3;
-    var targets = (rows || []).filter(function (r) { var m = r.metadata || {}; if (!wqNoOf(r)) return false; if (force || !m.wequote_name || !m.wequote_id || !m.wequote_activity_at) return true;   /* v1.1.0: no activity stamp yet → pull once */ return !(m.wequote_synced_at && new Date(m.wequote_synced_at).getTime() > staleBefore); });
-    var changed = 0, done = 0; var run = {};
+    var targets = (rows || []).filter(function (r) { var m = r.metadata || {}; if (!wqNoOf(r)) return false; if (quick) return !!m.wequote_internal_id; if (force || !m.wequote_name || !m.wequote_id || !m.wequote_activity_at) return true;   /* v1.1.0: no activity stamp yet → pull once */ return !(m.wequote_synced_at && new Date(m.wequote_synced_at).getTime() > staleBefore); });
+    var changed = 0, done = 0; var run = { quick: quick };
     if (targets.length) { try { await updateIndex(client, run, null, opts.onProgress); } catch (e) {} }   // v1.2.0 quote index (new quotes only after the first build)
     for (var ti = 0; ti < targets.length; ti++) {
       var r = targets[ti]; done++; if (opts.onProgress) try { opts.onProgress(done, targets.length, r); } catch (_) {}
       var wqNo = wqNoOf(r);
+      if (quick) {   // v1.3.1 — quotes only: re-read the ones we know, pick up new ones; names / customer stay as stored
+        var qm = r.metadata || {};
+        var qq = await quotesFor(client, r, Number(qm.wequote_internal_id), Number(qm.wequote_customer_id) || null, [qm.wequote_name, qm.wequote_customer], run);
+        if (!qq) continue;
+        var qpatch = { wequote_quotes: qq, wequote_quotes_synced_at: new Date().toISOString(), wequote_synced_at: new Date().toISOString() };
+        var qact = [qm.wequote_modified_at].concat(qq.map(function (q) { return wqIso(q.updated_at) || wqIso(q.quote_date); })).filter(Boolean).sort();
+        if (qact.length) qpatch.wequote_activity_at = qact[qact.length - 1];
+        try {
+          var qfresh = await client.from('projects').select('metadata,updated_at').eq('id', r.id).single();
+          var qfm = (qfresh.data && qfresh.data.metadata) || {};
+          var before = JSON.stringify(qfm.wequote_quotes || null), after = JSON.stringify(qq);
+          if (before === after) continue;   // nothing moved — no write, no updated_at bump
+          var qprev = qfm.wequote_synced_at && qfresh.data.updated_at && Math.abs(new Date(qfresh.data.updated_at) - new Date(qfm.wequote_synced_at)) < 120000;
+          qpatch.wequote_touched_before = (qprev && qfm.wequote_touched_before) ? qfm.wequote_touched_before : (qfresh.data && qfresh.data.updated_at) || new Date().toISOString();
+          var qu = await client.from('projects').update({ metadata: Object.assign({}, qfm, qpatch) }).eq('id', r.id);
+          if (qu.error) continue;
+          r.metadata = Object.assign({}, r.metadata, qpatch); changed++;
+        } catch (e) {}
+        continue;
+      }
       var p = await findProject(client, wqNo); if (!p) continue;
       r.metadata = r.metadata || {}; if (!r.metadata.wequote_id) r.metadata.wequote_id = wqNo;
       var patch = { wequote_id: wqNo, wequote_name: p.description || '', wequote_customer: p.customer_name || '', wequote_status: p.status || '', wequote_internal_id: p.id, wequote_synced_at: new Date().toISOString(),
