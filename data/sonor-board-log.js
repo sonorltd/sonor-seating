@@ -1,5 +1,6 @@
 /**
  * sonor-board-log.js — CANONICAL MASTER (sonor-platform §22 — the client-interaction contract)
+ * v1.1.1 · 2026-10-02 — actions carry a `kind` (call · email · quote · chase · visit · service · install · order · invoice · other)
  * v1.1.0 · 2026-10-02 — NEXT ACTIONS are a list: board.actions = [{ id, text, by, set_at, done_on, done_via, done_note }] (last 30);
  *   board.next / board.by always MIRROR the first open action so every reader of `next` keeps working. addAction · doneAction ·
  *   openActions · logContact({ done_action: id }) ticks the action off as part of logging the contact.
@@ -11,7 +12,7 @@
  *   projects.metadata.board = {
  *     star, priority (1|2|3), rank,                  — Board ordering (v1.3)
  *     next, by, set_at,                              — the CURRENT next action + chase date (mirror of actions[0] open — v1.1)
- *     actions: [{ id, text, by, set_at, done_on, done_via, done_note }],  — the list (open first), last 30 kept
+ *     actions: [{ id, text, kind, by, set_at, done_on, done_via, done_note }],  — the list (open first), last 30 kept
  *     enquiry_on,                                    — enquiry date override (v1.6)
  *     contact_on, contact_kind, contact_note,        — LAST client interaction (v1.6)
  *     contacts: [{ on, kind, note, source }],        — history, last 12
@@ -39,7 +40,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.1.0';
+  var VERSION = '1.1.1';
   var CONTACT_KINDS = { call: '📞', email: '✉️', whatsapp: '💬', site: '🏠', meeting: '🤝' };
   var DONE = ['accepted', 'won', 'approved', 'complete', 'declined', 'lost', 'expired', 'cancelled'];   // WeQuote stage vocabulary + older mirror names
 
@@ -132,13 +133,13 @@
   async function addAction(client, projectId, a, project) {
     var p = project && project.id === projectId ? project : await fetchProject(client, projectId); if (!p) throw new Error('project not found: ' + projectId);
     var list = actionsOf(p).map(function (x) { return x.id === 'legacy' ? Object.assign({}, x, { id: newId() }) : x; });
-    list.push({ id: newId(), text: String(a.text || '').slice(0, 160), by: a.by ? isoDay(a.by) : null, set_at: new Date().toISOString(), source: a.source || null });
+    list.push({ id: newId(), text: String(a.text || '').slice(0, 160), by: a.by ? isoDay(a.by) : null, kind: a.kind || null, set_at: new Date().toISOString(), source: a.source || null });
     return save(client, projectId, mirror(list), p);
   }
   async function editAction(client, projectId, actionId, patch, project) {
     var p = project && project.id === projectId ? project : await fetchProject(client, projectId); if (!p) throw new Error('project not found: ' + projectId);
     var list = actionsOf(p).map(function (x) { return x.id === 'legacy' ? Object.assign({}, x, { id: actionId === 'legacy' ? 'legacy' : newId() }) : x; });
-    list = list.map(function (x) { return x.id === actionId ? Object.assign({}, x, { text: patch.text != null ? String(patch.text).slice(0, 160) : x.text, by: patch.by !== undefined ? (patch.by ? isoDay(patch.by) : null) : x.by }, x.id === 'legacy' ? { id: newId() } : {}) : x; });
+    list = list.map(function (x) { return x.id === actionId ? Object.assign({}, x, { text: patch.text != null ? String(patch.text).slice(0, 160) : x.text, by: patch.by !== undefined ? (patch.by ? isoDay(patch.by) : null) : x.by, kind: patch.kind !== undefined ? (patch.kind || null) : (x.kind || null) }, x.id === 'legacy' ? { id: newId() } : {}) : x; });
     return save(client, projectId, mirror(list), p);
   }
   async function doneAction(client, projectId, actionId, opts, project) {

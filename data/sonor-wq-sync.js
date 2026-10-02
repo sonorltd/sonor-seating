@@ -1,5 +1,8 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.6.0 · 2026-10-02 — MIRROR: after reading a project's quotes the sync writes the live stage / revision / updated stamp back onto
+ *   the matching wq_quote_links rows (PM / Takeoffs mirrors) so no app can show a stale stage. WeQuote is the truth for a quote's
+ *   stage; a links row is a pointer to it. (28 Oldfield Road read "in progress" from a 30-Sep links row while WeQuote said sent.)
  * v1.5.1 · 2026-10-02 — adopt checks ownership against every project (closed ones too) + skips SONOR-internal WQ rows.
  * v1.5.0 · 2026-10-02 — ADOPT: every sync first adopts WeQuote projects that have no Sonor project yet (created, or with a quote
  *   touched, inside 180 days; test rows skipped) as `projects` rows — ref "<no> - <description>", status enquiry (the stage mirror
@@ -37,7 +40,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.5.1';
+  var VERSION = '1.6.0';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -256,6 +259,24 @@
     }
     return adopted;
   }
+  // ── v1.6.0 mirror: live quote state → wq_quote_links (stage, revision, wq_updated_at, wq_description) ──
+  async function mirrorLinks(client, row, qs) {
+    if (!qs || !qs.length) return 0; var n = 0;
+    try {
+      var no = wqNoOf(row); var refs = [row.ref]; if (no) refs.push(no);
+      var r = await client.from('wq_quote_links').select('id,project_ref,quote_id,quote_no,wq_stage,wq_revision,wq_updated_at').or('project_ref.eq.' + refs.map(function (x) { return String(x).replace(/,/g, ''); }).join(',project_ref.eq.'));
+      var links = (r.data || []).filter(function (l) { return l.quote_id || l.quote_no; });
+      for (var i = 0; i < links.length; i++) {
+        var l = links[i]; var q = qs.find(function (x) { return (l.quote_id && Number(x.id) === Number(l.quote_id)) || (l.quote_no && String(x.quote_no) === String(l.quote_no)); });
+        if (!q) continue;
+        var upd = wqIso(q.updated_at);
+        if (l.wq_stage === q.stage && (l.wq_revision || null) === (q.revision || null) && (l.wq_updated_at ? wqIso(l.wq_updated_at) : null) === upd) continue;
+        var u = await client.from('wq_quote_links').update({ wq_stage: q.stage, wq_revision: q.revision || null, wq_updated_at: upd, wq_description: q.description || null, stage_changed_at: l.wq_stage !== q.stage ? new Date().toISOString() : undefined }).eq('id', l.id);
+        if (!u.error) n++;
+      }
+    } catch (e) {}
+    return n;
+  }
   async function syncProjects(client, rows, opts) {
     opts = opts || {}; var force = !!opts.force; var quick = !!opts.quick && !force;
     var staleBefore = Date.now() - 7 * 24 * 3600e3;
@@ -278,6 +299,7 @@
         var qq = await quotesFor(client, r, Number(qm.wequote_internal_id), Number(qm.wequote_customer_id) || null, [qp && qp.description, qp && qp.customer_name, qm.wequote_name, qm.wequote_customer], run);
         if (!qq) continue;
         if (!qq.length && (qm.wequote_quotes || []).length) continue;   // never wipe a quote list on a lookup miss
+        try { await mirrorLinks(client, r, qq); } catch (e) {}
         var qpatch = { wequote_quotes: qq, wequote_quotes_synced_at: new Date().toISOString(), wequote_synced_at: new Date().toISOString() };
         if (qp) Object.assign(qpatch, { wequote_name: qp.description || qm.wequote_name || '', wequote_customer: qp.customer_name || qm.wequote_customer || '', wequote_status: qp.status || '', wequote_modified_at: wqIso(qp.modified_datetime) || qm.wequote_modified_at || null });
         var qact = [qm.wequote_modified_at].concat(qq.map(function (q) { return wqIso(q.updated_at) || wqIso(q.quote_date); })).filter(Boolean).sort();
@@ -307,6 +329,7 @@
       }
       var qs = await quotesFor(client, r, patch.wequote_internal_id, patch.wequote_customer_id, [p.description, p.customer_name], run);
       if (qs && !qs.length && (r.metadata.wequote_quotes || []).length) qs = null;   // v1.4.2 — a miss keeps what we had
+      if (qs && qs.length) { try { await mirrorLinks(client, r, qs); } catch (e) {} }
       if (qs && qs.length) {
         patch.wequote_quotes = qs; patch.wequote_quotes_synced_at = new Date().toISOString();
         var act = [patch.wequote_modified_at].concat(qs.map(function (q) { return wqIso(q.updated_at) || wqIso(q.quote_date); })).filter(Boolean).sort();
@@ -330,5 +353,5 @@
     }
     return changed;
   }
-  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, listProjects: listProjects, suggestProjects: suggestProjects, linkProject: linkProject, adoptProjects: adoptProjects, loadIndex: loadIndex, updateIndex: updateIndex, saveIndex: saveIndex, byProject: byProject, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
+  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, listProjects: listProjects, suggestProjects: suggestProjects, linkProject: linkProject, adoptProjects: adoptProjects, mirrorLinks: mirrorLinks, loadIndex: loadIndex, updateIndex: updateIndex, saveIndex: saveIndex, byProject: byProject, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
 })(typeof window !== 'undefined' ? window : this);
