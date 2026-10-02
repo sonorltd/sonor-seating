@@ -1,5 +1,8 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.3.0 · 2026-10-02 — LINKING: listProjects() (one /project/list_project per run), suggestProjects(row) (postcode · customer · name
+ *   matches for a Sonor project with no WQ number yet, e.g. an ENQ- lead once the WQ project exists), linkProject(client, row, wqNo)
+ *   (stamps wequote_id, renames an ENQ- / SITE- ref to "<no> - <WQ description>", syncs the row). Board 🔗 and Hub use it.
  * v1.2.0 · 2026-10-01 — QUOTE INDEX: every WQ quote fetched once (/quote/get) and kept by WQ project_id / customer_id in the
  *   `wq_quote_index` table (B-506) or this browser's localStorage; a project's quotes are then a lookup, not a name guess (1192
  *   Linkside etc. had quotes whose descriptions never mentioned the project). Incremental after the first build.
@@ -19,7 +22,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -144,6 +147,50 @@
   }
   // WeQuote stamps are "YYYY-MM-DD HH:MM:SS" (UK) — normalise to ISO so every app compares them the same way
   var wqIso = function (v) { if (!v) return null; var d = new Date(String(v).replace(' ', 'T')); return isNaN(d) ? null : d.toISOString(); };
+  // ── v1.3.0 linking ──
+  async function listProjects(client, run) {
+    if (run && run.projects) return run.projects;
+    var j = await apiFetch(client, '/project/list_project', {});
+    var list = Array.isArray(j) ? j : [];
+    if (run) run.projects = list;
+    return list;
+  }
+  var pcNorm = function (s) { return String(s || '').toUpperCase().replace(/\s+/g, ''); };
+  var words = function (s) { return norm(s).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 3 && ['the','and','ltd','limited','mr','mrs','dr','house','road','lane','drive','court','avenue','street','new','build','project','electrical','home','smart','cinema','upgrade','upgrades','installation','room','enq'].indexOf(w) < 0; }); };
+  // candidates for a Sonor row with no WQ number: scored by postcode (strong), customer/client name words, WQ description vs Sonor name/ref words
+  async function suggestProjects(client, row, run, taken) {
+    var list = await listProjects(client, run);
+    taken = taken || {};
+    var pc = pcNorm(row.postcode); var who = words([row.client_name, row.name, row.metadata && row.metadata.wequote_customer].join(' ')); var what = words([row.name, row.ref, row.address, row.notes].join(' '));
+    var enq = (row.metadata && (row.metadata.enquiry_date || row.metadata.first_seen)) || row.created_at; var enqT = enq ? new Date(enq).getTime() : 0;
+    return list.map(function (p) {
+      var score = 0, why = [];
+      // a WQ project no Sonor project owns yet, created around / after the enquiry, is the likeliest match of all
+      var cT = p.created_datetime ? new Date(String(p.created_datetime).replace(' ', 'T')).getTime() : 0;
+      if (!taken[String(p.project_no)]) { var dd = enqT && cT ? (cT - enqT) / 86400000 : null; if (dd != null && dd >= -3 && dd <= 45) { score += 40; why.push('unlinked, created ' + Math.round(dd) + 'd after the enquiry'); } else if (dd != null && dd > -45 && dd < 0) { score += 15; why.push('unlinked, created ' + Math.round(-dd) + 'd before the enquiry'); } }
+      if (pc && pcNorm(p.postcode) === pc) { score += 60; why.push('postcode'); }
+      var cw = words(p.customer_name); var hitC = cw.filter(function (w) { return who.indexOf(w) >= 0; });
+      if (hitC.length) { score += 25 * hitC.length; why.push('customer ' + hitC.join(' ')); }
+      var dw = words(p.description); var hitD = dw.filter(function (w) { return what.indexOf(w) >= 0; });
+      if (hitD.length) { score += 10 * hitD.length; why.push('name ' + hitD.join(' ')); }
+      if (taken[String(p.project_no)]) score -= 100;
+      return { no: String(p.project_no), id: p.id, description: p.description, customer: p.customer_name, postcode: p.postcode, created: p.created_datetime, status: p.status, score: score, why: why.join(' · ') };
+    }).filter(function (c) { return c.score > 0; }).sort(function (a, b) { return b.score - a.score || (b.created > a.created ? 1 : -1); }).slice(0, 6);
+  }
+  // link a Sonor project to a WQ project number, then sync it (names, customer, quotes, activity)
+  async function linkProject(client, row, wqNo, opts) {
+    opts = opts || {};
+    wqNo = String(wqNo || '').trim(); if (!/^\d{3,5}$/.test(wqNo)) throw new Error('WeQuote project number expected (e.g. 1407)');
+    var p = await findProject(client, wqNo); if (!p) throw new Error('WeQuote has no project ' + wqNo);
+    var fresh = await client.from('projects').select('metadata,updated_at').eq('id', row.id).single();
+    var fm = (fresh.data && fresh.data.metadata) || {};
+    var meta = Object.assign({}, fm, { wequote_id: wqNo, wequote_internal_id: p.id, wequote_linked_at: new Date().toISOString(), wequote_linked_by: opts.by || 'board', wequote_touched_before: fm.wequote_touched_before || (fresh.data && fresh.data.updated_at) || null });
+    var u = await client.from('projects').update({ metadata: meta }).eq('id', row.id);
+    if (u.error) throw u.error;
+    row.metadata = meta;
+    var n = await syncProjects(client, [row], { force: true, onProgress: opts.onProgress });
+    return { project: p, changed: n };
+  }
   async function syncProjects(client, rows, opts) {
     opts = opts || {}; var force = !!opts.force;
     var staleBefore = Date.now() - 7 * 24 * 3600e3;
@@ -171,7 +218,7 @@
         if (r.value_quoted == null && qs[0].subtotal != null) colPatch.value_quoted = qs[0].subtotal;
         if (qs[0].address) { patch.wequote_address = qs[0].address; if (qs[0].postcode) patch.wequote_postcode = qs[0].postcode; if (!r.address) colPatch.address = qs[0].address; if (!r.postcode && qs[0].postcode) colPatch.postcode = qs[0].postcode; }
       } else if (patch.wequote_modified_at) { patch.wequote_activity_at = patch.wequote_modified_at; }
-      if (String(r.ref || '').startsWith('SITE-') && r.metadata.wequote_id) colPatch.ref = r.metadata.wequote_id + ' - ' + (patch.wequote_name || r.name || '');
+      if (/^(SITE-|ENQ\b|ENQ-)/.test(String(r.ref || '')) && r.metadata.wequote_id) colPatch.ref = r.metadata.wequote_id + ' - ' + (patch.wequote_name || r.name || '');   // v1.3.0: ENQ- leads take the WQ ref once linked
       try {
         var fresh = await client.from('projects').select('metadata,updated_at').eq('id', r.id).single();
         var fm = (fresh.data && fresh.data.metadata) || {};
@@ -187,5 +234,5 @@
     }
     return changed;
   }
-  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, loadIndex: loadIndex, updateIndex: updateIndex, saveIndex: saveIndex, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
+  global.SonorWqSync = { VERSION: VERSION, getConfig: getConfig, apiFetch: apiFetch, findProject: findProject, findCustomer: findCustomer, quotesFor: quotesFor, listAllQuotes: listAllQuotes, listProjects: listProjects, suggestProjects: suggestProjects, linkProject: linkProject, loadIndex: loadIndex, updateIndex: updateIndex, saveIndex: saveIndex, wqIso: wqIso, wqNoOf: wqNoOf, syncProjects: syncProjects };
 })(typeof window !== 'undefined' ? window : this);

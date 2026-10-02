@@ -1,5 +1,6 @@
 /**
  * sonor-board-log.js — CANONICAL MASTER (sonor-platform §22 — the client-interaction contract)
+ * v1.0.2 · 2026-10-02 — lastSent counts accepted / complete / expired quotes and v2+ reworks (quote_date = issue date)
  * v1.0.1 · 2026-10-01 — touchedAt ignores WeQuote sync writes (metadata.wequote_synced_at + wequote_touched_before)
  * v1.0.0 · 2026-09-30
  *
@@ -34,19 +35,25 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.0.1';
+  var VERSION = '1.0.2';
   var CONTACT_KINDS = { call: '📞', email: '✉️', whatsapp: '💬', site: '🏠', meeting: '🤝' };
   var DONE = ['accepted', 'won', 'approved', 'complete', 'declined', 'lost', 'expired', 'cancelled'];   // WeQuote stage vocabulary + older mirror names
 
   function isoDay(v) { if (!v) return null; var d = new Date(v); return isNaN(d) ? null : d.toISOString().slice(0, 10); }
   function boardOf(p) { return (p && p.metadata && p.metadata.board && typeof p.metadata.board === 'object') ? p.metadata.board : {}; }
 
+  // v1.0.2 — "sent" = the quote has been in front of the client: stage sent / accepted / complete / won / approved / expired /
+  // declined / lost (WeQuote's quote_date is the issue date — there is no separate sent stamp in the API), OR an in-progress
+  // quote at revision 2+ (v1 was issued on quote_date; v2 is the rework after the client saw it).
+  var SEEN = ['sent', 'accepted', 'won', 'approved', 'complete', 'expired', 'declined', 'lost'];
   function lastSent(quotes) {
     var best = null;
     (quotes || []).forEach(function (q) {
-      if (String(q.stage || '').toLowerCase() !== 'sent') return;
-      var d = isoDay(q.since || q.quote_date || q.sent_at);
-      if (d && (!best || d > best.on)) best = { on: d, no: q.quote_no };
+      var st = String(q.stage || '').toLowerCase(); var rev = Number(q.revision) || 1;
+      var seen = SEEN.indexOf(st) >= 0 || (rev > 1 && q.quote_date);
+      if (!seen) return;
+      var d = isoDay(q.quote_date || q.sent_at || q.since);
+      if (d && (!best || d > best.on)) best = { on: d, no: q.quote_no, stage: st, rev: rev, prior: SEEN.indexOf(st) < 0 };
     });
     return best;
   }
@@ -54,7 +61,7 @@
     var b = boardOf(p);
     var c = b.contact_on ? { on: isoDay(b.contact_on), kind: b.contact_kind || 'call', note: b.contact_note || '', src: 'logged' } : null;
     var sn = lastSent(quotes);
-    var q = sn ? { on: sn.on, kind: 'quote', note: '#' + sn.no + ' sent', src: 'quote' } : null;
+    var q = sn ? { on: sn.on, kind: 'quote', note: '#' + sn.no + (sn.prior ? ' v' + (sn.rev - 1) + ' sent' : ' sent'), src: 'quote' } : null;
     if (c && q) return c.on >= q.on ? c : q;
     return c || q;
   }
