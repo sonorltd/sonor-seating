@@ -14,7 +14,7 @@
  *   matches for a Sonor project with no WQ number yet, e.g. an ENQ- lead once the WQ project exists), linkProject(client, row, wqNo)
  *   (stamps wequote_id, renames an ENQ- / SITE- ref to "<no> - <WQ description>", syncs the row). Board 🔗 and Hub use it.
  * v1.2.0 · 2026-10-01 — QUOTE INDEX: every WQ quote fetched once (/quote/get) and kept by WQ project_id / customer_id in the
- *   `wq_quote_index` table (B-506) or this browser's localStorage; a project's quotes are then a lookup, not a name guess (1192
+ *   `wq_quote_index` table (B-509) or this browser's localStorage; a project's quotes are then a lookup, not a name guess (1192
  *   Linkside etc. had quotes whose descriptions never mentioned the project). Incremental after the first build.
  * v1.1.0 · 2026-10-01 — quotes matched on the FRESH WQ project / customer names (+ one /quote/list walk per run, not 3 pages per
  *   project); stores wequote_created_at / wequote_modified_at / wequote_activity_at (+ per-quote created_at / updated_at / accepted_date)
@@ -80,7 +80,7 @@
   }
   // ── v1.2.0 QUOTE INDEX — every WeQuote quote, keyed by WQ project / customer, so "which quotes belong to project N" is a
   // lookup instead of a name guess (WQ's /quote/list has no project filter and carries only id / no / description). Lives in
-  // the `wq_quote_index` table when it exists (B-506 — shared by every device) and otherwise in localStorage on this
+  // the `wq_quote_index` table when it exists (B-509 — shared by every device) and otherwise in localStorage on this
   // browser (Hub + Board share it: same origin). Built once (one /quote/get per quote), then only NEW quote ids are fetched
   // and the quotes of the projects being synced are re-fetched so stage changes land.
   var IDX_KEY = 'sonor:wq-quote-index';

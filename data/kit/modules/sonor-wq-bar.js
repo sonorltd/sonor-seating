@@ -35,7 +35,7 @@
 //                  app actions, ↻. Dark (project bar) and light (Takeoffs header) via CSS vars — no cream anywhere.
 (function (global) {
   'use strict';
-  var VERSION = '1.4.4';
+  var VERSION = '1.4.5';   // 2026-10-02 §26 stage law: chips on the status tokens (amber ours · blue client · green yes · red no)
   var WQ_QUOTE_URL = 'https://app.wequote.cloud/sonor-ltd/quote/';   // + <id>/editor
   var LOCK_STAGES = { sent: 1, accepted: 1, complete: 1 };
   var STAGE_LABEL = { in_progress: 'in progress', sent: 'sent', accepted: 'accepted', complete: 'complete', cancelled: 'cancelled', declined: 'declined', draft: 'draft' };
@@ -70,7 +70,7 @@
       '.sonor-wq-bar .swq-pill{display:inline-flex;align-items:center;gap:5px;font-weight:600}',
       '.sonor-wq-bar .swq-pill.swq-none{opacity:.55;font-weight:500}',
       '.swq-stage{display:inline-block;padding:0 7px;border-radius:9px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:16px;color:#fff;background:#64748B}',
-      '.swq-stage-in-progress{background:#2F6FD6}.swq-stage-sent{background:#E8892B}.swq-stage-accepted{background:#1F9D55}.swq-stage-complete{background:#0F766E}.swq-stage-cancelled,.swq-stage-declined{background:#B91C1C}.swq-stage-draft{background:#64748B}',
+      '.swq-stage-in-progress,.swq-stage-draft{background:var(--status-amber,#E0922F)}.swq-stage-sent{background:var(--info,#3B9DD8)}.swq-stage-accepted,.swq-stage-complete{background:var(--status-ok,#3DB56F)}.swq-stage-cancelled,.swq-stage-declined{background:var(--status-bad,#E2524F)}',
       '.sonor-wq-bar .swq-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:120;min-width:320px;max-width:440px;padding:8px;border-radius:8px;background:var(--card,#fff);color:var(--text,#0F172A);border:1px solid var(--border,#CBD5E1);box-shadow:0 12px 32px rgba(15,23,42,.22);font:12px/1.4 "DM Sans",system-ui,sans-serif;display:none;flex-direction:column;gap:6px}',
       '.sonor-wq-bar.open .swq-menu{display:flex}',
       '.sonor-wq-bar .swq-card{padding:8px 10px;border-radius:6px;background:var(--surface,#F1F5F9);border:1px solid var(--border,#CBD5E1)}',

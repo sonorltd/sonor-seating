@@ -1,4 +1,4 @@
-/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.18.1 2026-10-01: status tones retuned; v0.18.0 2026-10-01: §23 traffic light — warn/no-answer pills on --status-amber, .pill-amber alias; v0.17.1 2026-09-30: dark ladder for legacy dark theme names; v0.17.0 2026-09-29: §18 hover/focus law — one wash, no lifts; v0.18.0 2026-09-30: rack view; catalogue picker; v0.16.0: .s-pill; .s-paper; sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
+/* sonor-components.css — shared component styles per Spine rule S-4.4. (v0.19.0 2026-10-02: §25 stage law — crisp pills, one stage colour everywhere (wq-stage-* / swq-stage-* / proj-stage-* → --stage); v0.18.1 2026-10-01: status tones retuned; v0.18.0 2026-10-01: §23 traffic light — warn/no-answer pills on --status-amber, .pill-amber alias; v0.17.1 2026-09-30: dark ladder for legacy dark theme names; v0.17.0 2026-09-29: §18 hover/focus law — one wash, no lifts; v0.18.0 2026-09-30: rack view; catalogue picker; v0.16.0: .s-pill; .s-paper; sortable styles; bar ladder tokens; locked = red; CSV controls hidden; graphite dark-theme aliases + re-tints, B-487; v0.9.0 2026-09-29: WQ modal kit on the brand scale tokens + skeleton / empty / motion, B-478 ph2 + B-479; v0.8.0 2026-09-28: icons / menus / chips kit, B-478)
    Synced to every "APP - {slug}"/data/sonor-components.css via sync-everything.sh.
    Edit here ONLY — never edit a per-app copy.
 
@@ -130,25 +130,46 @@
 }
 
 /* danger / warn / ok / info / muted / accent-tinted pills — all driven by theme tokens */
+/* v0.19.0 (2026-10-02, sonor-platform §26): pills are CRISP — the full status token as ink + a hairline of it, never the
+   60%-mixed pastel. Four tints, one meaning across every app (who holds it):
+     amber = ours to do · blue = with the client · green = yes · red = no · grey = nothing yet */
 .pill-red {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  color: color-mix(in srgb, var(--danger) 72%, var(--text-primary));
+  background: color-mix(in srgb, var(--status-bad, var(--danger)) 16%, transparent);
+  color: var(--status-bad, var(--danger));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-bad, var(--danger)) 45%, transparent);
 }
 .pill-yellow, .pill-amber {   /* §23: the warn pill is AMBER (--status-amber); .pill-yellow kept as an alias */
-  background: color-mix(in srgb, var(--warn) 24%, transparent);
-  color: color-mix(in srgb, var(--warn) 60%, var(--text-primary));
+  background: color-mix(in srgb, var(--status-amber, var(--warn)) 16%, transparent);
+  color: var(--status-amber, var(--warn));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-amber, var(--warn)) 45%, transparent);
 }
 .pill-green {
-  background: color-mix(in srgb, var(--ok) 18%, transparent);
-  color: color-mix(in srgb, var(--ok) 60%, var(--text-primary));
+  background: color-mix(in srgb, var(--status-ok, var(--ok)) 16%, transparent);
+  color: var(--status-ok, var(--ok));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-ok, var(--ok)) 45%, transparent);
 }
 .pill-grey {
   background: color-mix(in srgb, var(--text-muted) 18%, transparent);
   color: var(--text-secondary);
 }
 .pill-blue {
-  background: color-mix(in srgb, var(--info) 18%, transparent);
-  color: color-mix(in srgb, var(--info) 60%, var(--text-primary));
+  background: color-mix(in srgb, var(--info) 16%, transparent);
+  color: var(--info);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 45%, transparent);
+}
+/* §26 STAGE LAW — one colour per WeQuote / project stage, everywhere. Put the stage class on any pill / chip / dot and it takes
+   the right tint: `.pill.wq-stage-sent`, `.swq-stage-in-progress`, `.proj-stage-won`, or read var(--stage) yourself. */
+.wq-stage-in_progress, .wq-stage-in-progress, .wq-stage-planned, .wq-stage-pushed, .wq-stage-synced, .wq-stage-draft, .wq-stage-revising, .wq-stage-quoting,
+.swq-stage-in-progress, .swq-stage-draft, .proj-stage-quoting, .proj-stage-revising { --stage: var(--status-amber, var(--warn)); }
+.wq-stage-sent, .swq-stage-sent, .proj-stage-quoted { --stage: var(--info); }
+.wq-stage-accepted, .wq-stage-approved, .wq-stage-won, .wq-stage-complete, .swq-stage-accepted, .swq-stage-complete, .proj-stage-won, .proj-stage-complete { --stage: var(--status-ok, var(--ok)); }
+.wq-stage-cancelled, .wq-stage-declined, .wq-stage-expired, .wq-stage-lost, .swq-stage-cancelled, .swq-stage-declined, .proj-stage-cancelled, .proj-stage-lost { --stage: var(--status-bad, var(--danger)); }
+.proj-stage-enquiry { --stage: #b7b1a7; } .proj-stage-tender { --stage: #2d718b; } .proj-stage-active { --stage: #78ba57; } .proj-stage-install { --stage: #e37c59; }
+.proj-stage-commission { --stage: #e67eb1; } .proj-stage-snagging { --stage: #ec6061; } .proj-stage-on_hold { --stage: #8B7D6B; }
+.pill[class*="wq-stage-"], .pill[class*="proj-stage-"] {
+  background: color-mix(in srgb, var(--stage, var(--text-muted)) 16%, transparent);
+  color: var(--stage, var(--text-secondary));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--stage, var(--text-muted)) 45%, transparent);
 }
 .pill-purple {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
