@@ -1,5 +1,7 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.7.0 · 2026-10-06 — compact() keeps labour_hours / labour_cost / labour_price + expected_start / expected_end per quote (B-512: the Board's
+ *   '% of quoted labour' and a WeQuote fallback for the Target date come from here — no DDL, no extra pull).
  * v1.6.0 · 2026-10-02 — MIRROR: after reading a project's quotes the sync writes the live stage / revision / updated stamp back onto
  *   the matching wq_quote_links rows (PM / Takeoffs mirrors) so no app can show a stale stage. WeQuote is the truth for a quote's
  *   stage; a links row is a pointer to it. (28 Oldfield Road read "in progress" from a 30-Sep links row while WeQuote said sent.)
@@ -40,7 +42,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.6.0';
+  var VERSION = '1.7.0';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -49,6 +51,11 @@
     _cfgCache.set(client, c); return c;
   }
   async function apiFetch(client, path, params) {
+    // v1.7.0 / §29 — ONE transport: when the shared SonorWQClient is on the page (it carries the pluggable transport — proxy today,
+    // the WeQuote MCP connector tomorrow) every call goes through it; the direct proxy fetch below is only the fallback.
+    if (global.SonorWQClient && typeof global.SonorWQClient.get === 'function') {
+      try { await global.SonorWQClient.init(client); return await global.SonorWQClient.get(path, params || {}, { force: true }); } catch (e) { if (!/allowlist|not configured/.test(String(e && e.message))) return null; }
+    }
     var cfg = await getConfig(client); if (!cfg) return null;
     try {
       var url; var headers = { 'Accept': 'application/json' };
@@ -84,7 +91,10 @@
       quote_date: q.quote_date, expiry_date: q.expiry_date, accepted_date: q.accepted_date || null, created_at: q.created_datetime || null, updated_at: q.updated_datetime || null,
       project_id: q.project_id || null, customer_id: q.customer_id || null, revision: q.revision || null, is_latest: q.is_latest_revision !== false, archived: !!q.archived,
       subsystems: (q.subsystems || []).map(function (s) { return s.description; }),
-      address: [q.address_line_1, q.address_line_2, q.address_line_3, q.posttown, q.county].filter(Boolean).join(', '), postcode: q.postcode || '' };
+      address: [q.address_line_1, q.address_line_2, q.address_line_3, q.posttown, q.county].filter(Boolean).join(', '), postcode: q.postcode || '',
+      // v1.7.0 — the quote's own labour + programme (Bryn: "quoted labour hours … % used on the Board"; B-512): hours / cost / sell + WeQuote's expected dates
+      labour_hours: q.labour_total_hours != null ? Number(q.labour_total_hours) : null, labour_cost: q.labour_total_cost != null ? Number(q.labour_total_cost) : null, labour_price: q.labour_total_price != null ? Number(q.labour_total_price) : null,
+      expected_start: q.expected_start_date || null, expected_end: q.expected_completion_date || null };
   }
   // ── v1.2.0 QUOTE INDEX — every WeQuote quote, keyed by WQ project / customer, so "which quotes belong to project N" is a
   // lookup instead of a name guess (WQ's /quote/list has no project filter and carries only id / no / description). Lives in

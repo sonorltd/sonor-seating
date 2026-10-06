@@ -1,5 +1,10 @@
 /*!
- * SonorWQClient v1.1.0 — workspace-shared READ-ONLY WeQuote client (B-444g, 2026-09-10).
+ * SonorWQClient v1.2.0 — workspace-shared READ-ONLY WeQuote client (B-444g, 2026-09-10).
+ * v1.2.0 (2026-10-06, sonor-platform §29 — Bryn: "do all this on the basis that there is a future WQ MCP connector coming"):
+ *   ONE TRANSPORT. Every WeQuote read in the workspace ends here, and `get()` hands the actual call to a pluggable
+ *   transport: `setTransport(async (endpoint, params) => data)`. Today the transport is the wq-proxy edge function;
+ *   when the WeQuote MCP connector lands it is registered here (browser: a thin bridge; Claude sessions: the MCP tool)
+ *   and nothing else in the workspace changes. SonorWqSync.apiFetch delegates to this client when it is on the page.
  * ---------------------------------------------------------------------------
  * ROOT MASTER: /sonor-wq-client.js → synced to every app's data/ by sync-everything.sh.
  * Edit the root master only; never a per-app copy (S-4.3).
@@ -29,6 +34,8 @@
   var _cache = {};
   var CACHE_MS = 5 * 60 * 1000;
   var _initP = null;
+  var _transport = null;   // v1.2.0 — async (endpoint, params) → data; null = the proxy fetch below
+  function setTransport(fn, label) { _transport = typeof fn === 'function' ? fn : null; CFG.transport = fn ? (label || 'custom') : 'proxy'; _cache = {}; }
 
   // Pass a Supabase client (SonorDB.client or supabase.createClient(...)). Idempotent.
   function init(supa, opts) {
@@ -57,7 +64,7 @@
     return _initP;
   }
   function configure(opts) { Object.assign(CFG, opts || {}); CFG.ready = !!(CFG.proxyEnabled && CFG.proxyUrl); return status(); }
-  function status() { return { ready: CFG.ready, proxyUrl: CFG.proxyUrl, source: CFG.source, anon: !!CFG.anonKey }; }
+  function status() { return { ready: CFG.ready, proxyUrl: CFG.proxyUrl, source: CFG.source, anon: !!CFG.anonKey, transport: CFG.transport || 'proxy' }; }
 
   // Low-level GET through the proxy (canonical ?endpoint= contract). Cached 5 min per URL.
   async function get(endpoint, params, opts) {
@@ -75,6 +82,7 @@
     var key = u.toString();
     var c = _cache[key];
     if (!opts.force && c && (Date.now() - c.at) < CACHE_MS) return c.data;
+    if (_transport) { var td = await _transport(endpoint, params || {}); _cache[key] = { at: Date.now(), data: td }; return td; }   // v1.2.0 — MCP / any other transport
     var resp = await fetch(key, { method: 'GET', headers: headers });
     var text = await resp.text();
     var data; try { data = JSON.parse(text); } catch (e) { data = text; }
@@ -101,7 +109,7 @@
   async function quoteLinesResolved(quoteId, force) { var lines = await quoteLines(quoteId, force); var pm = await productMap(); return lines.map(function (l) { var p = pm[l.product_id] || {}; return Object.assign({}, l, { sku: p.sku || '', short_description: p.short_description || '', long_description: p.long_description || '', model: p.model || '', manufacturer_name: p.manufacturer_name || '', category_description: p.category_description || '', sell_price: l.unit_price != null && Number(l.unit_price) ? l.unit_price : p.sell_price, cost_price: l.unit_cost != null && Number(l.unit_cost) ? l.unit_cost : p.cost_price }); }); }
 
   root.SonorWQClient = {
-    VERSION: '1.1.0', init: init, configure: configure, status: status,
+    VERSION: '1.2.0', init: init, configure: configure, status: status, setTransport: setTransport,
     get: get, arr: arr, one: one, clearCache: clearCache,
     searchProducts: searchProducts, getProduct: getProduct, listQuotes: listQuotes, getQuote: getQuote,
     quoteLines: quoteLines, quoteLinesResolved: quoteLinesResolved, productMap: productMap, listProjects: listProjects, findCustomer: findCustomer, getProject: getProject, getCustomer: getCustomer
