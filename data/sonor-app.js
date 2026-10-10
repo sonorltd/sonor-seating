@@ -255,6 +255,14 @@
     else if (f && typeof f === 'object') raw = String(f.code || f.name || '');
     const code = raw.toUpperCase().trim();
     if (!code) return 9999;
+    // 2026-10-10 (Greylands) — OUTBUILDINGS: a separate building's levels sort after the house and
+    // before EXT. Codes PH (pool house) / PHB (its basement / plant) / OB / OBB, or names with
+    // POOL HOUSE / OUTBUILDING / ANNEX. Checked first so "Pool House Ground" / "… Basement" don't
+    // fall into the house's GF / BA ranks. Below-ground outbuilding levels sort after their building.
+    if (code === 'PH' || code === 'OB' || code === 'PHB' || code === 'OBB'
+        || /POOL ?HOUSE|OUTBUILDING|ANNEXE?\b/.test(code)) {
+      return 1800 + ((code === 'PHB' || code === 'OBB' || /BASEMENT|PLANT|LOWER/.test(code)) ? 10 : 0);
+    }
     // Ground floor first — code 'GF' / 'G' / '0F' or name containing 'GROUND'
     if (code === 'GF' || code === 'G' || code === '0F') return 0;
     // Check sub-ground variants BEFORE the GROUND prefix check so
