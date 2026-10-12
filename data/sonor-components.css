@@ -843,6 +843,18 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
 [data-theme='graphite'] .wqp-st-wq { background: #3A3A3C; color: #E5E5EA; } [data-theme='graphite'] .wqp-st-dim { background: #2C2C2E; color: #98989D; } [data-theme='graphite'] .wqp-st-bad { background: rgba(220,38,38,.2); color: #FCA5A5; }
 [data-theme='graphite'] .wqp-spec-row.miss { background: rgba(220,38,38,.18); } [data-theme='graphite'] .wqp-spec-row.diff { background: rgba(232,137,43,.18); }
 [data-theme='graphite'] .wqp-metric { color: #C7C7CC; } [data-theme='graphite'] .wqp-metric b { color: #F5F5F7; }
+/* 2026-10-12 — WQ / Head end modals on graphite: grey hairlines, never white (Bryn: "everything looks too highly contrasted with
+   white as the border, keep it grey tones … make it tight"). Fields sit on the card shade with a 10% border; rows 6%. */
+[data-theme='graphite'] .wqp-wrap select, [data-theme='graphite'] .wqp-wrap input, [data-theme='graphite'] .wqp-pick, [data-theme='graphite'] .wqp-mini,
+[data-theme='graphite'] .wqp-lay select, [data-theme='graphite'] .wqp-lay input[type=number], [data-theme='graphite'] .wqp-he input { background: #1C1C1E !important; border: 1px solid rgba(255,255,255,.10) !important; color: #E5E5EA; border-radius: 4px; }   /* !important: this file sits in the lower sonor-kit layer and apps style bare select/input */
+[data-theme='graphite'] .wqp-wrap select:hover, [data-theme='graphite'] .wqp-pick:hover:not(:disabled), [data-theme='graphite'] .wqp-he input:focus { border-color: rgba(255,255,255,.22); outline: none; }
+[data-theme='graphite'] .wqp-tbl th, [data-theme='graphite'] .wqp-tbl td { border-bottom: 1px solid rgba(255,255,255,.06) !important; }
+.wqp-review table td, .wqp-review table th { padding: 3px 10px !important; vertical-align: top; }
+[data-theme='graphite'] .wqp-tbl th { color: #98989D; font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+[data-theme='graphite'] .wqp-tot { background: #242426; }
+[data-theme='graphite'] .wqp-pick-none { color: #6E6E73; }
+.wqp-he td { padding: 2px 5px; font-size: 11.5px; } .wqp-he input { padding: 1px 4px; }
+.wqp-wrap .wqp-row { gap: 4px 10px; }
 [data-theme='graphite'] .swq-slot { background: #3A3A3C; color: #E5E5EA; }
 [data-theme='graphite'] .s-skeleton { background: linear-gradient(90deg, #2C2C2E 25%, #3A3A3C 50%, #2C2C2E 75%); background-size: 200% 100%; }
 [data-theme='graphite'] .pill, [data-theme='graphite'] .badge { border-color: rgba(255,255,255,.14); }
