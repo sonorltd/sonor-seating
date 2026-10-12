@@ -28,6 +28,7 @@
 //
 // Namespace: window.SonorProjectBar
 //
+// Version: 1.11.1 — Blueprint / Brief / Costs links are neutral graphite pills, not service-purple (2026-10-12).
 // Version: 1.11.0 — Lucide icons (B-478): chrome emoji on the Blueprint / Brief / Costs links and the bar buttons become
 //                  SVG icons when root sonor-icons.js is on the page (the WeQuote control loads it beside itself).
 // Version: 1.10.0 — 🧾 WeQuote status (2026-09-28, B-470). The bar mounts the shared
@@ -236,11 +237,13 @@
       }
       .sonor-project-bar .brief-link {
         font-size: 11.5px; font-weight: 600; text-decoration: none;
-        color: var(--surface-text, #F4F1EC); background: color-mix(in srgb, var(--s01, #8058a1) 35%, transparent);
-        border: 1px solid color-mix(in srgb, var(--s01, #8058a1) 70%, transparent);
-        padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+        color: var(--text-primary, var(--surface-text, #F4F1EC)); background: var(--card, rgba(255,255,255,.06));
+        border: 1px solid var(--border, rgba(148,163,184,.45));
+        padding: 3px 10px; border-radius: 999px; white-space: nowrap;
       }
-      .sonor-project-bar .brief-link:hover { background: color-mix(in srgb, var(--s01, #8058a1) 60%, transparent); }
+      /* v1.11.1 (2026-10-12, Bryn: "blueprint etc buttons are purple, should fit in with the dark grey theme") — neutral
+         graphite pills like the WeQuote control; the kit's §18 hover wash does the rest. Service purple is NOT chrome. */
+      .sonor-project-bar .brief-link:hover { border-color: var(--border-strong, rgba(244,241,236,.35)); background: var(--surface-hover, rgba(255,255,255,.1)); }
       .sonor-project-bar .status-pill {
         display: inline-flex; align-items: center; gap: 4px;
         padding: 2px 9px; border-radius: 10px;
@@ -638,7 +641,7 @@
   const api = {
     init, refresh, loadProjects,
     getActiveId, getProject, getProjects, setActive,
-    __version: '1.11.0',
+    __version: '1.11.1',
     __ls_key: LS_KEY
   };
   if (typeof window !== 'undefined') window.SonorProjectBar = api;

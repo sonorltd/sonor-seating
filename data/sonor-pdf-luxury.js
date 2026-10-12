@@ -1,4 +1,7 @@
-/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.1.2, root master)
+/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.2.0, root master)
+   v1.2.0 (2026-10-12, Survey): OPT-IN theme('neutral') — white paper + neutral greys for working documents (survey reports,
+   schedules, anything that is not a client proposal); gold accents stay. theme('luxury') = the cream default, untouched.
+   cover opts.brandColour — the top-left mark + wordmark colour on the cover (Survey passes COL.GOLD: white vanished on a bright hero).
    v1.1.0 (2026-09-10, Service Contracts): OPT-IN pageHead brand:'large', pageFoot {logos:[…]} (partner-logo footer),
    cover brandLarge + footLogos. Defaults unchanged — Cinema Aesthetic / Cinema Tools render byte-identical.
    window.SonorPdfLuxury — the proven pdf-lib page system from the Seating
@@ -21,6 +24,16 @@
     DARK: [9, 8, 7], DARK2: [22, 19, 24], LINE: [214, 205, 188], LABEL: [150, 138, 116], PAGE_NO: [170, 160, 140],
     INFO: [168, 156, 136]
   };
+
+  // ── v1.2.0 THEMES — Bryn: "I don't think we should have the cream background in the pdf… only maybe the luxury apps like
+  // seating and lighting, everything else should be more neutral". COL is mutated in place (every painter reads it at draw
+  // time), so a consumer calls theme() once before building. Default = luxury (cream) — Cinema Design / Seating / Lighting unchanged.
+  var THEMES = {
+    luxury:  { CREAM: [246, 242, 234], INK: [26, 24, 20], INK2: [60, 55, 47], MUT: [120, 112, 96], LINE: [214, 205, 188], LABEL: [150, 138, 116], PAGE_NO: [170, 160, 140], INFO: [168, 156, 136] },
+    neutral: { CREAM: [255, 255, 255], INK: [24, 24, 24], INK2: [62, 62, 62], MUT: [118, 118, 118], LINE: [222, 222, 222], LABEL: [138, 138, 138], PAGE_NO: [164, 164, 164], INFO: [172, 172, 172] }
+  };
+  var _theme = 'luxury';
+  function theme(name) { if (name == null) return _theme; var t = THEMES[name]; if (!t) return _theme; Object.keys(t).forEach(function (k) { COL[k] = t[k].slice(); }); _theme = name; return _theme; }
 
   var HOUSE = 'M92.02,38.41v51.4c0,2.63-2.13,4.75-4.75,4.75h-3.34c-2.62,0-4.75-2.12-4.75-4.75v-45.34c0-2.45-1.11-4.77-3.01-6.31l-25.23-20.41c-2.8-2.27-6.76-2.42-9.73-.36l-23.15,16.05.45,1.55c22.38,9.5,40.47,30.05,47.71,53.39.95,3.06-1.32,6.18-4.53,6.18h-5.36c-2.08,0-3.9-1.37-4.54-3.35-6.96-21.83-24.83-38.23-46.17-46.13-1.31-.49-2.31-1.5-2.79-2.75-.2-.51-.31-1.06-.32-1.64l-.12-9.11c-.02-1.58.75-3.06,2.05-3.96L28.74,10.74,42.11,1.45c.16-.11.32-.22.49-.31,2.35-1.4,5.22-1.5,7.64-.34.57.26,1.12.61,1.63,1.03l37.16,30.29c1.89,1.54,2.99,3.85,2.99,6.29Z ' +
     'M34.59,94.55h-5.25c-1.6,0-3.09-.81-3.97-2.15-5.47-8.37-11.98-15.35-20.72-20.32-1.5-.85-2.45-2.42-2.45-4.15v-5.58c0-3.52,3.68-5.79,6.85-4.26,12.79,6.15,23.95,16.91,29.85,29.73,1.45,3.14-.86,6.73-4.32,6.73h0Z ' +
@@ -238,8 +251,14 @@
     });
     // brandLarge (v1.1.0): mark + wordmark top-left inside the frame instead of the small strip entry
     if (opts.brandLarge) {
-      P.logo(M, M * 0.62 + 22, 30, COL.CREAM);
-      P.tracked('SONOR', M + 37, M * 0.62 + 28, 18, F.b, COL.CREAM, 4.2);
+      var bc = opts.brandColour || COL.CREAM;   // v1.2.0 — gold on a bright hero, cream on a dark one
+      if (opts.topShade) {   // v1.2.0 opt-in: a soft dark band under the mark so it reads on a bright hero — the smooth fade PNG, flipped (no stepped banding)
+        var H = A4.h * 0.22;
+        if (opts.fadeImg) P.page.drawImage(opts.fadeImg, { x: 0, y: A4.h, width: A4.w, height: -H, opacity: opts.topShade });
+        else P.rect(0, 0, A4.w, H * 0.5, COL.DARK, opts.topShade * 0.6);
+      }
+      P.logo(M, M * 0.62 + 22, 30, bc);
+      P.tracked('SONOR', M + 37, M * 0.62 + 28, 18, F.b, bc, 4.2);
     }
     // logo strip — clear band BELOW the frame (heights ≤13, one centreline)
     var cyL = A4.h - 14;
@@ -296,7 +315,7 @@
   }
 
   global.SonorPdfLuxury = {
-    __version: '1.0.1',
+    __version: '1.2.0', theme: theme, THEMES: THEMES,
     A4: A4, M: M, COL: COL, HOUSE: HOUSE, WA: WA,
     col: col, hexRgb: hexRgb, fadePngDataUrl: fadePngDataUrl,
     fetchBytes: fetchBytes, loadImage: loadImage,

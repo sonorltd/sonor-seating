@@ -35,7 +35,7 @@
 //                  app actions, ↻. Dark (project bar) and light (Takeoffs header) via CSS vars — no cream anywhere.
 (function (global) {
   'use strict';
-  var VERSION = '1.4.5';   // 2026-10-02 §26 stage law: chips on the status tokens (amber ours · blue client · green yes · red no)
+  var VERSION = '1.4.6';   // 2026-10-02 §26 stage law: chips on the status tokens (amber ours · blue client · green yes · red no)
   var WQ_QUOTE_URL = 'https://app.wequote.cloud/sonor-ltd/quote/';   // + <id>/editor
   var LOCK_STAGES = { sent: 1, accepted: 1, complete: 1 };
   var STAGE_LABEL = { in_progress: 'in progress', sent: 'sent', accepted: 'accepted', complete: 'complete', cancelled: 'cancelled', declined: 'declined', draft: 'draft' };
@@ -65,7 +65,7 @@
     var css = [
       '.sonor-wq-bar{position:relative;display:inline-flex;align-items:center;gap:6px;font:12px/1.3 "DM Mono",SF Mono,Menlo,monospace;color:inherit}',
       '.sonor-wq-bar .swq-btn{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;border:1px solid var(--swq-border,var(--border,rgba(148,163,184,.45)));background:var(--swq-bg,var(--card,rgba(255,255,255,.06)));color:inherit;cursor:pointer;white-space:nowrap;font:inherit;font-weight:600}',
-      '.sonor-wq-bar .swq-btn:hover{border-color:var(--s01,#8058a1)}',
+      '.sonor-wq-bar .swq-btn:hover{border-color:var(--border-strong,rgba(244,241,236,.35))}',   // 1.4.6: neutral hover, no service purple on chrome
       '.sonor-wq-bar .swq-btn .swq-caret{opacity:.6;font-size:10px;display:inline-flex}.sonor-wq-bar .swq-lbl{display:inline-flex;align-items:center;gap:5px}.sonor-wq-bar .swq-warn .s-icon,.sonor-wq-bar .swq-pill .s-icon{vertical-align:-0.1em}',
       '.sonor-wq-bar .swq-pill{display:inline-flex;align-items:center;gap:5px;font-weight:600}',
       '.sonor-wq-bar .swq-pill.swq-none{opacity:.55;font-weight:500}',
