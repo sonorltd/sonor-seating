@@ -35,11 +35,22 @@
  * Pass `status` + `metadata` too when available — they drive the completed sink
  * (rows without them are treated as live, never hidden).
  *
- * @version 1.2.0
+ * @version 1.3.2
+ *
+ * v1.3.0 (2026-10-12, Bryn: "projects should be sorted in time last touched order anyway" — an enquiry with no WQ
+ *   number (ENQ - Paul Murphy) was parked under 'Trials / no WQ' at the bottom, out of sight): the live list is now ONE
+ *   group, LAST TOUCHED FIRST (updated_at desc, created_at fallback), whatever the ref. No WQ-number ordering, no
+ *   'Recently edited' duplicates, no 'Trials' pen. Holding (⏳) and Completed (✔) still sink below it. `group()` keeps
+ *   the same return shape ({key,label,items}[]).
+ * v1.3.1 (same evening, Bryn: "keep the blocks thats useful, we dont want one solid list" · "probably need 10x in recents"):
+ *   blocks restored — ⏱ Recently edited (10) → WQ tenders → Enquiries / no WQ number → ⏳ Holding → ✔ Completed — but every
+ *   block is ordered last touched first; the WQ-number sort and the 'Trials' label are gone for good.
+ * v1.3.2: ⏱ Recently edited = touched by ANY Sonor app (updated_at); WQ tenders = by WeQuote activity
+ *   (metadata.wequote_activity_at / _modified_at from the Master Hub sync); Enquiries = updated_at.
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.2';
 
   // Parse the WeQuote number from a ref ("1381 - Awaken Spa" -> 1381). null if none.
   function wqOf(p) {
@@ -81,6 +92,12 @@
   // with no WeQuote number in its ref is holding by default — so future gcal
   // imports park themselves without waiting for the importer to tag them.
   // Assigning a real WQ ref (or setting holding='assigned') releases it.
+  // v1.3.2 — when WeQuote last touched the project (either timestamp, whichever is later); 0 when never synced
+  function wqTouchOf(p) {
+    if (!p) return 0; var m = p.metadata || {};
+    var t = 0; [p.wequote_activity_at || m.wequote_activity_at, p.wequote_modified_at || m.wequote_modified_at, p.wequote_created_at || m.wequote_created_at].forEach(function (v) { var n = v ? Date.parse(v) : 0; if (n && n > t) t = n; });
+    return t || 0;
+  }
   function holdingStateOf(p) {
     if (!p) return null;
     var h = String(p.holding || ((p.metadata || {}).holding) || '').toLowerCase();
@@ -95,7 +112,7 @@
   // Pure — returns ordered groups: [{ key, label, items:[...] }]
   function group(rows, opts) {
     opts = opts || {};
-    var recentCount = (opts.recentCount != null) ? opts.recentCount : 5;
+    var recentCount = (opts.recentCount != null) ? opts.recentCount : 10;   // v1.3.1 ten (Bryn: "probably need 10x in recents")
     var wqDescending = (opts.wqDescending !== false); // default newest-first
     var list = Array.isArray(rows) ? rows.slice() : [];
     var out = [];
@@ -108,20 +125,24 @@
     var live = list.filter(function (p) { return !doneOf(p) && !holdingOf(p); });
     var done = list.filter(doneOf);
 
-    var recent = live.filter(function (p) { return tsOf(p) > 0; })
-      .sort(function (a, b) { return tsOf(b) - tsOf(a); })
-      .slice(0, recentCount);
+    // v1.3.1 (Bryn: "keep the blocks thats useful, we dont want one solid list") — the BLOCKS stay, the ORDER inside
+    // every block is last touched first (updated_at desc; WQ number / name only break ties):
+    //   ⏱ Recently edited (top 10)  →  WQ tenders  →  Enquiries / no WQ number  →  ⏳ Holding  →  ✔ Completed
+    var byTouch = function (a, b) {
+      var d = tsOf(b) - tsOf(a); if (d) return d;
+      var wa = wqOf(a), wb = wqOf(b); if (wa != null && wb != null && wa !== wb) return wb - wa;
+      return String((a && (a.name || a.ref)) || '').localeCompare(String((b && (b.name || b.ref)) || ''));
+    };
+    var recent = live.filter(function (p) { return tsOf(p) > 0; }).sort(byTouch).slice(0, recentCount);
     if (recent.length) out.push({ key: 'recent', label: '⏱  Recently edited', items: recent });
-
-    var wq = live.filter(function (p) { return wqOf(p) != null; })
-      .sort(function (a, b) { return wqDescending ? (wqOf(b) - wqOf(a)) : (wqOf(a) - wqOf(b)); });
-    if (wq.length) out.push({ key: 'wq', label: 'WQ tenders — by number', items: wq });
-
-    var trials = live.filter(function (p) { return wqOf(p) == null; })
-      .sort(function (a, b) {
-        return String((a && (a.name || a.ref)) || '').localeCompare(String((b && (b.name || b.ref)) || ''));
-      });
-    if (trials.length) out.push({ key: 'trials', label: 'Trials / no WQ', items: trials });
+    // v1.3.2 (Bryn: "recents last touched by any of our apps, the rest can be in order of when wq was touched") —
+    // the WQ block orders by WEQUOTE activity (metadata.wequote_activity_at / wequote_modified_at, synced by Master Hub),
+    // not by our own updated_at; WQ number breaks ties.
+    var byWq = function (a, b) { var d = wqTouchOf(b) - wqTouchOf(a); if (d) return d; var wa = wqOf(a), wb = wqOf(b); if (wa != null && wb != null && wa !== wb) return wb - wa; return byTouch(a, b); };
+    var wq = live.filter(function (p) { return wqOf(p) != null; }).sort(byWq);
+    if (wq.length) out.push({ key: 'wq', label: 'WQ tenders — by WeQuote activity', items: wq });
+    var enq = live.filter(function (p) { return wqOf(p) == null; }).sort(byTouch);
+    if (enq.length) out.push({ key: 'enquiries', label: 'Enquiries / no WQ number — last touched first', items: enq });
 
     holding.sort(function (a, b) { return tsOf(b) - tsOf(a); });   // newest site visit first
     if (holding.length) out.push({ key: 'holding', label: '⏳  Site / holding — to assign', items: holding });
@@ -173,7 +194,7 @@
   }
 
   global.SonorProjectList = {
-    VERSION: VERSION, wqOf: wqOf, tsOf: tsOf, doneOf: doneOf,
+    VERSION: VERSION, wqOf: wqOf, tsOf: tsOf, wqTouchOf: wqTouchOf, doneOf: doneOf,
     holdingStateOf: holdingStateOf, holdingOf: holdingOf, dismissedOf: dismissedOf,
     group: group, populateSelect: populateSelect, defaultLabel: defaultLabel
   };

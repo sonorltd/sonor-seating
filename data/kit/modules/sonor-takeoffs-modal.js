@@ -147,7 +147,7 @@
       closeBtn.setAttribute('aria-label', 'Close');
       closeBtn.textContent = '×';
       closeBtn.style.cssText = 'background:none;border:none;font-size:22px;' +
-                                'cursor:pointer;color:#6b4a8a;line-height:1;padding:4px 8px;';
+                                'cursor:pointer;color:var(--muted,#64748B);line-height:1;padding:4px 8px;';
       closeBtn.addEventListener('click', () => instance.close('close'));
       head.appendChild(closeBtn);
       modal.appendChild(head);
@@ -176,9 +176,9 @@
         if (a.title) btn.title = a.title;
         if (a.disabled) btn.disabled = true;
         btn.style.cssText = 'padding:8px 14px;border-radius:6px;font-weight:600;' +
-                            'cursor:pointer;border:1px solid #6b4a8a;' +
-                            'background:' + (a.kind === 'primary' ? '#6b4a8a' : 'transparent') + ';' +
-                            'color:' + (a.kind === 'primary' ? '#fff' : '#6b4a8a') + ';';
+                            'cursor:pointer;border:1px solid ' + (a.kind === 'primary' ? 'var(--cta-bg,var(--accent,#2d718b))' : 'var(--border-strong,var(--border,#CBD5E1))') + ';' +
+                            'background:' + (a.kind === 'primary' ? 'var(--cta-bg,var(--accent,#2d718b))' : 'transparent') + ';' +
+                            'color:' + (a.kind === 'primary' ? 'var(--cta-text,#fff)' : 'var(--text,#15202D)') + ';';   // 2026-10-13 — graphite tokens, no purple chrome (Bryn)
         btn.addEventListener('click', () => {
           if (typeof a.onClick === 'function') {
             try { a.onClick(instance); } catch (e) { console.warn('[SonorModal] action handler threw:', e && e.message); }

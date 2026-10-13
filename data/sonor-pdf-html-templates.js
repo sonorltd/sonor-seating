@@ -562,6 +562,9 @@
     // Clamp at 5 (max possible). Total pages = cabling pages + bend radius
     // (always +1 page from separate buildBendRadiusPage).
     const pageIndex = Math.max(0, Math.min(5, (typeof o.pageIndex === 'number') ? o.pageIndex : 0));
+    // v5.243.0 (Bryn: "the pdf full version doesnt continue the notes on to more pages") — pageIndex 100+k = PLAN NOTES
+    // continuation page k; the orchestrator splits the notes into page-sized chunks and passes this page's chunk.
+    const _notesContIdx = (typeof o.pageIndex === 'number' && o.pageIndex >= 100) ? o.pageIndex - 100 : -1;
     const totalInfoPages = (typeof o.totalInfoPages === 'number') ? o.totalInfoPages : 6;
 
     // Canonical cable types + bend radii + drawing colour chip. This is
@@ -868,10 +871,11 @@
     // export in 📋 Notes render first, above the revision history panel.
     const _exportNotesHtml = (Array.isArray(o.exportNotes) && o.exportNotes.length) ? `
         <section class="rev-plan-notes-card">
-          <header class="panel-head">PLAN NOTES</header>
+          <header class="panel-head">PLAN NOTES${_notesContIdx >= 0 ? ' <span class="rev-cloud-legend-sub">continued</span>' : ''}</header>
           <ul class="rev-plan-notes-list">
             ${o.exportNotes.map(n => `<li>${h.esc(n.text || '')}${(Array.isArray(n.services) ? n.services : []).map(sv => ` <span class="rev-svc-chip" style="background:${h.esc((sv && sv.colour) || '#475161')}">${h.esc((sv && sv.nn) || '')}</span>`).join('')}${n.floor ? ` <span class="rev-cloud-room">${h.esc(n.floor)}</span>` : ''}${n.done ? ' <span class="rev-plan-note-done">✓ done</span>' : ''}</li>`).join('')}
           </ul>
+          ${o.notesMore ? '<div class="rev-plan-notes-more">Notes continue on the next page →</div>' : ''}
         </section>` : '';
     // v5.154.0 (Bryn: "rev history still has 1st header duplicate first,
     // delete it") — the hero band duplicated the panel head; the page now
@@ -1079,7 +1083,9 @@
       _PAGE_ROWS.push({ label: 'REVISION HISTORY', rows: [_section00_11] });
     }
     const safeIndex = Math.min(pageIndex, _PAGE_ROWS.length - 1);
-    const _page = _PAGE_ROWS[safeIndex];
+    const _page = (_notesContIdx >= 0)
+      ? { label: 'PLAN NOTES (CONTINUED)', rows: [`<section class="info-section info-section-fullwidth info-section-taxonomy">${_exportNotesHtml}</section>`], full: true }
+      : _PAGE_ROWS[safeIndex];
     const innerBody = _page.full
       ? `<div class="info-fullpage">${_page.rows.join('')}</div>`
       : `<div class="info-fullpage info-rowstack">${_page.rows.join('')}</div>`;

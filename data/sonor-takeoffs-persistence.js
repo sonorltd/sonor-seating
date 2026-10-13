@@ -7,6 +7,10 @@
  * Synced into APP - Takeoffs/data/sonor-takeoffs-persistence.js by
  * sync-everything.sh; never hand-edit the per-app copy.
  *
+ * @version 1.7.0   (Sonor Takeoffs v5.244.0 — 2026-10-13 — soft-delete floors: deleteFloorCloud(); pullFloors skips deleted_at rows;
+ *                  pushFloors never re-saves a deleted floor)
+ * @version 1.6.0   (Sonor Takeoffs v5.244.0 — 2026-10-13 — pushFloors refuses to INSERT a floor id that belongs to another
+ *                  project saved in the last 30 days: cross-project leak guard, reason "cross-project")
  * @version 1.2.0   (Sonor Takeoffs v5.46.1 — 2026-07-06 — added 'buildingOutline' to
  *                   FLOOR_BUCKETS. ROOT-CAUSE of "outline doesn't persist": the module
  *                   keeps its OWN bucket list; registerKind('buildingOutline') pushed
@@ -594,12 +598,15 @@
   async function pullFloors(supa, projectId, localBgByFloorId) {
     if (!supa || !projectId) return { rows: [], ok: false, reason: 'not-wired' };
     try {
-      const { data, error } = await supa
+      let { data, error } = await supa
         .from('takeoffs_floors')
-        .select('floor_id, code, name, seq, content, version, updated_at')
+        .select('floor_id, code, name, seq, content, version, updated_at, deleted_at')
         .eq('project_id', projectId)
         .order('seq', { ascending: true });
       if (error) throw error;
+      // v1.7.0 — soft-deleted floors stay deleted (and are reported so the boot merge never re-adds them from the local envelope)
+      const deletedIds = (data || []).filter(r => r.deleted_at).map(r => r.floor_id);
+      data = (data || []).filter(r => !r.deleted_at);
       const rows = (data || []).map(r => rowToFloor(r, localBgByFloorId || {}));
       let newestCloudAt = null;
       (data || []).forEach(r => {
@@ -608,7 +615,7 @@
           if (!newestCloudAt || t > newestCloudAt) newestCloudAt = t;
         }
       });
-      return { rows, ok: true, newestCloudAt };
+      return { rows, ok: true, newestCloudAt, deletedIds };
     } catch (err) {
       console.warn('[SonorPersistence] pullFloors failed:', err);
       return { rows: [], ok: false, error: err };
@@ -621,6 +628,22 @@
    * still succeeds (last-write-wins by updated_at) but the local row's
    * `version` is incremented so the next save matches.
    */
+  /**
+   * v1.7.0 (2026-10-13, Bryn: "why did all the other ones come back after refresh?") — deleting a floor in the app only removed it
+   * from memory; the cloud row stayed and pullFloors brought it back. There is no DELETE policy on takeoffs_floors (by design), so a
+   * delete is a SOFT delete: deleted_at + deleted_reason on the row; pullFloors skips it, pushFloors never re-saves it.
+   */
+  async function deleteFloorCloud(supa, projectId, floorId, reason) {
+    if (!supa || !projectId || !floorId) return { ok: false, reason: 'not-wired' };
+    try {
+      const { data, error } = await supa.from('takeoffs_floors')
+        .update({ deleted_at: new Date().toISOString(), deleted_reason: reason || 'deleted in Takeoffs' })
+        .eq('project_id', projectId).eq('floor_id', floorId).select('floor_id');
+      if (error) throw error;
+      return { ok: true, count: (data || []).length };
+    } catch (err) { console.warn('[SonorPersistence] deleteFloorCloud failed:', err); return { ok: false, error: err }; }
+  }
+
   async function pushFloors(supa, projectId, floors, opts) {
     const o = opts || {};
     const appVersion = o.appVersion || (typeof window !== 'undefined' && window.APP_VERSION) || 'unknown';
@@ -635,6 +658,7 @@
     // any number of writers. Replaces the pre-v1.3.0 unconditional upsert
     // (LWW) that let a stale writer silently clobber newer cloud data.
     const conflicts = [];
+    const crossProject = [];   // v1.6.0
     let count = 0;
     // v1.4.1 (audit A1) — seq threading. Hosts push CHANGED-FLOOR SUBSETS
     // (change-detection filter), so the loop index is NOT the floor's canonical
@@ -653,13 +677,31 @@
         // Probe existence to choose INSERT (new floor) vs CAS-UPDATE.
         const sel = await supa
           .from('takeoffs_floors')
-          .select('version')
+          .select('version, deleted_at')
           .eq('project_id', projectId)
           .eq('floor_id', f.id)
           .limit(1);
         if (sel.error) throw sel.error;
         const existing = sel.data && sel.data[0];
+        // v1.7.0 — a floor deleted in the app (soft delete) is never resurrected by a stale tab / in-memory copy.
+        if (existing && existing.deleted_at) { console.warn('[SonorPersistence] skip save of deleted floor ' + f.id); continue; }
         if (!existing) {
+          // v1.6.0 CROSS-PROJECT LEAK GUARD (2026-10-13: Greylands' 6 floors were INSERTED into Heybridge Cottage at 13:29 — the
+          // in-memory floors belonged to the previous project while projectId was already the new one; an earlier wave in Apr–Sep
+          // spread two template floors into 18 projects). A floor id that already lives in ANOTHER project which was saved in the
+          // last 30 days is that project's floor, not a new one for this project — refuse the insert and report it.
+          const other = await supa
+            .from('takeoffs_floors')
+            .select('project_id, updated_at')
+            .eq('floor_id', f.id)
+            .neq('project_id', projectId)
+            .gte('updated_at', new Date(Date.now() - 30 * 864e5).toISOString())
+            .limit(1);
+          if (!other.error && other.data && other.data.length) {
+            console.warn('[SonorPersistence] refused cross-project insert of floor ' + f.id + ' (' + (f.name || '') + ') into project ' + projectId
+              + ' — it belongs to project ' + other.data[0].project_id);
+            conflicts.push(f.id); crossProject.push(f.id); continue;
+          }
           const insRow = floorToRow(f, projectId, seqOf(f, i), appVersion);
           if (!insRow) continue;
           insRow.version = 1;                     // fresh row starts at v1
@@ -687,7 +729,8 @@
           count++;
         }
       }
-      if (conflicts.length) return { ok: false, reason: 'version-conflict', conflicts, count };
+      if (crossProject.length && crossProject.length === conflicts.length) return { ok: false, reason: 'cross-project', conflicts, crossProject, count };
+      if (conflicts.length) return { ok: false, reason: 'version-conflict', conflicts, crossProject, count };
       return { ok: true, count };
     } catch (err) {
       console.warn('[SonorPersistence] pushFloors failed:', err);
@@ -850,7 +893,7 @@
   // it appended (same-project envelopes only — a stale envelope from a
   // DIFFERENT project must never leak floors across projects, the B-370
   // incident family).
-  function mergeLocalOnlyFloors(cloudFloors, envelope, currentProjectId) {
+  function mergeLocalOnlyFloors(cloudFloors, envelope, currentProjectId, deletedIds) {
     const appended = [];
     try {
       if (!envelope || !Array.isArray(envelope.floors)) return appended;
@@ -858,7 +901,7 @@
       if (String(envelope.currentProjectId) !== String(currentProjectId)) return appended;
       const cloudIds = new Set((cloudFloors || []).map(f => f && f.id));
       envelope.floors.forEach(lf => {
-        if (lf && lf.id && !cloudIds.has(lf.id)) {
+        if (lf && lf.id && !cloudIds.has(lf.id) && !(deletedIds || []).includes(lf.id)) {   // v1.7.0 — never revive a deleted floor
           cloudFloors.push(lf);
           appended.push(lf);
         }
@@ -1242,6 +1285,7 @@
     floorToRow,
     rowToFloor,
     pullFloors,
+    deleteFloorCloud,
     pushFloors,
 
     // local

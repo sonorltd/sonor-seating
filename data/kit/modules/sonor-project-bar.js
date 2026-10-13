@@ -28,6 +28,9 @@
 //
 // Namespace: window.SonorProjectBar
 //
+// Version: 1.12.0 — OFFLINE project list (2026-10-13): the loaded list is mirrored to localStorage `sonor_projects_cache`
+//                  (slim rows, ~1 KB each) and used when Supabase can't be reached, so a field app refreshed with no
+//                  signal still has its picker / finder / project name. Bryn: "will all this work offline on the ipad".
 // Version: 1.11.1 — Blueprint / Brief / Costs links are neutral graphite pills, not service-purple (2026-10-12).
 // Version: 1.11.0 — Lucide icons (B-478): chrome emoji on the Blueprint / Brief / Costs links and the bar buttons become
 //                  SVG icons when root sonor-icons.js is on the page (the WeQuote control loads it beside itself).
@@ -464,6 +467,7 @@
   // ---- Project list loader ----
   async function loadProjects() {
     if (!_supa) return [];
+    if (!_projects.length) { const seed = _cacheRead(); if (seed.length) { _projects = seed; _render(); } }   // v1.12.0 instant picker from the device cache; the live list replaces it when it lands
     try {
       const { data, error } = await _supa
         .from('projects')
@@ -471,13 +475,34 @@
         .order('updated_at', { ascending: false });
       if (error) throw error;
       _projects = Array.isArray(data) ? data : [];
+      _cacheWrite(_projects);
       _render();
       return _projects;
     } catch (e) {
       console.warn('[ProjectBar] loadProjects failed:', e && e.message);
-      return [];
+      // v1.12.0 OFFLINE — no signal on site (or a refresh with none): fall back to the last list this device saw, so the
+      // picker, the finder and the project name still work and the field apps carry on from their own caches.
+      const cached = _cacheRead();
+      if (cached.length && !_projects.length) { _projects = cached; _render(); }
+      return _projects.slice();
     }
   }
+  // Slim per-device cache of the project list (localStorage, ~1 KB per project): the picker/finder fields + the metadata
+  // keys SonorProjectList orders by. Never the big metadata blobs (briefs, survey summaries, plan notes).
+  const CACHE_KEY = 'sonor_projects_cache';
+  const META_KEEP = ['is_test', 'holding', 'source', 'wequote_status', 'wequote_number', 'wequote_activity_at', 'wequote_modified_at', 'wequote_created_at', 'trades', 'budget'];
+  function _cacheWrite(rows) {
+    try {
+      const slim = rows.map(p => {
+        const m = p.metadata || {}, mm = {};
+        META_KEEP.forEach(k => { if (m[k] !== undefined) mm[k] = m[k]; });
+        if (m.brief) mm.brief = true;   // the bar only asks "is there a brief?"
+        return { id: p.id, ref: p.ref, name: p.name, client_name: p.client_name, address: p.address, postcode: p.postcode, status: p.status, created_at: p.created_at, updated_at: p.updated_at, metadata: mm };
+      });
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), rows: slim }));
+    } catch (e) { /* quota / private mode — the cache is a convenience */ }
+  }
+  function _cacheRead() { try { const o = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return o && Array.isArray(o.rows) ? o.rows : []; } catch (e) { return []; } }
 
   // Suggest a unique-looking project ref so users don't have to invent one.
   // Pattern: SON-{YYYY}-{NNN} where NNN is the next free number for the year
@@ -641,7 +666,7 @@
   const api = {
     init, refresh, loadProjects,
     getActiveId, getProject, getProjects, setActive,
-    __version: '1.11.1',
+    __version: '1.12.0',
     __ls_key: LS_KEY
   };
   if (typeof window !== 'undefined') window.SonorProjectBar = api;

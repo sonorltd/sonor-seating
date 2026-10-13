@@ -11211,9 +11211,27 @@ const SonorPdf = (function () {
       { key: 'infoinstall', idx: 3 },   // 00.5 Cable ID + 00.6 Types & Bend Radii
       { key: 'infotails',   idx: 4 }    // 00.7 Install Notes + 00.8 Tails Protocol
     ];
+    // v5.243.0 (Bryn: "the pdf full version doesnt continue the notes on to more pages") — the PLAN NOTES card on the
+    // revision-history page was a fixed A3 page, so a long notes / RFI list was cut off at the page edge. Split the export
+    // notes into page-sized chunks (estimated lines: ~190 chars per line on the full-width card; the first page shares the
+    // sheet with the revision history, so it takes fewer) and emit continuation pages (pageIndex 100+k) straight after it.
+    const _NOTES_FIRST_LINES = 22, _NOTES_CONT_LINES = 50, _NOTES_CHARS = 215;
+    const _pdfNoteChunks = () => {
+      let notes = [];
+      try { notes = (typeof window !== 'undefined' && typeof window._planNotesForExport === 'function') ? (window._planNotesForExport() || []) : []; } catch (_) { notes = []; }
+      const chunks = [[]]; let used = 0;
+      notes.forEach(n => {
+        const lines = Math.max(1, Math.ceil((String(n.text || '').length + 24) / _NOTES_CHARS)) + 0.35;
+        const budget = chunks.length === 1 ? _NOTES_FIRST_LINES : _NOTES_CONT_LINES;
+        if (used + lines > budget && chunks[chunks.length - 1].length) { chunks.push([]); used = 0; }
+        chunks[chunks.length - 1].push(n); used += lines;
+      });
+      return chunks;
+    };
     const _infoCablingIdxFor = (hasRev) => {
       // FRONT pages only (the pack emits later, before the Cable Schedule).
       const l = _INFO_FRONT.filter(pg => _secOn(pg.key)).map(pg => pg.idx);
+      if (l.indexOf(0) >= 0) { const nC = _pdfNoteChunks().length; const extra = []; for (let k = 1; k < nC; k++) extra.push(100 + k); l.splice(l.indexOf(0) + 1, 0, ...extra); }
       if (hasRev && _secOn('inforev')) l.push(5);   // 00.4 legacy rev table rides the rev tick
       return l;
     };
@@ -11720,7 +11738,7 @@ const SonorPdf = (function () {
             // others") — the REVISION HISTORY page (pageIndex 0) takes the
             // slim strip; the once-per-doc full title block latches onto
             // the next info page instead.
-            footerSlim: pageIndex === 0,
+            footerSlim: pageIndex === 0 || pageIndex >= 100,
             totalInfoPages: enabledTotal || TOTAL_INFO_PAGES,   // v5.170.0 — enabled count
             services: _servicesForChrome,
             // v5.4.60 — floors + totals + revision-cloud counts piped to
@@ -11755,8 +11773,8 @@ const SonorPdf = (function () {
             // on export... displayed at the top of the revisions page") —
             // notes flagged 'export' in 📋 Notes render above the revision
             // history panel.
-            exportNotes: (typeof window !== 'undefined' && typeof window._planNotesForExport === 'function')
-              ? window._planNotesForExport() : [],
+            exportNotes: (pageIndex === 0 || pageIndex >= 100) ? ((_pdfNoteChunks()[pageIndex >= 100 ? pageIndex - 100 : 0]) || []) : [],
+            notesMore: (pageIndex === 0 || pageIndex >= 100) ? ((pageIndex >= 100 ? pageIndex - 100 : 0) + 1 < _pdfNoteChunks().length) : false,
             revisionCloudsByRev: (function () {
               const map = {};
               try {

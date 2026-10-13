@@ -86,14 +86,14 @@
       '.sonor-wq-bar .swq-ev{font-size:11px;padding:2px 8px;opacity:.85}',
       '.sonor-wq-bar .swq-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px;padding-top:6px;border-top:1px solid var(--border,#CBD5E1)}',
       '.sonor-wq-bar .swq-mini{padding:2px 8px;font-size:11px;border-radius:4px;border:1px solid var(--border,#CBD5E1);background:var(--card,#fff);color:inherit;cursor:pointer}',
-      '.sonor-wq-bar .swq-primary{background:#6b4a8a;border-color:#6b4a8a;color:#fff}',
+      '.sonor-wq-bar .swq-primary{background:var(--cta-bg,var(--accent,#2d718b));border-color:var(--cta-bg,var(--accent,#2d718b));color:var(--cta-text,#fff)}',
       '.sonor-wq-bar .swq-warn{display:inline-block;padding:0 6px;border-radius:8px;background:#DC2626;color:#fff;font-size:10px;font-weight:700;line-height:16px}',
       '.sonor-wq-bar .swq-ok{color:#22C55E;font-weight:700}',
       '.sonor-wq-bar .swq-drift{background:#B45309}',
       '.sonor-wq-bar .swq-doc{padding:4px 8px;border-radius:5px;border:1px solid transparent;display:flex;flex-direction:column;gap:2px}.sonor-wq-bar .swq-doc:hover{border-color:var(--border,#CBD5E1)}',
       '.sonor-wq-bar .swq-doc.swq-dead{opacity:.5}.sonor-wq-bar .swq-doc .swq-grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}',
       '.sonor-wq-bar .swq-danger{background:#DC2626;border-color:#DC2626;color:#fff}',
-      '.sonor-project-bar .sonor-wq-bar{--swq-bg:rgba(107,74,138,.35);--swq-border:rgba(107,74,138,.9)}',
+      '.sonor-project-bar .sonor-wq-bar{--swq-bg:var(--tint,#E2E8F0);--swq-border:var(--border-strong,var(--border,#CBD5E1))}'   /* 2026-10-13 — neutral chrome, no purple (Bryn) */,
       '.sonor-project-bar .sonor-wq-bar .swq-menu{color:var(--text,#0F172A)}'   /* v1.4.4: the menu sits on --card, so its ink is --text (graphite made it dark-on-dark) */
     ].join('\n');
     var st = document.createElement('style'); st.id = 'sonor-wq-bar-styles'; st.textContent = css; document.head.appendChild(st);
