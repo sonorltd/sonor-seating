@@ -35,7 +35,7 @@
 //                  app actions, ↻. Dark (project bar) and light (Takeoffs header) via CSS vars — no cream anywhere.
 (function (global) {
   'use strict';
-  var VERSION = '1.4.6';   // 2026-10-02 §26 stage law: chips on the status tokens (amber ours · blue client · green yes · red no)
+  var VERSION = '1.5.0';   // 1.5.0 (2026-10-13) WeQuote API call budget readout (wq_api_usage) in the menu foot · 1.4.6 // 2026-10-02 §26 stage law: chips on the status tokens (amber ours · blue client · green yes · red no)
   var WQ_QUOTE_URL = 'https://app.wequote.cloud/sonor-ltd/quote/';   // + <id>/editor
   var LOCK_STAGES = { sent: 1, accepted: 1, complete: 1 };
   var STAGE_LABEL = { in_progress: 'in progress', sent: 'sent', accepted: 'accepted', complete: 'complete', cancelled: 'cancelled', declined: 'declined', draft: 'draft' };
@@ -93,6 +93,9 @@
       '.sonor-wq-bar .swq-doc{padding:4px 8px;border-radius:5px;border:1px solid transparent;display:flex;flex-direction:column;gap:2px}.sonor-wq-bar .swq-doc:hover{border-color:var(--border,#CBD5E1)}',
       '.sonor-wq-bar .swq-doc.swq-dead{opacity:.5}.sonor-wq-bar .swq-doc .swq-grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}',
       '.sonor-wq-bar .swq-danger{background:#DC2626;border-color:#DC2626;color:#fff}',
+      '.sonor-wq-bar .swq-api{font-size:11px;padding:4px 8px;border-radius:5px;margin-top:4px;background:var(--tint,#E2E8F0);color:var(--muted,#64748B)}',
+      '.sonor-wq-bar .swq-api-warn{color:#B45309;background:color-mix(in srgb,#E0922F 18%,transparent)}',
+      '.sonor-wq-bar .swq-api-over{color:#fff;background:#DC2626;font-weight:700}',
       '.sonor-project-bar .sonor-wq-bar{--swq-bg:var(--tint,#E2E8F0);--swq-border:var(--border-strong,var(--border,#CBD5E1))}'   /* 2026-10-13 — neutral chrome, no purple (Bryn) */,
       '.sonor-project-bar .sonor-wq-bar .swq-menu{color:var(--text,#0F172A)}'   /* v1.4.4: the menu sits on --card, so its ink is --text (graphite made it dark-on-dark) */
     ].join('\n');
@@ -113,6 +116,9 @@
       _state.quotes = (r2 && r2.data) || [];
       _state.events = (r3 && r3.data) || [];
       try { var r4 = await _supa.from('client_docs').select('id, token, kind, title, project_ref, quote_no, quote_rev, created_at, expires_at, revoked_at, views, last_viewed_at').or('project_ref.eq.' + no + ',project_ref.ilike.' + no + ' - %,project_ref.ilike.' + no + '-%').order('created_at', { ascending: false }).order('id').limit(8); _state.docs = (r4 && r4.data) || []; } catch (_) { _state.docs = []; }
+      // 1.5.0 — API call budget this period (public.wq_api_usage; period starts on the 18th). Shown in the foot so a blown
+      // allowance is visible before a push is attempted (13.10.26: 17,807 / 5,000 calls, locked out until the 18th).
+      try { var r5 = await _supa.from('wq_api_usage').select('period_start, calls, limit_calls, hard_stop, exhausted').order('period_start', { ascending: false }).limit(1).maybeSingle(); _state.api = (r5 && r5.data) || null; } catch (_) { _state.api = null; }
       _state.loadedAt = Date.now();
     } catch (e) { _state.error = e && e.message || String(e); }
     _render();
@@ -198,6 +204,11 @@
       _state.events.forEach(function (e) { var r = e.resolved || {};
         if (e.type === 'spec_check') { h.push('<div class="swq-ev">' + (r.issues ? '<span class="swq-warn">' + _esc(r.issues) + '</span> spec check' : _ico('check', '✓', { size: 12 }) + ' spec check') + (e.quote_id ? ' · #' + _esc(r.quote_no || e.quote_id) : '') + (r.issues ? ' — ' + _esc(r.missing || 0) + ' missing, ' + _esc(r.qty_diff || 0) + ' qty' : ' — matches') + ' <span class="swq-dim">' + _ago(e.received_at) + ' · nightly</span></div>'); return; }
         h.push('<div class="swq-ev">' + _esc(String(e.type || '').replace(/_/g, ' ')) + (e.quote_id ? ' · #' + _esc(r.quote_no || e.quote_id) : '') + (r.stage ? ' → ' + _esc(STAGE_LABEL[r.stage] || r.stage) : '') + ' <span class="swq-dim">' + _ago(e.received_at) + '</span></div>'); });
+    }
+    if (_state.api) {   // 1.5.0 — API budget line
+      var ap = _state.api, used = Number(ap.calls || 0), lim = Number(ap.limit_calls || 5000), ps = new Date(ap.period_start + 'T00:00:00'), rs = new Date(ps.getFullYear(), ps.getMonth() + 1, ps.getDate());
+      var over = ap.exhausted || used >= Number(ap.hard_stop || 4500), warn = !over && used >= 3500;
+      h.push('<div class="swq-api' + (over ? ' swq-api-over' : warn ? ' swq-api-warn' : '') + '" title="WeQuote API calls this billing period (resets on the 18th) — every proxy read and push write counts; Sonor stops at ' + _esc(ap.hard_stop || 4500) + '">' + (over ? _ico('alert-triangle', '⛔', { size: 12 }) + ' ' : '') + 'API calls ' + _esc(used.toLocaleString()) + ' / ' + _esc(lim.toLocaleString()) + ' · resets ' + rs.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (over ? ' — pushes and lookups are off until then' : '') + '</div>');
     }
     h.push('<div class="swq-foot"><span class="swq-dim">' + (_state.error ? '⚠ ' + _esc(_state.error) : (_state.loadedAt ? 'live · ' + _ago(new Date(_state.loadedAt).toISOString()) : '')) + '</span><span><button type="button" class="swq-mini" data-swq-refresh="1" title="Re-read from Supabase">' + _ico('refresh-cw', '↻', { size: 12 }) + '</button></span></div>');
     return h.join('');
