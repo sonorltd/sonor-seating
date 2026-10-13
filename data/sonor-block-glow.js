@@ -24,7 +24,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.0.1';
+  var VERSION = '1.1.0';   // 1.1.0 (2026-10-13, Bryn: "needs to also disappear upon click and drag because it obscures the view") — card hides on mouse-down / drag; selection keeps the halo only; ⌥-click (Alt) pins the card
 
   function hexA(hex, a) {
     var h = String(hex || '#f5d05c').replace('#', '');
@@ -102,7 +102,7 @@
     ov.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:5;';
     var card = document.createElement('div'); card.className = 'sbg-card'; card.style.display = 'none';
     if (hostEl) { hostEl.appendChild(ov); hostEl.appendChild(card); }
-    var ctx = ov.getContext('2d'), hover = null, pinned = null, info = null, raf = 0;
+    var ctx = ov.getContext('2d'), hover = null, pinned = null, sel = null, info = null, raf = 0;   // sel 1.1.0 — selected block keeps its halo, no card
 
     function enabled() { try { return opts.enabled ? !!opts.enabled() : true; } catch (e) { return true; } }
     function resolve(o) { try { return o ? opts.resolve(o) : null; } catch (e) { console.warn('[block-glow] resolve', e && e.message); return null; } }
@@ -115,7 +115,7 @@
       var W = canvas.getWidth(), H = canvas.getHeight(), dpr = (canvas.getRetinaScaling && canvas.getRetinaScaling()) || global.devicePixelRatio || 1;
       if (ov.width !== Math.round(W * dpr) || ov.height !== Math.round(H * dpr)) { ov.width = Math.round(W * dpr); ov.height = Math.round(H * dpr); ov.style.width = W + 'px'; ov.style.height = H + 'px'; }
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, ov.width, ov.height);
-      var focus = pinned || hover; if (!focus || !info) return;
+      var focus = pinned || hover || sel; if (!focus) return; if (!info) { info = resolve(focus); if (!info) return; }
       if (canvas.getObjects().indexOf(focus) < 0) { clear(); return; }
       var t = (Date.now() % 1600) / 1600, breathe = 0.82 + 0.18 * Math.sin(t * Math.PI * 2);
       var rel = [];
@@ -140,7 +140,7 @@
       });
       card.style.left = Math.round(best[0]) + 'px'; card.style.top = Math.round(best[1]) + 'px';
     }
-    function loop() { cancelAnimationFrame(raf); if (!(hover || pinned)) return; paint(); raf = requestAnimationFrame(loop); }
+    function loop() { cancelAnimationFrame(raf); if (!(hover || pinned || sel)) return; paint(); raf = requestAnimationFrame(loop); }
     function show(o, pin) {
       info = resolve(o); if (!info) { clear(); return; }
       card.style.setProperty('--sbg-c', info.colour || '#f5d05c');
@@ -151,23 +151,34 @@
       });
       loop();
     }
-    function clear() { hover = null; pinned = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint(); }
+    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint(); }
 
     canvas.on('mouse:over', function (e) {
-      if (pinned || !enabled()) return; var o = e && e.target; if (!o || !resolve(o)) return;
+      if (pinned || suppressed || !enabled()) return; var o = e && e.target; if (!o || !resolve(o)) return;
       hover = o; show(o, false);
     });
-    canvas.on('mouse:out', function (e) { if (pinned) return; if (e && e.target === hover) { hover = null; info = null; card.style.display = 'none'; paint(); } });
+    canvas.on('mouse:out', function (e) { if (pinned) return; if (e && e.target === hover) { hover = null; info = null; card.style.display = 'none'; if (sel) loop(); else paint(); } });
+    // 1.1.0 — the card gets out of the way: any mouse-down on the canvas hides it (click, drag, marquee) and it stays hidden
+    // until the pointer leaves and re-enters a block. Selecting a block keeps the HALO (paint) but no card; ⌥/Alt-click pins
+    // the interactive card on purpose.
+    var suppressed = false;
+    canvas.on('mouse:down', function (e) {
+      var ev = e && e.e, o = e && e.target;
+      if (ev && ev.altKey && o && o.type !== 'activeSelection' && enabled() && resolve(o)) { pinned = o; hover = null; suppressed = false; show(o, true); return; }
+      if (pinned) { pinned = null; }
+      suppressed = true; hover = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint();
+    });
+    canvas.on('mouse:out', function () { suppressed = false; });
     function onSel() {
       var a = canvas.getActiveObject && canvas.getActiveObject();
-      if (a && a.type !== 'activeSelection' && enabled() && resolve(a)) { pinned = a; hover = null; show(a, true); }
-      else if (pinned) { clear(); }
+      if (pinned && a !== pinned) { pinned = null; card.style.display = 'none'; }
+      sel = (a && a.type !== 'activeSelection' && enabled() && resolve(a)) ? a : null; info = null; loop();
     }
-    canvas.on('selection:created', onSel); canvas.on('selection:updated', onSel); canvas.on('selection:cleared', function () { if (pinned) clear(); });
-    canvas.on('object:moving', function () { if (pinned || hover) paint(); });
-    canvas.on('after:render', function () { if (!(hover || pinned)) { if (ov.width) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, ov.width, ov.height); } } });
+    canvas.on('selection:created', onSel); canvas.on('selection:updated', onSel); canvas.on('selection:cleared', function () { sel = null; if (pinned) clear(); else { info = null; cancelAnimationFrame(raf); paint(); } });
+    canvas.on('object:moving', function () { if (hover || pinned) { hover = null; card.style.display = 'none'; } paint(); });
+    canvas.on('after:render', function () { if (!(hover || pinned || sel)) { if (ov.width) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, ov.width, ov.height); } } });
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && (pinned || hover)) clear(); });
-    var api = { clear: clear, refresh: function () { var o = pinned || hover; if (o) show(o, !!pinned); }, VERSION: VERSION };
+    var api = { clear: clear, refresh: function () { var o = pinned || hover; if (o) show(o, !!pinned); else if (sel) { info = null; paint(); } }, VERSION: VERSION };
     canvas.__sonorBlockGlow = api; return api;
   }
 
