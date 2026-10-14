@@ -1,4 +1,6 @@
 /* sonor-ink.js — SHARED INK RENDERER (canonical master at workspace root, synced to every app's data/)
+ * v1.3.1 (2026-10-14, Survey v0.11.1) — drawStrokeSegments(ctx, st, from, to, cap): incremental live painting
+ * v1.3.0 (2026-10-14, Survey v0.11.0) — mark kind 'object': site objects (radiator, steel, loft hatch, existing kit…) as a graphite rounded square
  * v1.2.0 (2026-10-12, Survey v0.6.0) — text objects + pin marks (RFI / snag / client / note / dim)
  * v1.0.0 (2026-10-12, APP - Survey v0.3.0 / Takeoffs survey-ink layer) — HARMONY §3: the one place that knows how a
  * Survey stroke / image object is painted, so Takeoffs (overlay layer), Survey (editor, thumbnails, PDF report) and any
@@ -16,7 +18,7 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = factory(); else root.SonorInk = factory();
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var VERSION = '1.2.0', PAPER = { line: 36, grid: 25 }, MARK_R = 13;
+  var VERSION = '1.3.1', PAPER = { line: 36, grid: 25 }, MARK_R = 13;
   var PIN_LABEL = { rfi: 'RFI', snag: 'SNAG', client: 'CLIENT', note: 'NOTE', dim: 'DIM' };
   // v1.1.0 — SURVEY MARKS: { id, code, block_code, service_nn, label, glyph, c:'#svc', x, y, t, kind:'block'|'photo', photo_page_id?, note? }
   // A mark is a survey-stage intent ("TV here", "keypad here", "photo taken here") in page units; Takeoffs swaps block marks
@@ -40,6 +42,12 @@
       var lw = ctx.measureText(lab).width + r * 0.8, lx = m.x + r * 1.35, ly = m.y - r * 0.6, lh = r * 1.2;
       ctx.fillStyle = c; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(lx, ly, lw, lh, r * 0.25); else ctx.rect(lx, ly, lw, lh); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
       ctx.fillStyle = inkFor(c); ctx.fillText(lab, lx + r * 0.4, ly + lh / 2 + 0.5);
+    } else if (m.kind === 'object') {   // v1.3.0 — SITE OBJECT (radiator, steel, loft hatch…): graphite rounded square, so it never reads as a service device
+      ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(m.x - r, m.y - r, r * 2, r * 2, r * 0.3); else ctx.rect(m.x - r, m.y - r, r * 2, r * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = inkFor(c); ctx.font = 'bold ' + Math.round(r * 0.7) + 'px "DM Sans", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(m.glyph || '?').slice(0, 4), m.x, m.y + 0.5);
+      if (m.photo_page_id) { ctx.fillStyle = '#fff'; ctx.strokeStyle = c; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(m.x + r * 0.85, m.y - r * 0.85, r * 0.38, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     } else {
       ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(m.x, m.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -52,20 +60,24 @@
   function drawMarks(ctx, marks, opts) { (marks || []).forEach(function (m) { drawMark(ctx, m, opts); }); }
   function markAt(marks, pt, r) { r = r || MARK_R * 1.3; for (var i = (marks || []).length - 1; i >= 0; i--) { var m = marks[i]; var dy = m.kind === 'photo' ? pt[1] - (m.y - MARK_R * 1.4) : pt[1] - m.y; if (Math.hypot(m.x - pt[0], dy) <= r) return m; } return null; }
   function widthAt(st, p) { if (st.tool === 'hl') return st.w * 4; var pr = (p == null || p === 0) ? 0.5 : p; return st.w * (0.45 + 1.1 * pr); }
-  function drawStroke(ctx, st, opts) {
+  function drawStroke(ctx, st, opts) { drawStrokeSegments(ctx, st, 1, (st.pts || []).length, true, opts); }
+  // v1.3.1 — segments [from, to) of a stroke, so a live stroke is painted INCREMENTALLY while the pen moves (Notability feel:
+  // each pointer event adds its new segments instead of repainting the whole stroke). Segment i is the quadratic through the
+  // midpoints around pts[i-1], so it depends only on pts[i-2..i]; `cap` draws the final lineTo to the last point.
+  function drawStrokeSegments(ctx, st, from, to, cap, opts) {
     var pts = st.pts; if (!pts || !pts.length) return;
     var alpha = (opts && opts.alpha != null) ? opts.alpha : 1;
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = st.c; ctx.globalAlpha = alpha;
     if (st.tool === 'hl') { ctx.globalAlpha = 0.32 * alpha; ctx.globalCompositeOperation = 'multiply'; ctx.lineCap = 'butt'; }
-    if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], widthAt(st, pts[0][2]) / 2, 0, Math.PI * 2); ctx.fillStyle = st.c; ctx.fill(); ctx.restore(); return; }
-    var prev = pts[0];
-    for (var i = 1; i < pts.length; i++) {
-      var p = pts[i], w = (widthAt(st, prev[2]) + widthAt(st, p[2])) / 2;
+    if (pts.length === 1) { if (from <= 1) { ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], widthAt(st, pts[0][2]) / 2, 0, Math.PI * 2); ctx.fillStyle = st.c; ctx.fill(); } ctx.restore(); return; }
+    from = Math.max(1, from | 0); to = Math.min(pts.length, to == null ? pts.length : to | 0);
+    for (var i = from; i < to; i++) {
+      var prev = pts[i - 1], p = pts[i], w = (widthAt(st, prev[2]) + widthAt(st, p[2])) / 2;
       ctx.lineWidth = Math.max(0.4, w); ctx.beginPath();
       if (i > 1) { var pp = pts[i - 2]; ctx.moveTo((pp[0] + prev[0]) / 2, (pp[1] + prev[1]) / 2); ctx.quadraticCurveTo(prev[0], prev[1], (prev[0] + p[0]) / 2, (prev[1] + p[1]) / 2); }
       else { ctx.moveTo(prev[0], prev[1]); ctx.lineTo((prev[0] + p[0]) / 2, (prev[1] + p[1]) / 2); }
-      if (i === pts.length - 1) ctx.lineTo(p[0], p[1]);
-      ctx.stroke(); prev = p;
+      if (cap && i === pts.length - 1) ctx.lineTo(p[0], p[1]);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -124,5 +136,5 @@
     drawMarks(x, page.marks, { r: Math.max(MARK_R, (opts.minMark || 0) / s) });
     return canvas;
   }
-  return { VERSION: VERSION, PAPER: PAPER, MARK_R: MARK_R, PIN_LABEL: PIN_LABEL, inkFor: inkFor, drawText: drawText, wrapText: wrapText, drawMark: drawMark, drawMarks: drawMarks, markAt: markAt, widthAt: widthAt, drawStroke: drawStroke, drawObjects: drawObjects, drawPaper: drawPaper, drawInk: drawInk, renderPage: renderPage };
+  return { VERSION: VERSION, PAPER: PAPER, MARK_R: MARK_R, PIN_LABEL: PIN_LABEL, inkFor: inkFor, drawText: drawText, wrapText: wrapText, drawMark: drawMark, drawMarks: drawMarks, markAt: markAt, widthAt: widthAt, drawStroke: drawStroke, drawStrokeSegments: drawStrokeSegments, drawObjects: drawObjects, drawPaper: drawPaper, drawInk: drawInk, renderPage: renderPage };
 }));
