@@ -781,7 +781,7 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
 .wqp-tbl { width: 100%; border-collapse: collapse; max-height: 44vh; display: block; overflow: auto; }
 .wqp-tbl th, .wqp-tbl td { padding: var(--sp-1, 4px) 6px; border-bottom: 1px solid var(--border, #CBD5E1); text-align: left; white-space: nowrap; }
 .wqp-tbl.wqp-he { max-height: 58vh; }
-.wqp-bad { color: #a33; } .wqp-ok { color: #1F9D55; } .wqp-note { opacity: .8; }
+.wqp-bad { color: #a33; } .wqp-ok { color: #1F9D55; } .wqp-note { opacity: .8; } .wqp-warn { color: var(--status-amber, #E8A317); font-weight: 600; }
 .wqp-tot { padding: var(--sp-2, 8px) 10px; border-radius: var(--r-lg, 8px); background: var(--tint, var(--surface, #E2E8F0)); }
 .wqp-sub { font-size: var(--fs-2xs, 10px); opacity: .75; }
 .wqp-room { background: var(--tint, var(--surface, #E2E8F0)); font-weight: 700; }
