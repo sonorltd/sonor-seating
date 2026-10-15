@@ -1,5 +1,5 @@
 /*!
- * SonorWQClient v1.2.0 — workspace-shared READ-ONLY WeQuote client (B-444g, 2026-09-10).
+ * SonorWQClient v1.2.1 (2026-10-15 — X-Sonor-Source on every proxy call; setSource(name)) — workspace-shared READ-ONLY WeQuote client (B-444g, 2026-09-10).
  * v1.2.0 (2026-10-06, sonor-platform §29 — Bryn: "do all this on the basis that there is a future WQ MCP connector coming"):
  *   ONE TRANSPORT. Every WeQuote read in the workspace ends here, and `get()` hands the actual call to a pluggable
  *   transport: `setTransport(async (endpoint, params) => data)`. Today the transport is the wq-proxy edge function;
@@ -34,6 +34,19 @@
   var _cache = {};
   var CACHE_MS = 5 * 60 * 1000;
   var _initP = null;
+  // v1.2.1 — who is calling (wq_api_log / the per-source burst guard): SonorWQClient.setSource('board') wins, else the page's
+  // <html data-app> / SonorApp key / the hosted path segment ("sonor-takeoffs"), else 'app-unknown'.
+  var _source = null;
+  function sourceName() {
+    if (_source) return _source;
+    try {
+      var d = root.document;
+      var k = (d && d.documentElement && d.documentElement.getAttribute('data-app')) || (root.SonorApp && (root.SonorApp.key || root.SonorApp.appKey)) || root.APP_KEY || null;
+      if (!k && root.location) { var m = String(root.location.pathname || '').match(/\/(sonor-[a-z0-9-]+)/); k = m ? m[1] : null; }
+      return String(k || 'app-unknown').slice(0, 60);
+    } catch (e) { return 'app-unknown'; }
+  }
+  function setSource(name) { _source = String(name || '').slice(0, 60) || null; }
   var _transport = null;   // v1.2.0 — async (endpoint, params) → data; null = the proxy fetch below
   function setTransport(fn, label) { _transport = typeof fn === 'function' ? fn : null; CFG.transport = fn ? (label || 'custom') : 'proxy'; _cache = {}; }
 
@@ -77,7 +90,7 @@
       var v = params[k];
       if (v !== undefined && v !== null && v !== '') u.searchParams.set(k, v);
     });
-    var headers = { 'Accept': 'application/json' };
+    var headers = { 'Accept': 'application/json', 'X-Sonor-Source': sourceName() };   // v1.2.1 — every caller named (wq-api skill §2: the burst guard is per source)
     if (CFG.anonKey) { headers['apikey'] = CFG.anonKey; headers['Authorization'] = 'Bearer ' + CFG.anonKey; }
     var key = u.toString();
     var c = _cache[key];
@@ -109,7 +122,7 @@
   async function quoteLinesResolved(quoteId, force) { var lines = await quoteLines(quoteId, force); var pm = await productMap(); return lines.map(function (l) { var p = pm[l.product_id] || {}; return Object.assign({}, l, { sku: p.sku || '', short_description: p.short_description || '', long_description: p.long_description || '', model: p.model || '', manufacturer_name: p.manufacturer_name || '', category_description: p.category_description || '', sell_price: l.unit_price != null && Number(l.unit_price) ? l.unit_price : p.sell_price, cost_price: l.unit_cost != null && Number(l.unit_cost) ? l.unit_cost : p.cost_price }); }); }
 
   root.SonorWQClient = {
-    VERSION: '1.2.0', init: init, configure: configure, status: status, setTransport: setTransport,
+    VERSION: '1.2.1', init: init, configure: configure, status: status, setTransport: setTransport, setSource: setSource, source: sourceName,
     get: get, arr: arr, one: one, clearCache: clearCache,
     searchProducts: searchProducts, getProduct: getProduct, listQuotes: listQuotes, getQuote: getQuote,
     quoteLines: quoteLines, quoteLinesResolved: quoteLinesResolved, productMap: productMap, listProjects: listProjects, findCustomer: findCustomer, getProject: getProject, getCustomer: getCustomer

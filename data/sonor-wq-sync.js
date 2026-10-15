@@ -1,5 +1,8 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.7.1 · 2026-10-15 — the `wq_quote_index` table now EXISTS (B-509 closed): the index is shared by every device and built once —
+ *   before this every browser / node run rebuilt it in localStorage, one /quote/get per quote (~400 calls a time). Labour + programme
+ *   fields (v1.7.0) now round-trip through the table too.
  * v1.7.0 · 2026-10-06 — compact() keeps labour_hours / labour_cost / labour_price + expected_start / expected_end per quote (B-512: the Board's
  *   '% of quoted labour' and a WeQuote fallback for the Target date come from here — no DDL, no extra pull).
  * v1.6.0 · 2026-10-02 — MIRROR: after reading a project's quotes the sync writes the live stage / revision / updated stamp back onto
@@ -42,7 +45,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.7.0';
+  var VERSION = '1.7.1';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -58,12 +61,14 @@
     }
     var cfg = await getConfig(client); if (!cfg) return null;
     try {
-      var url; var headers = { 'Accept': 'application/json' };
+      var url; var headers = { 'Accept': 'application/json', 'X-Sonor-Source': 'wq-sync' };   // v1.7.1 — named for the per-source burst guard
       if (cfg.proxy_enabled && cfg.proxy_url) { url = new URL(cfg.proxy_url); url.searchParams.set('endpoint', path); }
       else { url = new URL((cfg.api_base || 'https://app.wequote.cloud/external').replace(/\/$/, '') + path); headers['Api-Key'] = cfg.api_key; }
       Object.entries(params || {}).forEach(function (kv) { url.searchParams.set(kv[0], kv[1]); });
-      var r = await fetch(url.toString(), { headers }); if (!r.ok) return null; return await r.json();
-    } catch (e) { return null; }
+      var r = await fetch(url.toString(), { headers });
+      if (r.status === 429) { var b = null; try { b = await r.json(); } catch (_) {} var err = new Error('WeQuote call budget refused: ' + ((b && b.reason) || 'burst')); err.budget = true; throw err; }   // v1.7.1 — never read a refusal as data
+      if (!r.ok) return null; return await r.json();
+    } catch (e) { if (e && e.budget) throw e; return null; }
   }
   async function findProject(client, projectNo) { var j = await apiFetch(client, '/project/find_project', { project_no: projectNo }); return (Array.isArray(j) && j[0] && j[0].project_no) ? j[0] : null; }
   async function findCustomer(client, name) { if (!name) return null; var j = await apiFetch(client, '/customer/find', { name: name }); return (Array.isArray(j) && j[0] && j[0].name) ? j[0] : null; }
@@ -111,7 +116,8 @@
         idx.store = 'table';
         r.data.forEach(function (row) { idx.quotes[row.quote_id] = { id: row.quote_id, quote_no: row.quote_no, description: row.description, title: row.title, stage: row.stage, subtotal: row.subtotal, total: row.total, margin: row.margin_pct,
           quote_date: row.quote_date, expiry_date: row.expiry_date, accepted_date: row.accepted_date, created_at: row.wq_created_at, updated_at: row.wq_updated_at, project_id: row.project_id, customer_id: row.customer_id,
-          revision: row.revision, is_latest: row.is_latest !== false, archived: !!row.archived, subsystems: row.subsystems || [], address: row.address || '', postcode: row.postcode || '', history: row.history || [], superseded: !!row.superseded }; });
+          revision: row.revision, is_latest: row.is_latest !== false, archived: !!row.archived, subsystems: row.subsystems || [], address: row.address || '', postcode: row.postcode || '', history: row.history || [], superseded: !!row.superseded,
+          labour_hours: row.labour_hours, labour_cost: row.labour_cost, labour_price: row.labour_price, expected_start: row.expected_start, expected_end: row.expected_end }; });
         idx.built_at = r.data.length ? 'table' : null;
       }
     } catch (e) { /* no table → local */ }
@@ -125,8 +131,9 @@
     if (idx.store === 'table') {
       var rows = (changedIds || Object.keys(idx.quotes)).map(function (id) { var q = idx.quotes[id]; return q && { quote_id: q.id, quote_no: q.quote_no, project_id: q.project_id, customer_id: q.customer_id, stage: q.stage, description: q.description, title: q.title,
         revision: q.revision, is_latest: q.is_latest, archived: q.archived, quote_date: q.quote_date, expiry_date: q.expiry_date, accepted_date: q.accepted_date, subtotal: q.subtotal, total: q.total, margin_pct: q.margin,
-        subsystems: q.subsystems, address: q.address, postcode: q.postcode, wq_created_at: wqIso(q.created_at), wq_updated_at: wqIso(q.updated_at), history: q.history || [], superseded: !!q.superseded, indexed_at: new Date().toISOString() }; }).filter(Boolean);
-      for (var i = 0; i < rows.length; i += 200) { try { await client.from('wq_quote_index').upsert(rows.slice(i, i + 200), { onConflict: 'quote_id' }); } catch (e) {} }
+        subsystems: q.subsystems, address: q.address, postcode: q.postcode, wq_created_at: wqIso(q.created_at), wq_updated_at: wqIso(q.updated_at), history: q.history || [], superseded: !!q.superseded,
+        labour_hours: q.labour_hours ?? null, labour_cost: q.labour_cost ?? null, labour_price: q.labour_price ?? null, expected_start: q.expected_start || null, expected_end: q.expected_end || null, indexed_at: new Date().toISOString() }; }).filter(Boolean);
+      for (var i = 0; i < rows.length; i += 200) { try { var ur = await client.from('wq_quote_index').upsert(rows.slice(i, i + 200), { onConflict: 'quote_id' }); if (ur && ur.error) console.warn('[wq-sync] index save failed:', ur.error.message); } catch (e) { console.warn('[wq-sync] index save failed:', e && e.message); } }   // v1.7.1 — never silent (a 400 hid the whole index for 2 weeks)
     } else {
       try { localStorage.setItem(IDX_KEY, JSON.stringify({ v: 1, built_at: idx.built_at || new Date().toISOString(), quotes: idx.quotes })); } catch (e) {}
     }
@@ -144,6 +151,7 @@
       if (onProgress) try { onProgress(i + 1, want.length, { ref: 'WQ quote index', name: String(want[i]) }); } catch (_) {}
       var q = await apiFetch(client, '/quote/get', { id: want[i] });
       run.fetched[want[i]] = true;
+      if (want.length > 60) await new Promise(function (res) { setTimeout(res, 1100); });   // v1.7.1 — pace a big build (~55/min) under the burst guard (120/min, 600/10 min per source)
       var prev = idx.quotes[want[i]];
       if (q && q.id) {
         var row = compact(q); row.history = (prev && prev.history) || [];
@@ -151,7 +159,8 @@
         if (prev && prev.revision && row.revision > prev.revision) row.history = row.history.concat([{ on: wqIso(q.created_datetime) || new Date().toISOString(), rev: row.revision }]).slice(-20);
         if (!prev && !row.history.length) row.history = [{ on: wqIso(q.created_datetime) || new Date().toISOString(), seen: row.stage, rev: row.revision }];
         idx.quotes[q.id] = row; changed.push(q.id);
-      } else if (prev && !prev.superseded && refreshIds && refreshIds.indexOf(want[i]) >= 0 && !(await apiFetch(client, '/quote/get', { id: want[i] }))) { prev.superseded = true; prev.superseded_at = new Date().toISOString(); changed.push(prev.id); }   // WeQuote stopped serving it = a newer revision replaced it
+      }
+      if (changed.length && changed.length % 25 === 0) { idx.built_at = idx.built_at || new Date().toISOString(); await saveIndex(client, idx, changed.slice(-25)); }   // v1.7.1 — checkpoint: an interrupted build resumes, never restarts else if (prev && !prev.superseded && refreshIds && refreshIds.indexOf(want[i]) >= 0 && !(await apiFetch(client, '/quote/get', { id: want[i] }))) { prev.superseded = true; prev.superseded_at = new Date().toISOString(); changed.push(prev.id); }   // WeQuote stopped serving it = a newer revision replaced it
     }
     if (changed.length || !idx.built_at) { idx.built_at = idx.built_at || new Date().toISOString(); await saveIndex(client, idx, changed); }
     return idx;
