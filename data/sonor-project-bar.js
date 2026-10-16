@@ -353,6 +353,14 @@
         const newId = e.target.value || null;
         _setActiveProject(newId);
       });
+      // v1.13.0 (Bryn 16.10.26: "the recents isnt accurate") — the list was fetched ONCE at boot, so a project saved by
+      // another app / session after that (or created while the tab sat open) never moved into ⏱ Recently edited. Opening
+      // the picker re-fetches when the list is older than 20 s; the native dropdown keeps the stale options until the
+      // live list lands (a blink later), and the active selection is kept.
+      const _refreshIfStale = () => { if (Date.now() - _loadedAt > 20000 && !_loading) loadProjects(); };
+      sel.addEventListener('mousedown', _refreshIfStale);
+      sel.addEventListener('focus', _refreshIfStale);
+      sel.addEventListener('keydown', e => { if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') _refreshIfStale(); });
     }
     const refreshBtn = document.getElementById('sonorProjectRefresh');
     if (refreshBtn) refreshBtn.addEventListener('click', () => loadProjects());
@@ -465,8 +473,10 @@
   }
 
   // ---- Project list loader ----
+  let _loadedAt = 0, _loading = false;   // v1.13.0
   async function loadProjects() {
     if (!_supa) return [];
+    _loading = true;
     if (!_projects.length) { const seed = _cacheRead(); if (seed.length) { _projects = seed; _render(); } }   // v1.12.0 instant picker from the device cache; the live list replaces it when it lands
     try {
       const { data, error } = await _supa
@@ -475,10 +485,12 @@
         .order('updated_at', { ascending: false });
       if (error) throw error;
       _projects = Array.isArray(data) ? data : [];
+      _loadedAt = Date.now(); _loading = false;
       _cacheWrite(_projects);
       _render();
       return _projects;
     } catch (e) {
+      _loading = false;
       console.warn('[ProjectBar] loadProjects failed:', e && e.message);
       // v1.12.0 OFFLINE — no signal on site (or a refresh with none): fall back to the last list this device saw, so the
       // picker, the finder and the project name still work and the field apps carry on from their own caches.
@@ -666,7 +678,7 @@
   const api = {
     init, refresh, loadProjects,
     getActiveId, getProject, getProjects, setActive,
-    __version: '1.12.0',
+    __version: '1.13.0',
     __ls_key: LS_KEY
   };
   if (typeof window !== 'undefined') window.SonorProjectBar = api;
