@@ -21,7 +21,7 @@ window.__SONOR_BRAND__ = {
     email:    "projects@sonor.co.uk",
     office:   "office@sonor.co.uk",
     phoneSupport: "07933 684 000",
-    emailSupport: "support@sonor.co.uk"
+    emailSupport: "service@sonor.co.uk"
   },
 
   // ── 10 Services (permanent — never reassign) ─────────
