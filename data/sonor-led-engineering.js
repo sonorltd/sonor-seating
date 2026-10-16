@@ -166,19 +166,40 @@
     // one universe of 512 then the next. Data / pixel strips take pixel-controller outputs instead (PX1, PX2 …).
     var used = {};   // universe → [[from,to]]
     out.forEach(function (e) { if (e.dmx && e.dmx.manual && e.dmx.channels) { var u = e.dmx.universe || 1; (used[u] = used[u] || []).push([e.dmx.address, e.dmx.address + e.dmx.channels - 1]); e.dmx.universe = u; } });
-    var cur = { u: 1, a: 1 }, pxOut = 0;
+    // Zone-aware (Bryn 22:25: "based on rooms and zones, if there is one or 2 single channels in the same zone, they may
+    // start at 007 or something"): runs are walked in floor · room groups; inside a group every MULTI-channel device
+    // starts on a fresh xx1 block, and the group's SINGLE-channel devices pack straight after the last multi-channel
+    // device (005, 006, 007 …) instead of each taking a block; a group of singles only starts on a fresh xx1 and packs.
+    // The next room always starts on the next free xx1.
+    var cur = { u: 1, a: 1 }, pxOut = 0, blk = Math.max(1, num(c.dmxBlock, 10));
     function free(u, a, n) { var r = used[u] || []; for (var i = 0; i < r.length; i++) { if (a <= r[i][1] && a + n - 1 >= r[i][0]) return false; } return true; }
+    function snap(a) { return Math.floor((a - 1) / blk) * blk + 1; }
+    function nextBlock(a) { return snap(a) === a ? a : snap(a) + blk; }
+    function take(e, n, wantBlock) {
+      if (wantBlock) cur.a = nextBlock(cur.a);
+      while (true) {
+        if (cur.a + n - 1 > c.dmxUniverseSize) { cur.u++; cur.a = 1; }
+        if (free(cur.u, cur.a, n)) break;
+        cur.a = wantBlock ? nextBlock(cur.a + 1) : cur.a + 1;
+      }
+      e.dmx.universe = cur.u; e.dmx.address = cur.a; (used[cur.u] = used[cur.u] || []).push([cur.a, cur.a + n - 1]); cur.a += n;
+    }
+    var groups = [], gIdx = {};
     out.forEach(function (e) {
       if (!e.dmx) return;
       if (e.dmx.data) { pxOut++; e.dmx.universe = null; e.dmx.output = 'PX' + Math.ceil(pxOut / c.pixelControllerOutputs) + '-' + (((pxOut - 1) % c.pixelControllerOutputs) + 1); return; }
       if (e.dmx.manual) return;
-      var n = e.dmx.channels, blk = Math.max(1, num(c.dmxBlock, 10));
-      var snap = function (a) { return Math.floor((a - 1) / blk) * blk + 1; };   // → the xx1 at or below a
-      if (snap(cur.a) !== cur.a) cur.a = snap(cur.a) + blk;                     // never start mid-block
-      while (true) { if (cur.a + n - 1 > c.dmxUniverseSize) { cur.u++; cur.a = 1; } if (free(cur.u, cur.a, n)) break; cur.a += blk; }
-      e.dmx.universe = cur.u; e.dmx.address = cur.a; (used[cur.u] = used[cur.u] || []).push([cur.a, cur.a + n - 1]);
-      cur.a += Math.ceil(n / blk) * blk;                                        // next device on the next free xx1
+      var gk = (e.floor || '') + ' · ' + (e.room || '');
+      if (gIdx[gk] == null) { gIdx[gk] = groups.length; groups.push({ key: gk, multi: [], single: [] }); }
+      groups[gIdx[gk]][e.dmx.channels > 1 ? 'multi' : 'single'].push(e);
     });
+    groups.forEach(function (g) {
+      cur.a = nextBlock(cur.a);                                  // a new zone starts on a fresh xx1
+      g.multi.forEach(function (e) { take(e, e.dmx.channels, true); });
+      g.single.forEach(function (e, i) { take(e, 1, g.multi.length === 0 && i === 0); });   // singles pack after the zone's last multi-channel device (a singles-only zone opens its own xx1)
+      g.zoneAddr = null;
+    });
+    out.forEach(function (e) { if (e.dmx && !e.dmx.data) e.dmx.zone = (e.floor || '') + ' · ' + (e.room || ''); });
     var dmxRuns = out.filter(function (e) { return e.dmx && !e.dmx.data; }), dmxCh = dmxRuns.reduce(function (a, e) { return a + e.dmx.channels; }, 0);
     var byControl = {}; out.forEach(function (e) { byControl[e.control] = (byControl[e.control] || 0) + 1; });
     var totalM = out.reduce(function (a, e) { return a + e.metres; }, 0), totalW = out.reduce(function (a, e) { return a + e.load_w; }, 0);

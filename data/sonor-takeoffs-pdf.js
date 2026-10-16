@@ -10802,7 +10802,7 @@ const SonorPdf = (function () {
     // schedule" section tick.
     if (asp === 'cables_v2' || asp === 'cables' || asp === 'cable_summary'
         || asp === 'cables_lighting') return 'cables';
-    if (asp === 'leds') return 'leds';
+    if (asp === 'leds' || asp === 'dmx') return 'leds';   // v5.255.0 — the DMX Address Schedule rides the LED tick
     if (asp === 'lighting') return 'lighting';
     if (asp === 'shades') return 'shades';
     if (asp === 'tvs' || asp === 'displays') return 'displays';
