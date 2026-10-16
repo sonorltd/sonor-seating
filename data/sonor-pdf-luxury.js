@@ -1,4 +1,7 @@
-/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.2.0, root master)
+/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.3.1, root master)
+   v1.3.1 (2026-10-16, Takeover): cover() wraps a title that is still too wide at 38 pt onto two lines (eyebrow lifts with it).
+   v1.3.0 (2026-10-16, Takeover): footerMode('minimal', project) — page-number-only running footer; rearPage() — the closing contact page
+   (projects@ / service@ / phone / web / CEDIA). Adopted by Takeover + Service Contracts; classic footer stays the default elsewhere.
    v1.2.0 (2026-10-12, Survey): OPT-IN theme('neutral') — white paper + neutral greys for working documents (survey reports,
    schedules, anything that is not a client proposal); gold accents stay. theme('luxury') = the cream default, untouched.
    cover opts.brandColour — the top-left mark + wordmark colour on the cover (Survey passes COL.GOLD: white vanished on a bright hero).
@@ -185,8 +188,18 @@
   }
   // opts (v1.1.0): { logos: [pdf-lib images] } → footer band shows ONLY those logos (partners /
   // third parties / manufacturers), centred, ≤ 18 pt tall; no wordmark, no contact line.
+  // v1.3.0 (2026-10-16, Takeover / Bryn: "dont think we need the info in the footer of every page, just page numbering and then full
+  // contact info on the rear page"): footerMode('minimal') makes EVERY pageFoot call render only `<project> · Page N` (bottom-right,
+  // small) — the full contact block moves to rearPage(). Default stays 'classic' so Seating / Cinema render byte-identical until they opt in.
+  var _footerMode = 'classic', _footerProject = '';
+  function footerMode(mode, project) { if (mode) _footerMode = mode; if (project != null) _footerProject = String(project); return _footerMode; }
   function pageFoot(P, F, opts) {
     opts = opts || {};
+    if (_footerMode === 'minimal' || opts.minimal) {
+      var txt = (opts.project || _footerProject ? (opts.project || _footerProject) + '  ·  ' : '') + (opts.pageLabel || 'Page') + ' ' + (opts.pageNo || '');
+      if (opts.pageNo) P.trackedRight(txt, A4.w - M, A4.h - 30, 7, F.r, COL.PAGE_NO, 1.2);
+      return;
+    }
     if (opts.logos) {
       P.hline(M, A4.w - M, A4.h - 56, COL.LINE, 0.8);
       var imgs = opts.logos.filter(Boolean), maxH = 18, gapL = 22, dims = imgs.map(function (im) { var h = Math.min(maxH, im.height), w = im.width * (h / im.height); if (w > 110) { w = 110; h = im.height * (w / im.width); } return { im: im, w: w, h: h }; });
@@ -235,11 +248,15 @@
     // airy (v1.1.0, Service Contracts): title block starts higher and the info row sits lower, so a
     // title + subtitle + 3-cell info row breathe instead of stacking tight above the logo strip.
     var ty = opts.airy ? 630 : 672;
-    P.hline(M, M + 26, ty - 20, COL.GOLD, 1, 0.95);
-    P.tracked(String(opts.eyebrow || 'PROPOSAL').toUpperCase(), M + 34, ty - 24, 8.5, F.r, COL.GOLDL, 3.2);
     var title = opts.title || 'Proposal';
     var tsize = F.b.widthOfTextAtSize(title, 54) > (A4.w - M * 2) ? 38 : 54;
-    P.text(title, M - 2, ty + (tsize === 38 ? 12 : 0), tsize, F.b, COL.CREAM);
+    // v1.3.1 (2026-10-16, Takeover): a title still too wide at 38 pt wraps onto a second line ABOVE the baseline row instead of
+    // running off the frame (Woodbrook "Smart home system rescue & takeover"). Single-line titles render byte-identical.
+    var tl = (tsize === 38 && F.b.widthOfTextAtSize(title, 38) > (A4.w - M * 2)) ? wrap(title, F.b, 38, A4.w - M * 2).slice(0, 2) : [title];
+    var lift = (tl.length - 1) * 44;
+    P.hline(M, M + 26, ty - 20 - lift, COL.GOLD, 1, 0.95);
+    P.tracked(String(opts.eyebrow || 'PROPOSAL').toUpperCase(), M + 34, ty - 24 - lift, 8.5, F.r, COL.GOLDL, 3.2);
+    tl.forEach(function (ln, i) { P.text(ln, M - 2, ty + (tsize === 38 ? 12 : 0) - lift + i * 44, tsize, F.b, COL.CREAM); });
     if (opts.subtitle) P.text(opts.subtitle, M, ty + (opts.airy ? 68 : 62), 19, F.l, COL.GOLDL);
 
     var iy = opts.airy ? 766 : 772, cw = (A4.w - M * 2) / 3;
@@ -284,6 +301,27 @@
     }
   }
 
+  // ── REAR PAGE (v1.3.0) — the full contact block, once, on a charcoal closing page. opts: { tagline, labels:{new,service,phone,web},
+  //    email_new, email_service, phone, web, company, cediaImg, markColour }. Every client document ends with this (sonor-platform §43).
+  function rearPage(P, F, opts) {
+    opts = opts || {};
+    P.rect(0, 0, A4.w, A4.h, COL.DARK2);
+    var bc = opts.markColour || COL.CREAM;
+    P.logo(M, M * 0.62 + 22, 30, bc);
+    P.tracked('SONOR', M + 37, M * 0.62 + 28, 18, F.b, bc, 4.2);
+    var ty = 372;
+    P.text(opts.tagline || 'Smart homes, beautifully done.', M, ty, 22, F.l, COL.GOLDL);
+    P.hline(M, A4.w - M, ty + 62, COL.GOLD, 0.5, 0.45);
+    var L = opts.labels || {}, cw = (A4.w - M * 2) / 2, rows = [
+      [[L.new || 'NEW PROJECTS & PROPOSALS', opts.email_new || 'projects@sonor.co.uk'], [L.service || 'SERVICE & SUPPORT', opts.email_service || 'service@sonor.co.uk']],
+      [[L.phone || 'TELEPHONE', opts.phone || '+44 7933 684 000'], [L.web || 'WEB', opts.web || 'sonor.co.uk']]
+    ];
+    rows.forEach(function (r, ri) { r.forEach(function (c, ci) { var x = M + ci * cw, y = ty + 84 + ri * 46; P.tracked(String(c[0]).toUpperCase(), x, y, 7, F.r, COL.INFO, 1.8); P.text(c[1], x, y + 13, 13, F.b, COL.CREAM); }); });
+    P.text(opts.company || 'Sonor Ltd  ·  Chester, England  ·  Trusted by homeowners across the North West & Wales', M, ty + 194, 8.5, F.r, COL.INFO);
+    if (opts.cediaImg) { var ch = (opts.cediaImg.width / opts.cediaImg.height) < 3 ? 13 : 9; var cwd = ch * (opts.cediaImg.width / opts.cediaImg.height); P.image(opts.cediaImg, M, A4.h - 40 - ch, cwd, ch, 0.92); }
+    else P.tracked('CEDIA MEMBER', M, A4.h - 46, 6, F.r, COL.INFO, 1.2);
+  }
+
   // ── labelled spec rows (the p2/p4 pattern: LABEL / bold value / divider) ──
   // rows: [[label, value], …] (null/empty values dropped). Returns bottom y.
   function specRows(P, F, rows, x, top, colW) {
@@ -315,7 +353,7 @@
   }
 
   global.SonorPdfLuxury = {
-    __version: '1.2.0', theme: theme, THEMES: THEMES,
+    __version: '1.3.1', theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
     A4: A4, M: M, COL: COL, HOUSE: HOUSE, WA: WA,
     col: col, hexRgb: hexRgb, fadePngDataUrl: fadePngDataUrl,
     fetchBytes: fetchBytes, loadImage: loadImage,

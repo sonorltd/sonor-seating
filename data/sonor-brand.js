@@ -81,7 +81,7 @@ window.__SONOR_BRAND__ = {
   // ── Contact contexts (which email/phone for which purpose) ──
   contacts: [
     { context: "Office",       usage: "Website, proposals, correspondence", phone: "07933 684 000", email: "projects@sonor.co.uk" },
-    { context: "Support",      usage: "Client support, service calls",      phone: "07933 684 000", email: "office@sonor.co.uk" },
+    { context: "Support",      usage: "Client support, service calls",      phone: "07933 684 000", email: "service@sonor.co.uk" },
     { context: "General Docs", usage: "RAMS, formal documents",             phone: "07933 684 000", email: "office@sonor.co.uk" }
   ],
 
@@ -136,6 +136,7 @@ window.__SONOR_BRAND__ = {
       'cinema-aesthetic': '../APP - Cinema Aesthetic/dashboard/sonor-cinema-aesthetic.html',
       'lighting-design': '../APP - Lighting Design/dashboard/sonor-lighting-design.html',
       'garden-lighting': '../APP - Garden Lighting/dashboard/sonor-garden-lighting.html',
+      'stretched-fabric': '../APP - Stretched Fabric/dashboard/sonor-stretched-fabric.html',
       survey: '../APP - Survey/dashboard/sonor-survey.html',
       'fractal-rig':     '../STUDIO - Fractal Rig/web/index.html',
       'pixel-conductor': '../STUDIO - Pixel Conductor/web/index.html',
@@ -165,7 +166,8 @@ window.__SONOR_BRAND__ = {
       health:         'health.html',
       kit:            '../sonor-kit/catalogue/index.html',
       partners:       '../HUB - Partners/index.html',
-      'service-contracts': '../APP - Service Contracts/dashboard/sonor-service-contracts.html'
+      'service-contracts': '../APP - Service Contracts/dashboard/sonor-service-contracts.html',
+      takeover:       '../APP - Takeover/dashboard/sonor-takeover.html'
     },
     hosted: {
       master:      'https://sonorltd.github.io/sonor-master/',
@@ -209,6 +211,7 @@ window.__SONOR_BRAND__ = {
       'cinema-aesthetic': 'https://sonorltd.github.io/sonor-cinema-aesthetic/',
       'lighting-design': 'https://sonorltd.github.io/sonor-lighting-design/',
       'garden-lighting': 'https://sonorltd.github.io/sonor-garden-lighting/',
+      'stretched-fabric': 'https://sonorltd.github.io/sonor-stretched-fabric/',
       survey: 'https://sonorltd.github.io/sonor-survey/',
       'fractal-rig':     'https://sonorltd.github.io/sonor-fractal-rig/',
       'pixel-conductor': 'https://sonorltd.github.io/sonor-pixel-conductor/',
@@ -238,7 +241,8 @@ window.__SONOR_BRAND__ = {
       health:         'https://sonorltd.github.io/sonor-master/health.html',
       kit:            'https://sonorltd.github.io/sonor-kit/catalogue/',
       partners:       'https://sonorltd.github.io/sonor-partners/',
-      'service-contracts': 'https://sonorltd.github.io/sonor-service-contracts/'
+      'service-contracts': 'https://sonorltd.github.io/sonor-service-contracts/',
+      takeover:       'https://sonorltd.github.io/sonor-takeover/'
     }
   },
 
