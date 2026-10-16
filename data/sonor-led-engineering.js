@@ -32,7 +32,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.1.0';   // v1.1.0 2026-10-16 — control method (DMX / triac / 0-10V / DALI / switched) + DMX addressing (Bryn: "RGBW led will be dmx controlled … main also have triac dimmable driver, need options for all this … including DMX channel assignment")
+  var VERSION = '1.1.0';   // v1.1.0 2026-10-16 — control method (DMX / triac / 0-10V / DALI / switched) + DMX addressing on xx1 blocks (Bryn: "RGBW led will be dmx controlled … main also have triac dimmable driver, need options for all this … including DMX channel assignment")
 
   var DEFAULTS = {
     headroom: 0.8,                                   // driver ≥ load / headroom
@@ -45,6 +45,7 @@
     wastePct: 10, reelM: 5,
     decoderChannels: 4,
     dmxUniverseSize: 512,                            // DMX512 — addresses 1…512 per universe
+    dmxBlock: 10,                                    // Sonor house rule (Bryn 16.10.26): every device starts on an xx1 address — 001, 011, 021 … (10-address blocks; a device needing more spans blocks)
     pixelControllerOutputs: 4,                       // outputs per pixel controller (data runs)
     maxFeedM: function (st) {                        // single-feed length by W/m and V when the type carries none
       var v = Number(st.volts) || 24, w = Number(st.watts_per_metre) || 10;
@@ -171,9 +172,12 @@
       if (!e.dmx) return;
       if (e.dmx.data) { pxOut++; e.dmx.universe = null; e.dmx.output = 'PX' + Math.ceil(pxOut / c.pixelControllerOutputs) + '-' + (((pxOut - 1) % c.pixelControllerOutputs) + 1); return; }
       if (e.dmx.manual) return;
-      var n = e.dmx.channels;
-      while (true) { if (cur.a + n - 1 > c.dmxUniverseSize) { cur.u++; cur.a = 1; } if (free(cur.u, cur.a, n)) break; cur.a++; }
-      e.dmx.universe = cur.u; e.dmx.address = cur.a; (used[cur.u] = used[cur.u] || []).push([cur.a, cur.a + n - 1]); cur.a += n;
+      var n = e.dmx.channels, blk = Math.max(1, num(c.dmxBlock, 10));
+      var snap = function (a) { return Math.floor((a - 1) / blk) * blk + 1; };   // → the xx1 at or below a
+      if (snap(cur.a) !== cur.a) cur.a = snap(cur.a) + blk;                     // never start mid-block
+      while (true) { if (cur.a + n - 1 > c.dmxUniverseSize) { cur.u++; cur.a = 1; } if (free(cur.u, cur.a, n)) break; cur.a += blk; }
+      e.dmx.universe = cur.u; e.dmx.address = cur.a; (used[cur.u] = used[cur.u] || []).push([cur.a, cur.a + n - 1]);
+      cur.a += Math.ceil(n / blk) * blk;                                        // next device on the next free xx1
     });
     var dmxRuns = out.filter(function (e) { return e.dmx && !e.dmx.data; }), dmxCh = dmxRuns.reduce(function (a, e) { return a + e.dmx.channels; }, 0);
     var byControl = {}; out.forEach(function (e) { byControl[e.control] = (byControl[e.control] || 0) + 1; });
