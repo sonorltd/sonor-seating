@@ -36,7 +36,7 @@
 (function () {
   'use strict';
 
-  const MODULE_VERSION = '1.8.0';   // v1.8.0 — measureSchedule + onLayout row-fit (Takeoffs v5.198.0)
+  const MODULE_VERSION = '1.9.0';   // v1.9.0 — sonor-pdf-theme :root overrides appended to the stylesheet; v1.8.0 — measureSchedule + onLayout row-fit (Takeoffs v5.198.0)
 
   // ---- CSS cache ---------------------------------------------------------
 
@@ -73,6 +73,8 @@
       const r = await fetch(url, { credentials: 'same-origin' });
       if (!r.ok) throw new Error('CSS fetch ' + r.status);
       _cssCache = await r.text();
+      // v1.9.0 (2026-10-16) — sonor-pdf-theme.js :root overrides ride after the stylesheet: black/gold chrome + neutral greys
+      try { if (window.SonorPdfTheme && typeof window.SonorPdfTheme.htmlCss === 'function') _cssCache += window.SonorPdfTheme.htmlCss(); } catch (_) {}
       return _cssCache;
     } catch (e) {
       console.warn('[SonorPdfHtmlCover] CSS load failed (' + url + ') — falling back to inline minimal styles:', e);

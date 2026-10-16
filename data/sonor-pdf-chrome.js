@@ -75,6 +75,12 @@
     archived:      '#302F2E'
   };
 
+  // 2026-10-16 — sonor-pdf-theme.js is the ONE palette (§41): black chrome, ink greys, gold accent. Literals above = offline fallback.
+  try {
+    const _T = (typeof window !== 'undefined' && window.SonorPdfTheme) ? window.SonorPdfTheme.HEX : null;
+    if (_T) Object.assign(COLOURS, { bar: _T.black, text: _T.ink, text2: _T.ink2, muted: _T.muted, faint: _T.g500, panel: _T.g100, tint: _T.g100, altRow: _T.g50, border: _T.g300, borderHard: _T.g400, accent: _T.gold, appAccent: _T.gold, archived: _T.label });
+  } catch (_) {}
+
   // ============================================================
   // PURE UTILITIES — no pdf-lib dependency, safe to call early
   // ============================================================

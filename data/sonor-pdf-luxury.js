@@ -1,4 +1,5 @@
-/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.3.1, root master)
+/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.4.0, root master)
+   v1.4.0 (2026-10-16): palette read from sonor-pdf-theme.js when present — ONE PDF theme workspace-wide (black/gold chrome, neutral greys).
    v1.3.1 (2026-10-16, Takeover): cover() wraps a title that is still too wide at 38 pt onto two lines (eyebrow lifts with it).
    v1.3.0 (2026-10-16, Takeover): footerMode('minimal', project) — page-number-only running footer; rearPage() — the closing contact page
    (projects@ / service@ / phone / web / CEDIA). Adopted by Takeover + Service Contracts; classic footer stays the default elsewhere.
@@ -35,6 +36,12 @@
     luxury:  { CREAM: [246, 242, 234], INK: [26, 24, 20], INK2: [60, 55, 47], MUT: [120, 112, 96], LINE: [214, 205, 188], LABEL: [150, 138, 116], PAGE_NO: [170, 160, 140], INFO: [168, 156, 136] },
     neutral: { CREAM: [255, 255, 255], INK: [24, 24, 24], INK2: [62, 62, 62], MUT: [118, 118, 118], LINE: [222, 222, 222], LABEL: [138, 138, 138], PAGE_NO: [164, 164, 164], INFO: [172, 172, 172] }
   };
+  // v1.4.0 (2026-10-16) — sonor-pdf-theme.js is the ONE palette (Bryn: "gel all the branding now so minor tweaks can be
+  // system wide"): when it is on the page its luxury() sets replace the literals above — same values today, one place tomorrow.
+  try {
+    var _T = (typeof window !== 'undefined' && window.SonorPdfTheme) ? window.SonorPdfTheme.luxury() : null;
+    if (_T) { Object.assign(COL, _T.shared, _T.luxury); THEMES.luxury = _T.luxury; THEMES.neutral = _T.neutral; }
+  } catch (e) {}
   var _theme = 'luxury';
   function theme(name) { if (name == null) return _theme; var t = THEMES[name]; if (!t) return _theme; Object.keys(t).forEach(function (k) { COL[k] = t[k].slice(); }); _theme = name; return _theme; }
 

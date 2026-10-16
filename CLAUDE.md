@@ -1,6 +1,22 @@
-# Seating Configurator — Claude Code Context (v0.24.0)
+# Seating Configurator — Claude Code Context (v0.25.0)
 
 > **Active theme: locked custom / slate canvas** — client-facing surface, `data-theme-lock` (sonor-platform §2 exemption); the cross-app ◐ cookie never flips it.
+
+> **v0.25.0 — CINEMA SEATING · THE MAKERS (brand guide PDF).** Bryn 2026-10-16: *"take that custom controls
+> comparison between all the brands and make it in to a pdf which can be downloaded from our seating config
+> app in our pdf branding for that app"*. New module `data/seating-brand-guide.js` (`SeatingBrandGuide.generate()`),
+> built on the synced root master `data/sonor-pdf-luxury.js` — the exact seating-proposal chrome (venice cover,
+> cream pages, gold rules, Gilroy; `gilroy-ultralight.otf` added to `data/fonts/` so the master's trio embeds).
+> Landing hero gains **"Guide to the makers ↓"**. Pages: cover · introduction (how we choose + contents) · seating
+> formats · features worth having · rules of thumb (row pitch ≈ reclined depth + 500 mm ≈ 2.0 m, wall-huggers, 300–450 mm
+> riser, leather vs fabric, no bonded leather) · how it happens (five-step process) — from the Custom Controls seating
+> page Bryn sent — then one
+> page per maker — Cineak, Moovia, Vismara Design, Cineca, Home Cinema Modules, Fortress, Cinema Deco, Cinelux,
+> FrontRow — with photo (app range assets) or SSOT logo, spec rows and "The Sonor view" · other routes
+> (designer sofas, US online brands) · at-a-glance table · the detail. **"AVAILABLE THROUGH SONOR" pill is live**
+> from `seatingRanges()` manufacturer slugs (= `seating_manufacturers`), else "ON REQUEST". Content written in
+> Sonor's voice from the makers' published information + the Custom Controls comparison (July 2026, credited on
+> the detail page). No prices, no hosted links. Ref `SNR-SG-yymmdd-XXXX`.
 
 > **v0.24.0 — FrontRow's own diagrams + a seats-per-row selector.** The 70 Serenity
 > configuration drawings and 14 module tiles that were scraped in July were sitting in

@@ -150,9 +150,17 @@
     return { w: p.w, h: p.h }; // default landscape
   }
 
+  // ---- v1.2.0 (2026-10-16) — sonor-pdf-theme.js overrides: white paper, black/gold chrome for EVERY theme key, amber
+  //      status (Bryn: "neutral greys for tables, black gold for the stylish parts … gel all the branding"). The literals
+  //      above stay as the offline fallback; the theme master is the editable source.
+  try {
+    const _T = (window.SonorPdfTheme && window.SonorPdfTheme.v6) ? window.SonorPdfTheme.v6() : null;
+    if (_T) { Object.assign(BASE, _T.BASE); Object.keys(_T.THEMES).forEach(k => { THEMES[k] = _T.THEMES[k]; }); Object.keys(_T.STATUS).forEach(k => { STATUS[k] = _T.STATUS[k]; }); }
+  } catch (_) {}
+
   // ---- export ---------------------------------------------------------
   window.SonorPdfV6Tokens = {
-    VERSION: '1.1.0',
+    VERSION: '1.2.0',
     SERVICES,
     STATUS,
     THEMES,

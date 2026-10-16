@@ -23,7 +23,10 @@
   <script src="../data/seating-catalogue.js"></script>
   <script src="../data/seating-engine.js"></script>
   <script src="../data/seating-recommend.js"></script>
+  <script src="../data/sonor-pdf-theme.js"></script>   <!-- 2026-10-16 — ONE PDF theme (black/gold chrome, neutral greys) — load before every PDF pipeline, §41 -->
+<script src="../data/sonor-pdf-luxury.js"></script>   <!-- root master (synced): shared luxury chrome — the brand guide builds on it -->
   <script src="../data/seating-pdf.js"></script>
+  <script src="../data/seating-brand-guide.js"></script>   <!-- v0.25.0 — CINEMA SEATING · THE MAKERS guide PDF -->
   <script src="../data/seating-app.js"></script>
   <script src="../data/backups/sonor-db-backup-latest.js"></script>
   <link rel="stylesheet" href="../data/brand.css">
@@ -441,6 +444,7 @@
         <div class="hero-ctas">
           <button class="cta-lg solid" onclick="SeatingApp.enter()">Start — design your cinema →</button>
           <a class="cta-lg ghost" href="#how">See how it works</a>
+          <button class="cta-lg ghost" onclick="SeatingBrandGuide.generate()" title="Download the Sonor guide to the cinema-seating makers (PDF)">Guide to the makers ↓</button>
         </div>
         <div class="hero-tags"><span>68 ranges · 6 makers</span><span>Made to measure</span><span>Live layout &amp; pricing</span></div>
       </div></div>
@@ -480,7 +484,7 @@
   </div>
 
   <script>
-    const APP_VERSION = '0.24.0';   // 2026-09-30 GEL: code const lagged docs+config (v0.23/v0.24 features were shipped without bumping the const)
+    const APP_VERSION = '0.25.0';   // 2026-09-30 GEL: code const lagged docs+config (v0.23/v0.24 features were shipped without bumping the const)
     document.addEventListener('DOMContentLoaded', function(){ var v = document.getElementById('hdrVer'); if (v) v.textContent = 'v' + APP_VERSION; });
     // one-line swappable hero image (see seating-config.js → heroImage)
     (function(){ var cfg = window.__SEATING_CONFIG__ || {}; var el = document.getElementById('heroBg');
