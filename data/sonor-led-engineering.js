@@ -32,7 +32,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';   // v1.1.0 2026-10-16 — control method (DMX / triac / 0-10V / DALI / switched) + DMX addressing (Bryn: "RGBW led will be dmx controlled … main also have triac dimmable driver, need options for all this … including DMX channel assignment")
 
   var DEFAULTS = {
     headroom: 0.8,                                   // driver ≥ load / headroom
@@ -44,6 +44,8 @@
     defaultFeedCableM: 10,
     wastePct: 10, reelM: 5,
     decoderChannels: 4,
+    dmxUniverseSize: 512,                            // DMX512 — addresses 1…512 per universe
+    pixelControllerOutputs: 4,                       // outputs per pixel controller (data runs)
     maxFeedM: function (st) {                        // single-feed length by W/m and V when the type carries none
       var v = Number(st.volts) || 24, w = Number(st.watts_per_metre) || 10;
       if (v <= 5) return 3; if (v <= 12) return 5;
@@ -54,6 +56,23 @@
   function num(x, d) { var n = Number(x); return isFinite(n) ? n : (d || 0); }
   function r1(x) { return Math.round(x * 10) / 10; }
 
+  // ── control method ───────────────────────────────────────────────────────
+  // run.control wins → strip metadata.control_default → house rule: data / pixel strips and anything with ≥ 2 channels
+  // (RGB, RGBW, tunable white) are DMX; single-colour strips are on a TRIAC-dimmable CV driver (mains-dimmed from the
+  // lighting panel). '0-10v' / 'dali' / 'switched' are explicit choices.
+  var CONTROLS = {
+    dmx:      { id: 'dmx',      label: 'DMX',               driver: 'CV driver + DMX decoder',            circuit: 'dmx' },
+    triac:    { id: 'triac',    label: 'Triac dimmable',    driver: 'Triac-dimmable CV driver (mains-dimmed)', circuit: 'centralised' },
+    '0-10v':  { id: '0-10v',    label: '0-10V',             driver: '0-10V dimmable CV driver',          circuit: '0-10v' },
+    dali:     { id: 'dali',     label: 'DALI',              driver: 'DALI dimmable CV driver',           circuit: 'dali' },
+    switched: { id: 'switched', label: 'Switched (on/off)', driver: 'CV driver, switched',               circuit: 'centralised' }
+  };
+  function controlFor(rn, st) {
+    var ex = String((rn && rn.control) || '').toLowerCase(); if (CONTROLS[ex]) return CONTROLS[ex];
+    var md = (st && st.metadata && String(st.metadata.control_default || '').toLowerCase()) || ''; if (CONTROLS[md]) return CONTROLS[md];
+    var ch = num(st && st.dmx_channels, 1), data = ch >= 10 || /pixel|address/i.test(String((st && (st.label || st.id)) || ''));
+    return (data || ch >= 2) ? CONTROLS.dmx : CONTROLS.triac;
+  }
   function stripMaxFeedM(st, c) { var m = st && st.metadata && Number(st.metadata.max_single_feed_m); return m > 0 ? m : c.maxFeedM(st || {}); }
 
   // ── drivers ──────────────────────────────────────────────────────────────
@@ -113,12 +132,16 @@
     else if (worstCable && !worstCable.ok) notes.push('feed cable ' + worstCable.csa + ' mm² needed (' + worstCable.drop_pct + ' % drop)');
     var drv = driverFor(load, c);
     var ch = num(st.dmx_channels, 1), data = ch >= 10 || /pixel|address/i.test(String(st.label || st.id || ''));
+    var ctl = controlFor(rn, st);
+    var dmxCh = ctl.id === 'dmx' ? (data ? 0 : Math.max(1, ch)) : 0;   // data strips take a pixel-controller output, not channels
     return {
       id: rn.id || rn.label || '', label: rn.label || rn.id || '', floor: rn.floor || '', room: rn.room || '',
       strip: { id: st.id || rn.ledId || '', label: st.label || rn.ledLabel || 'LED strip', volts: volts, wpm: wpm, channels: ch, data: data, kelvin: st.kelvin || null, ip: st.ip_rating || null, maxFeedM: maxFeed },
       metres: r1(metres), load_w: r1(load),
       feeds: feeds, feedsManual: manual, feedLoads_w: perFeed, cables: cables, cable: worstCable,
       driver: drv, driverAt: rn.driverAt || rn.driver_location || null, dimming: rn.dimming || (data ? 'data' : (ch > 1 ? 'dmx' : null)),
+      control: ctl.id, controlLabel: ctl.label, driverType: ctl.driver, circuitType: ctl.circuit, controlExplicit: !!(rn && rn.control),
+      dmx: ctl.id === 'dmx' ? { channels: dmxCh, data: data, universe: num(rn.dmx_universe) > 0 ? num(rn.dmx_universe) : null, address: num(rn.dmx_address) > 0 ? num(rn.dmx_address) : null, manual: num(rn.dmx_address) > 0 } : null,
       flags: flags, notes: notes
     };
   }
@@ -138,13 +161,31 @@
     });
     Object.keys(byType).forEach(function (k) { var t = byType[k]; t.metres = r1(t.metres); t.load_w = r1(t.load_w); t.order_m = Math.ceil(t.metres * (1 + c.wastePct / 100) / c.reelM) * c.reelM; });
     var decoders = 0; Object.keys(rooms).forEach(function (k) { decoders += Math.ceil(rooms[k] / c.decoderChannels); channels[k] = rooms[k]; });
+    // ── DMX addressing (v1.1.0): manual addresses are honoured; the rest are packed in run order from the next free address,
+    // one universe of 512 then the next. Data / pixel strips take pixel-controller outputs instead (PX1, PX2 …).
+    var used = {};   // universe → [[from,to]]
+    out.forEach(function (e) { if (e.dmx && e.dmx.manual && e.dmx.channels) { var u = e.dmx.universe || 1; (used[u] = used[u] || []).push([e.dmx.address, e.dmx.address + e.dmx.channels - 1]); e.dmx.universe = u; } });
+    var cur = { u: 1, a: 1 }, pxOut = 0;
+    function free(u, a, n) { var r = used[u] || []; for (var i = 0; i < r.length; i++) { if (a <= r[i][1] && a + n - 1 >= r[i][0]) return false; } return true; }
+    out.forEach(function (e) {
+      if (!e.dmx) return;
+      if (e.dmx.data) { pxOut++; e.dmx.universe = null; e.dmx.output = 'PX' + Math.ceil(pxOut / c.pixelControllerOutputs) + '-' + (((pxOut - 1) % c.pixelControllerOutputs) + 1); return; }
+      if (e.dmx.manual) return;
+      var n = e.dmx.channels;
+      while (true) { if (cur.a + n - 1 > c.dmxUniverseSize) { cur.u++; cur.a = 1; } if (free(cur.u, cur.a, n)) break; cur.a++; }
+      e.dmx.universe = cur.u; e.dmx.address = cur.a; (used[cur.u] = used[cur.u] || []).push([cur.a, cur.a + n - 1]); cur.a += n;
+    });
+    var dmxRuns = out.filter(function (e) { return e.dmx && !e.dmx.data; }), dmxCh = dmxRuns.reduce(function (a, e) { return a + e.dmx.channels; }, 0);
+    var byControl = {}; out.forEach(function (e) { byControl[e.control] = (byControl[e.control] || 0) + 1; });
     var totalM = out.reduce(function (a, e) { return a + e.metres; }, 0), totalW = out.reduce(function (a, e) { return a + e.load_w; }, 0);
     return {
       version: VERSION, runs: out,
       totals: { runs: out.length, metres: r1(totalM), load_w: r1(totalW), drivers: Object.keys(drivers).reduce(function (a, k) { return a + drivers[k]; }, 0), feeds: out.reduce(function (a, e) { return a + e.feeds.length; }, 0), flagged: out.filter(function (e) { return e.flags.length; }).length },
       byType: Object.keys(byType).map(function (k) { return byType[k]; }).sort(function (a, b) { return b.metres - a.metres; }),
       drivers: Object.keys(drivers).sort(function (a, b) { return parseFloat(a) - parseFloat(b); }).map(function (k) { return { size: k, qty: drivers[k] }; }),
-      controllers: { channelsByRoom: channels, decoders: decoders, decoderChannels: c.decoderChannels },
+      controllers: { channelsByRoom: channels, decoders: decoders, decoderChannels: c.decoderChannels,
+        dmx: { runs: dmxRuns.length, channels: dmxCh, universes: Object.keys(used).length, decoders: Math.ceil(dmxCh / c.decoderChannels), pixelOutputs: pxOut, pixelControllers: Math.ceil(pxOut / c.pixelControllerOutputs) },
+        byControl: byControl, triacDrivers: out.filter(function (e) { return e.control === 'triac'; }).reduce(function (a, e) { return a + e.driver.drivers; }, 0) },
       cable: Object.keys(cable).sort(function (a, b) { return parseFloat(a) - parseFloat(b); }).map(function (k) { return { csa: k, metres: Math.ceil(cable[k] * 1.15) }; }),   // +15 % like every other cable estimate
       schedule: out.map(scheduleRow)
     };
@@ -154,9 +195,16 @@
     var drv = e.driver.drivers ? ((e.driver.drivers > 1 ? e.driver.drivers + ' × ' : '') + e.driver.driver_w + ' W' + (e.driver.loaded_pct ? ' (' + e.driver.loaded_pct + ' %)' : '')) : '—';
     var feeds = e.feeds.length + (e.feedsManual ? ' (marked)' : '') + ' @ ' + e.feeds.map(function (m) { return m + 'm'; }).join(', ');
     var cab = e.cable ? e.cable.csa + ' mm² · ' + e.cable.length_m + ' m · ' + e.cable.drop_pct + ' %' : '—';
-    return [e.floor || '—', e.id || '—', e.room || '—', e.strip.label + ' · ' + e.strip.volts + ' V · ' + e.strip.wpm + ' W/m', e.metres.toFixed(1), e.load_w.toFixed(0), feeds, drv, e.driverAt || 'local (accessible)', cab, (e.flags.length ? e.flags.join(' · ') + ' — ' : '') + e.notes.join('; ')];
+    return [e.floor || '—', e.id || '—', e.room || '—', e.strip.label + ' · ' + e.strip.volts + ' V · ' + e.strip.wpm + ' W/m', e.metres.toFixed(1), e.load_w.toFixed(0), feeds, drv, e.driverAt || 'local (accessible)', cab, e.controlLabel || '—', dmxText(e), (e.flags.length ? e.flags.join(' · ') + ' — ' : '') + e.notes.join('; ')];
   }
-  var SCHEDULE_HEADERS = ['Floor', 'ID', 'Room', 'Strip', 'Metres', 'Load W', 'Feeds', 'Driver', 'Driver at', 'Feed cable', 'Notes'];
+  function dmxText(e) {
+    if (!e.dmx) return '—';
+    if (e.dmx.data) return 'pixel ' + (e.dmx.output || 'output');
+    if (!e.dmx.universe || !e.dmx.address) return e.dmx.channels + ' ch';
+    var pad = function (n) { return ('00' + n).slice(-3); };
+    return 'U' + e.dmx.universe + ' · ' + pad(e.dmx.address) + (e.dmx.channels > 1 ? '–' + pad(e.dmx.address + e.dmx.channels - 1) : '') + (e.dmx.manual ? ' (set)' : '');
+  }
+  var SCHEDULE_HEADERS = ['Floor', 'ID', 'Room', 'Strip', 'Metres', 'Load W', 'Feeds', 'Driver', 'Driver at', 'Feed cable', 'Control', 'DMX', 'Notes'];
 
-  global.SonorLedEng = { VERSION: VERSION, DEFAULTS: DEFAULTS, run: run, project: project, driverFor: driverFor, feedCable: feedCable, stripMaxFeedM: function (st) { return stripMaxFeedM(st, cfg()); }, scheduleRow: scheduleRow, SCHEDULE_HEADERS: SCHEDULE_HEADERS };
+  global.SonorLedEng = { VERSION: VERSION, DEFAULTS: DEFAULTS, CONTROLS: CONTROLS, controlFor: controlFor, dmxText: dmxText, run: run, project: project, driverFor: driverFor, feedCable: feedCable, stripMaxFeedM: function (st) { return stripMaxFeedM(st, cfg()); }, scheduleRow: scheduleRow, SCHEDULE_HEADERS: SCHEDULE_HEADERS };
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
