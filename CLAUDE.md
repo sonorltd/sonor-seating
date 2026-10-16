@@ -15,8 +15,8 @@
 > FrontRow — with photo (app range assets) or SSOT logo, spec rows and "The Sonor view" · other routes
 > (designer sofas, US online brands) · at-a-glance table · the detail. **"AVAILABLE THROUGH SONOR" pill is live**
 > from `seatingRanges()` manufacturer slugs (= `seating_manufacturers`), else "ON REQUEST". Content written in
-> Sonor's voice from the makers' published information + the Custom Controls comparison (July 2026, credited on
-> the detail page). No prices, no hosted links. Ref `SNR-SG-yymmdd-XXXX`.
+> Sonor's voice from the makers' published information (no third-party credit — Bryn 2026-10-16: "remove the credit, we'll
+> adjust in own words at some point"). No prices, no hosted links. Ref `SNR-SG-yymmdd-XXXX`.
 
 > **v0.24.0 — FrontRow's own diagrams + a seats-per-row selector.** The 70 Serenity
 > configuration drawings and 14 module tiles that were scraped in July were sitting in
