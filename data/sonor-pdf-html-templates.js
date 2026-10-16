@@ -20,6 +20,9 @@
 // it in. Templates never hardcode CSS.
 
 (function () {
+  // 2026-10-16 §41 — chrome inks from sonor-pdf-theme when present
+  const _TH = (typeof window !== 'undefined' && window.SonorPdfTheme && window.SonorPdfTheme.HEX) || {};
+  const INK = _TH.ink || '#1a1f28', GOLD = _TH.gold || '#ad9978', INK2 = _TH.ink2 || '#302F2E';
   'use strict';
 
   function _h() { return window.SonorPdfHtmlHelpers || { esc: s => String(s == null ? '' : s) }; }
@@ -53,7 +56,7 @@
     // wordmark vanished into it. White wordmark for dark surfaces.
     const wordmarkUrl = (typeof window !== 'undefined' &&
       (window.__SONOR_WORDMARK_PDF_WHITE__ || window.__SONOR_WORDMARK_PDF__)) || '';
-    const accent = o.accentHex || '#ad9978' /* v5.138.0 SONOR GOLD (brand swatch) */;
+    const accent = o.accentHex || GOLD;
 
     // Hero inline-style — accent is the only template-injected style; the
     // backdrop image is also inline because the URL is data-driven. Everything
@@ -307,7 +310,7 @@
   function buildSchedule(opts, css) {
     const o = opts || {};
     const h = _h(), c = _c();
-    const accent = h.esc(o.accentHex || '#ad9978' /* v5.138.0 SONOR GOLD (brand swatch) */);
+    const accent = h.esc(o.accentHex || GOLD);
 
     // v5.4.71 — Bryn directive 2026-05-10: "we don't need the second
     // title and sub title in main body, this is just taking up space".
@@ -380,7 +383,7 @@
   function buildPlanPage(opts, css) {
     const o = opts || {};
     const h = _h(), c = _c();
-    const accent = h.esc(o.accentHex || '#ad9978' /* v5.138.0 SONOR GOLD (brand swatch) */);
+    const accent = h.esc(o.accentHex || GOLD);
 
     const ledSpec = o.ledColourSpec || null;
     const ledHtml = ledSpec && Array.isArray(ledSpec.rows) && ledSpec.rows.length ? `
@@ -501,7 +504,7 @@
   function buildContents(opts, css) {
     const o = opts || {};
     const h = _h(), c = _c();
-    const accent = h.esc(o.accentHex || '#ad9978');
+    const accent = h.esc(o.accentHex || GOLD);
     const rows = Array.isArray(o.rows) ? o.rows : [];
     const rowsHtml = rows.map(r => {
       const label = h.esc(r.label || '');
@@ -510,14 +513,14 @@
         + 'px; width:' + (Number(r.w) || 100) + 'px; height:' + (Number(r.h) || 14) + 'px;';
       if (r.depth === 0) {
         return '<div class="toc-row toc-row-top" style="' + pos + ' background:' + h.esc(r.washRgba || 'rgba(71,81,97,0.10)') + ';">'
-          + '<span class="toc-bar" style="background:' + h.esc(r.barHex || '#475161') + '"></span>'
-          + '<span class="toc-label" style="color:' + h.esc(r.headCss || '#302F2E') + '">' + label + '</span>'
+          + '<span class="toc-bar" style="background:' + h.esc(r.barHex || GOLD) + '"></span>'
+          + '<span class="toc-label" style="color:' + h.esc(r.headCss || INK2) + '">' + label + '</span>'
           + '<span class="toc-leader"></span>'
           + '<span class="toc-page">' + page + '</span>'
           + '</div>';
       }
       return '<div class="toc-row toc-row-child" style="' + pos + '">'
-        + '<span class="toc-pip" style="background:' + h.esc(r.barHex || '#475161') + '"></span>'
+        + '<span class="toc-pip" style="background:' + h.esc(r.barHex || GOLD) + '"></span>'
         + '<span class="toc-label">' + label + '</span>'
         + '<span class="toc-leader"></span>'
         + '<span class="toc-page">' + page + '</span>'
@@ -573,7 +576,7 @@
   function buildCablingInfoPage(opts, css) {
     const o = opts || {};
     const h = _h(), c = _c();
-    const accent = h.esc(o.accentHex || '#ad9978' /* v5.138.0 SONOR GOLD (brand swatch) */);
+    const accent = h.esc(o.accentHex || GOLD);
     // v1.6.3 — pageIndex 0..5 (5 cabling info pages + optional 00.11).
     // Clamp at 5 (max possible). Total pages = cabling pages + bend radius
     // (always +1 page from separate buildBendRadiusPage).
@@ -601,7 +604,7 @@
       { type: 'Shades / Blinds', r: '90',  notes: 'Somfy 4-core mains (default) · Lutron QS where specified', code: 'B', colour: '#ad9978', darkText: false }   // v5.185.0 — Sivoia-era label refreshed (somfy-4core is the project default since v5.147.0)
     ];
     const cableRowsHtml = cableTypes.map(r => {
-      const ink = r.darkText ? '#1a1f28' : '#ffffff';
+      const ink = r.darkText ? INK : '#ffffff';
       return `
       <tr>
         <td class="info-cable-chip-cell"><span class="info-cable-chip" style="background:${h.esc(r.colour)};color:${ink}">${h.esc(r.code)}</span></td>
@@ -1231,7 +1234,7 @@
   function buildOverallCountsPage(opts, css) {
     const o = opts || {};
     const h = _h(), c = _c();
-    const accent = h.esc(o.accentHex || '#ad9978' /* v5.138.0 SONOR GOLD (brand swatch) */);
+    const accent = h.esc(o.accentHex || GOLD);
     const grand = o.grand || {};
     const services = Array.isArray(o.servicesData) ? o.servicesData : [];
 
@@ -1554,7 +1557,7 @@
   function buildSectionDivider(opts, css) {
     const o = opts || {};
     const h = _h(), c = _c();
-    const accent = o.accentHex || '#ad9978' /* v5.138.0 SONOR GOLD (brand swatch) */;
+    const accent = o.accentHex || GOLD;
     const meta = o.projectMeta || {};
     const owner = o.owner || {};
     const services = (Array.isArray(o.services) && o.services.length) ? o.services : null;
@@ -1631,7 +1634,7 @@
   function buildImagePage(opts, css) {
     const o = opts || {};
     const h = _h(), c = _c();
-    const accent = h.esc(o.accentHex || '#ad9978' /* v5.138.0 SONOR GOLD (brand swatch) */);
+    const accent = h.esc(o.accentHex || GOLD);
     const eyebrow = h.esc(o.sectionEyebrow || 'PLAN');
     const imgSrc = o.imageDataUrl || '';
     const imgAlt = h.esc(o.imageAlt || o.sectionTitle || 'Cinema view');

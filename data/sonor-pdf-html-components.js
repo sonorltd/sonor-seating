@@ -25,12 +25,15 @@
 // Each function returns a String of HTML. Pure — no DOM, no side effects.
 
 (function () {
+  // 2026-10-16 §41 — chrome inks come from sonor-pdf-theme when it is on the page (service colours stay literal: they ARE the per-area colour)
+  const _TH = (typeof window !== 'undefined' && window.SonorPdfTheme && window.SonorPdfTheme.HEX) || {};
+  const INK = _TH.ink || '#1a1f28', GOLD = _TH.gold || '#ad9978', LABEL = _TH.label || '#8b7d6b', G500 = _TH.g500 || '#94a3b8', G600 = _TH.g600 || '#636c7a';
   'use strict';
 
   function _h() {
     return (typeof window !== 'undefined' && window.SonorPdfHtmlHelpers) || {
       esc: s => String(s == null ? '' : s),
-      statusColour: () => '#636c7a',
+      statusColour: () => G600,
       statusInkOn: () => '#ffffff'
     };
   }
@@ -172,7 +175,7 @@
         return `<div class="rev-dot rev-dot-ellipsis"><span class="rev-ellipsis">…</span></div>`;
       }
       const isLatest = (r.code === latestCode);
-      const dotFill = isLatest ? accentForLatest : '#8b7d6b';
+      const dotFill = isLatest ? accentForLatest : LABEL;
       const dateShort = (r.date || '').slice(0, 5);
       const abBadge = r.as_built && !isLatest ? `<span class="rev-ab-badge">AB</span>` : '';
       return `
@@ -201,7 +204,7 @@
   function pageHeader(opts) {
     const h = _h();
     const o = opts || {};
-    const accent = h.esc(o.accentHex || '#6b4a8a');
+    const accent = h.esc(o.accentHex || GOLD);   // §41 gold, never purple chrome
     // v1.4.0 — optional subtitle renders muted below the section name on
     // the same strip.
     const subtitleHtml = o.subtitle
@@ -628,10 +631,10 @@
   // Mounting glyphs are drawn as inline SVG so they reproduce crisply at any
   // print scale (no font rendering artefacts).
   const _MOUNT_TYPES = [
-    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#1a1f28" stroke-width="1.5"/></svg>', label: 'Ceiling-mounted' },
-    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="#1a1f28" stroke-width="1.5"/></svg>', label: 'Wall-mounted' },
-    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="3" y="3" width="8" height="8" fill="none" stroke="#1a1f28" stroke-width="1.5" transform="rotate(45 7 7)"/></svg>', label: 'Floor-mounted' },
-    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="#1a1f28" stroke-width="1.5" stroke-dasharray="2 2"/></svg>', label: 'Pre-wire only' }
+    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="' + INK + '" stroke-width="1.5"/></svg>', label: 'Ceiling-mounted' },
+    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="' + INK + '" stroke-width="1.5"/></svg>', label: 'Wall-mounted' },
+    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="3" y="3" width="8" height="8" fill="none" stroke="' + INK + '" stroke-width="1.5" transform="rotate(45 7 7)"/></svg>', label: 'Floor-mounted' },
+    { glyph: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="' + INK + '" stroke-width="1.5" stroke-dasharray="2 2"/></svg>', label: 'Pre-wire only' }
   ];
 
   function drawingKey(opts) {
@@ -733,7 +736,7 @@
     if (!Array.isArray(rows) || !rows.length) return '';
     const html = rows.map(r => {
       if (r.kind === 'group' && r.level === 'service') {
-        const accent = h.esc(r.accent || r.colour || '#1a1f28');
+        const accent = h.esc(r.accent || r.colour || INK);
         return `<div class="lg-svc"><span class="lg-svc-bar" style="background:${accent}"></span><span class="lg-svc-label">${h.esc(r.label || '')}</span></div>`;
       }
       if (r.kind === 'group' && r.level === 'sub') {
@@ -880,7 +883,7 @@
         k: { key: key, klass: null,
              glyph: (REG[key].short || '•'),
              label: String(REG[key].label || key).toLowerCase(),
-             colour: REG[key].colour || '#94a3b8' },
+             colour: REG[key].colour || G500 },
         n: Number(counts[key]) || 0
       })));
     return `<div class="rev-pills">` + pills.map(p => {

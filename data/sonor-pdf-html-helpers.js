@@ -36,10 +36,10 @@
     'FINAL CONSTRUCTION':'#5a8b40',
     'FINAL':           '#78ba57',
     'FINAL DRAFT':     '#e37c59',
-    'FOR REVIEW':      '#f5d05c',
-    'FOR QUOTATION':   '#f5d05c',
-    'FOR QUOTE':       '#f5d05c',
-    'SITE REVIEW':     '#f5d05c',
+    'FOR REVIEW':      '#E8A317',
+    'FOR QUOTATION':   '#E8A317',
+    'FOR QUOTE':       '#E8A317',
+    'SITE REVIEW':     '#E8A317',
     'REVISED':         '#e37c59',
     'REVISED DRAFT':   '#e37c59',
     'PRELIMINARY':     '#e37c59',
@@ -69,6 +69,7 @@
   // Light-fill hexes that need DARK ink for legibility (yellow / aqua / light green).
   const LIGHT_PILL_FILLS = new Set([
     '#f5d05c', // svc04 yellow
+    '#e8a317', // §23 amber (for review / for quote) — dark ink on it
     '#4bb9d3', // svc02 aqua
     '#78ba57'  // svc03 green
   ]);
