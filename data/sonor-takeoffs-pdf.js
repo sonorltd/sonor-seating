@@ -60,7 +60,7 @@
   // header History, boot banner and host cache-bust all disagreeing).
   // Bump THIS on every functional change to the module; the banner and
   // window.SonorPdf.__version derive from it.
-  var SONOR_PDF_VERSION = '2.6.0';   // v2.6.0 2026-10-16 — merged PROJECT INFORMATION front page, CABLING STANDARDS numbered on its own, TRADES REQUIREMENTS — BUILDER sheet
+  var SONOR_PDF_VERSION = '2.7.0';   // v2.7.0 2026-10-16 — DMX PLAN special page (remote DMX driver loop, variant 'dmx'; servicePlan opts.variant) · v2.6.0 2026-10-16 — merged PROJECT INFORMATION front page, CABLING STANDARDS numbered on its own, TRADES REQUIREMENTS — BUILDER sheet
 
 // ============================================================
 // Boot diagnostic — resolved PDF pipeline
@@ -5913,7 +5913,7 @@ const SonorPdf = (function () {
   function _withExportLayerBoost(planKey, fn) {
     const w = (typeof window !== 'undefined') ? window : {};
     const prevCones = w._cctvViewsHidden;
-    const prevLc = w._lcLinksVisible, prevLkp = w._lkpLinksVisible;
+    const prevLc = w._lcLinksVisible, prevLkp = w._lkpLinksVisible, prevDmx = w._dmxLinksVisible;   // v2.7.0
     let boosted = false;
     try {
       if (planKey === 'cctv' && prevCones === true) {
@@ -5931,14 +5931,20 @@ const SonorPdf = (function () {
         try { if (typeof w._resolveCircuitLinks === 'function') w._resolveCircuitLinks(); } catch (_) {}
         boosted = true;
       }
+      if (planKey === 'dmxplan' && w._dmxLinksVisible === false) {   // v2.7.0
+        w._dmxLinksVisible = true;
+        try { if (typeof w._resolveCircuitLinks === 'function') w._resolveCircuitLinks(); } catch (_) {}
+        boosted = true;
+      }
       return fn();
     } finally {
       if (boosted) {
         w._cctvViewsHidden = prevCones;
         w._lcLinksVisible = prevLc;
         w._lkpLinksVisible = prevLkp;
+        w._dmxLinksVisible = prevDmx;   // v2.7.0
         try { if (planKey === 'cctv' && typeof _resyncAllViewCones === 'function') _resyncAllViewCones(); } catch (_) {}
-        try { if ((planKey === 'lightingplan' || planKey === 'lkpplan') && typeof w._resolveCircuitLinks === 'function') w._resolveCircuitLinks(); } catch (_) {}
+        try { if ((planKey === 'lightingplan' || planKey === 'lkpplan' || planKey === 'dmxplan') && typeof w._resolveCircuitLinks === 'function') w._resolveCircuitLinks(); } catch (_) {}
       }
     }
   }
@@ -6111,6 +6117,12 @@ const SonorPdf = (function () {
         scopeLabel: 'KEYPAD BUS SCOPE',
         has: (sym) => !!(window._isWiredKeypad && window._isWiredKeypad(sym)),
         snap: () => _snapshotCanvasByService('04', 'lkp') },
+      { key: 'dmxplan', svcNn: '04', code: 'DMX',   // v2.7.0 (Takeoffs 5.257.0) — remote DMX driver loop
+        title: 'DMX PLAN',
+        subtitle: 'Remote DMX drivers, DMX interface + floor DMX loop (data daisy chain from the interface and back)',
+        scopeLabel: 'DMX LOOP SCOPE',
+        has: (sym) => !!(window._isDmxDriver && window._isDmxDriver(sym)),
+        snap: () => _snapshotCanvasByService('04', 'dmx') },
       { key: 'cctv', svcNn: '08', code: 'CCT',
         title: 'CCTV COVERAGE PLAN',
         subtitle: 'Cameras + field-of-view coverage',
@@ -6290,6 +6302,11 @@ const SonorPdf = (function () {
         return (window._isWiredKeypad && window._isWiredKeypad(sym))
             || (window._isLpnl && window._isLpnl(sym));
       }
+      if (variant === 'dmx') {   // v2.7.0 — DMX drivers + the interface + the LPNL it heads from
+        return (window._isDmxDriver && window._isDmxDriver(sym))
+            || (window._isDmxInterface && window._isDmxInterface(sym))
+            || (window._isLpnl && window._isLpnl(sym));
+      }
       return sym.service_nn === serviceNn;
     };
     if (typeof _coneRebuildRaf !== 'undefined' && _coneRebuildRaf != null) {
@@ -6425,14 +6442,16 @@ const SonorPdf = (function () {
       if (o.sonorMeasure && (o.sonorMeasure.kind === 'length' || o.sonorMeasure.kind === 'led')) {
         if (variant === 'lighting') keep = (o.sonorMeasure.kind === 'led');   // LED runs belong on the lighting plan
         else if (variant === 'lkp') keep = false;
+        else if (variant === 'dmx') keep = (o.sonorMeasure.kind === 'led' && !!(window._ledIsDmx && window._ledIsDmx(o.sonorMeasure)));   // v2.7.0 — DMX-controlled runs only
         else if (variant === 'override') keep = false;   // v5.157.0 — watermark-override: no cables/LEDs either
         else keep = (serviceNn === '11' || serviceNn === '04');
       }
       // v5.69.0 — circuit links: LC curves on the lighting plan, bus loops
       // on the LKP plan; hidden on classic service slices.
       if (o._sonorCircuitLink === true) {
-        keep = variant === 'lighting' ? o._lcKind !== 'lkp'
+        keep = variant === 'lighting' ? (o._lcKind !== 'lkp' && o._lcKind !== 'dmx')
              : variant === 'lkp'      ? o._lcKind === 'lkp'
+             : variant === 'dmx'      ? o._lcKind === 'dmx'   // v2.7.0
              : false;
       }
       // Labels: hide unless they belong to a kept symbol family — simplest
@@ -6947,7 +6966,7 @@ const SonorPdf = (function () {
       if (typeof setStatus === 'function') setStatus('PDF library not loaded — check network.');
       return null;
     }
-    const snap = _snapshotCanvasByService(serviceNn);
+    const snap = _snapshotCanvasByService(serviceNn, opts && opts.variant);   // v2.7.0 — opts.variant ('dmx' …) filters like the full-document special plans
     if (!snap) {
       if (typeof setStatus === 'function') setStatus('Plan canvas not ready.');
       return null;

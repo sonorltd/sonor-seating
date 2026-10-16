@@ -32,7 +32,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.1.0';   // v1.1.0 2026-10-16 — control method (DMX / triac / 0-10V / DALI / switched) + DMX addressing on xx1 blocks (Bryn: "RGBW led will be dmx controlled … main also have triac dimmable driver, need options for all this … including DMX channel assignment")
+  var VERSION = '1.2.0';   // v1.1.0 2026-10-16 — control method (DMX / triac / 0-10V / DALI / switched) + DMX addressing on xx1 blocks (Bryn: "RGBW led will be dmx controlled … main also have triac dimmable driver, need options for all this … including DMX channel assignment")
 
   var DEFAULTS = {
     headroom: 0.8,                                   // driver ≥ load / headroom
@@ -140,7 +140,7 @@
       strip: { id: st.id || rn.ledId || '', label: st.label || rn.ledLabel || 'LED strip', volts: volts, wpm: wpm, channels: ch, data: data, kelvin: st.kelvin || null, ip: st.ip_rating || null, maxFeedM: maxFeed },
       metres: r1(metres), load_w: r1(load),
       feeds: feeds, feedsManual: manual, feedLoads_w: perFeed, cables: cables, cable: worstCable,
-      driver: drv, driverAt: rn.driverAt || rn.driver_location || null, dimming: rn.dimming || (data ? 'data' : (ch > 1 ? 'dmx' : null)),
+      driver: drv, driverAt: rn.driverAt || rn.driver_location || null, driverId: rn.driverId || null, driverRemote: !!rn.driverRemote,   // 1.2.0 — remote DMX driver block feeding the run dimming: rn.dimming || (data ? 'data' : (ch > 1 ? 'dmx' : null)),
       control: ctl.id, controlLabel: ctl.label, driverType: ctl.driver, circuitType: ctl.circuit, controlExplicit: !!(rn && rn.control),
       dmx: ctl.id === 'dmx' ? { channels: dmxCh, data: data, universe: num(rn.dmx_universe) > 0 ? num(rn.dmx_universe) : null, address: num(rn.dmx_address) > 0 ? num(rn.dmx_address) : null, manual: num(rn.dmx_address) > 0 } : null,
       flags: flags, notes: notes
