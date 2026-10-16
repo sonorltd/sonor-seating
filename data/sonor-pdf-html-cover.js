@@ -284,6 +284,18 @@
     }
   }
 
+
+  // ---- renderRearPage (v1.9.0, §41) — the rear contact page, A4 landscape like the cover ----
+  async function renderRearPage(opts) {
+    try {
+      const css = await _loadCss();
+      const html = window.SonorPdfHtmlTemplates.buildRearPage(opts || {}, css);
+      const result = await _renderHtmlToImage(html, { width: 1190, height: 842, scale: 3 });
+      try { window.__SONOR_HTMLCOVER_LAST_PATH__ = 'rendered-rear'; } catch (_) {}
+      return result;
+    } catch (e) { try { window.__SONOR_HTMLCOVER_LAST_ERROR__ = e; } catch (_) {} throw e; }
+  }
+
   // ---- renderSchedule ----------------------------------------------------
   // Schedules render at A3 landscape (1190×842 in jsPDF points) — matches the
   // host's existing schedule format. Caller passes the same opts shape that
@@ -450,7 +462,7 @@
   if (typeof window !== 'undefined') {
     window.SonorPdfHtmlCover = {
       __version: MODULE_VERSION,
-      renderCover, renderSectionDivider, renderSchedule, measureSchedule, renderPlanPage,
+      renderCover, renderSectionDivider, renderRearPage, renderSchedule, measureSchedule, renderPlanPage,
       renderCablingInfo, renderBendRadius, renderOverallCounts,
       renderContents,   // v5.146.0
       renderElectricalRequirements,

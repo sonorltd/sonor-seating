@@ -125,6 +125,13 @@ const SonorPdf = (function () {
   // app's UI chrome. PDFs match so the output reads as part of the same
   // family. NEVER hardcode separate values — if brand-core.xml changes,
   // refresh these constants in lock-step.
+
+  // v5.249.0 (§41) — the project's cover photo for the hero (the same photo the scope brief uses); null when none is set.
+  async function _coverBackdrop() {
+    try { if (typeof window._wqCoverPhotoUrl === 'function') return await window._wqCoverPhotoUrl(); } catch (_) {}
+    return null;
+  }
+  try { window._coverBackdrop = _coverBackdrop; } catch (_) {}
   const COLOURS = {
     bar:        '#151A22',   // surface-bar (slate near-black) — header/footer strip
     text:       '#1A1F28',   // text-primary (dark slate body text)
@@ -148,6 +155,12 @@ const SonorPdf = (function () {
     archived:     '#8b7d6b', // earthy --text-muted (Muted Taupe) per brand-core
     draftSlate:   '#636C7A'  // matches COLOURS.muted
   };
+
+  // 2026-10-16 — sonor-pdf-theme.js is the ONE palette (§41): black chrome, ink greys, gold accent. Literals above = offline fallback.
+  try {
+    const _T = (typeof window !== 'undefined' && window.SonorPdfTheme) ? window.SonorPdfTheme.HEX : null;
+    if (_T) Object.assign(COLOURS, { bar: _T.black, text: _T.ink, text2: _T.ink2, muted: _T.muted, faint: _T.g500, panel: _T.g100, tint: _T.g100, altRow: _T.g50, border: _T.g300, borderHard: _T.g400, accent: _T.gold, appAccent: _T.gold, archived: _T.label });
+  } catch (_) {}
   // v1.27.0 — corrected key reads. __SONOR_BRAND__.company schema is
   // { name, legal, tagline, location, url, phone, email, office, ... }.
   // v1.23.0 read .web (undefined) → footer rendered "undefined · email · phone".
@@ -2589,6 +2602,7 @@ const SonorPdf = (function () {
             reference: meta.ref || '', status: meta.status, revision: meta.revision,
             issueDate: meta.dateUk || meta.date,
             services: _svcChrome,
+            backdropImg: (await _coverBackdrop()) || null,   // v5.249.0 §41
             extract: {
               label: opts.title || 'Schedule',
               note: 'EXTRACT — refer to the FULL TAKE-OFF export for complete project information.'
@@ -2966,7 +2980,7 @@ const SonorPdf = (function () {
           appName: 'Takeoffs',
           appVersion: meta.appVersion,
           accentHex: '#ad9978',   // v5.138.0/v5.143.0 — SONOR GOLD (re-applied to root master)
-          backdropImg: null,
+          backdropImg: (await _coverBackdrop()) || null,   // v5.249.0 — project cover photo (takeoffs-push link metadata.cover_photo) fades to black on the luxury hero (§41)
           services,
           floors: floorsForHtml,
           totals: totalsForHtml,
@@ -10565,7 +10579,7 @@ const SonorPdf = (function () {
         appName: 'Takeoffs',
         appVersion: meta.appVersion,
         accentHex: '#ad9978',   // v5.138.0/v5.143.0 — SONOR GOLD (re-applied to root master)
-        backdropImg: null,
+        backdropImg: (await _coverBackdrop()) || null,   // v5.249.0 — project cover photo (takeoffs-push link metadata.cover_photo) fades to black on the luxury hero (§41)
         services,
         floors: floorsForHtml,
         totals: totalsForHtml
@@ -11167,6 +11181,7 @@ const SonorPdf = (function () {
       catch (_) { return true; }
     })();
     const _dividerCount = () => (_cinemaPresent ? 3 : 2);
+    const _rearPageOn = () => !(opts && opts.plansOnly) && !(opts && opts.noRearPage);   // v5.249.0 §41 — every full document ends on the contact page
     const _incSlices   = _secOn('slices',   'takeoffs-fullpdf-svcslices');
     // v5.157.0 (Bryn: "need a subsection of service slices ticks in case we
     // dont want every one") — per-service slice tick, default ON. Host hook
@@ -11430,6 +11445,7 @@ const SonorPdf = (function () {
       } catch (_) {}
       // Section dividers (3 hardcoded — Rack Build, Schematics, Cinema Construction)
       if (_incDividers) total += _dividerCount();  // v5.18.0 — honour the dividers ticklist flag (v5.198.0: Cinema divider only when 01 blocks exist)
+      if (_rearPageOn()) total += 1;   // v5.249.0 — rear contact page (§41) — counter twin of the emitter before pdf.save
       // v5.70.0 — Schedules counted EXACTLY: the paginator is deterministic
       // and cheap, so run it per aspect up-front (was 1-page-per-aspect —
       // every multi-page schedule broke "PAGE x OF y" from that point on).
@@ -11589,7 +11605,7 @@ const SonorPdf = (function () {
           appName: 'Takeoffs',
           appVersion: meta.appVersion,
           accentHex: '#ad9978',   // v5.138.0/v5.143.0 — SONOR GOLD (re-applied to root master)
-          backdropImg: null,
+          backdropImg: (await _coverBackdrop()) || null,   // v5.249.0 — project cover photo (takeoffs-push link metadata.cover_photo) fades to black on the luxury hero (§41)
           services,
           floors: floorsForHtml,
           totals: totalsForHtml,
@@ -13220,7 +13236,7 @@ const SonorPdf = (function () {
             sectionSubtitle: 'Front + rear rack elevations, bill of materials, technical schematic per rack',
             crossAppLabel: 'Sonor Packs',
             crossAppDetail: 'Open the project in the Packs app to generate the latest rack drawings, BOM tables, and per-rack cable IDs. Live build sheets are exported separately and bound into this deck before site issue.',
-            accent: '#475161',
+            accent: '#ad9978',   // §41 — gold (was slate)
             pageCode: 'DIV-PCK',
             wipBadge: true
           },
@@ -13229,7 +13245,7 @@ const SonorPdf = (function () {
             sectionSubtitle: 'Distributed audio, video, control, network, lighting and power schematics',
             crossAppLabel: 'Sonor Engineering',
             crossAppDetail: 'Schematic deliverables (audio + cinema, distributed video + IR, control + network + PoE, lighting circuits, power) are owned by the Engineering app. Cross-app integration ships in v6.0.0 — for now, request the latest schematic export directly from the design team.',
-            accent: '#8058a1',
+            accent: '#ad9978',   // §41 — gold (purple stays the 01 service colour on the Cinema divider only)
             pageCode: 'DIV-ENG',
             wipBadge: true
           },
@@ -13258,7 +13274,7 @@ const SonorPdf = (function () {
             try {
               if (typeof setStatus === 'function') setStatus('Rendering ' + d.sectionTitle + ' (HTML/CSS) …');
               const _result = await window.SonorPdfHtmlCover.renderSectionDivider({
-                accentHex: d.accent || '#6b4a8a',
+                accentHex: d.accent || '#ad9978',   // §41 — gold, never purple chrome
                 title: d.sectionTitle,
                 subtitle: d.sectionSubtitle,
                 services: _servicesForChrome,
@@ -13303,6 +13319,23 @@ const SonorPdf = (function () {
       }
     } catch (e) { console.warn('[fullDocument] Section dividers failed:', e); }
 
+    // v5.249.0 (2026-10-16, §41 — Bryn: the running footer carries page numbers only, the full contact details go on a rear
+    // page) — REAR CONTACT PAGE, last page of every Full Document (not on plans-only). Counter twin: _rearPageOn() in the estimator.
+    try {
+      if (_rearPageOn() && window.SonorPdfHtmlCover && typeof window.SonorPdfHtmlCover.renderRearPage === 'function' && window.SonorPdfHtmlCover.available()) {
+        if (typeof setStatus === 'function') setStatus('Rendering rear contact page (HTML/CSS) …');
+        const _rear = await window.SonorPdfHtmlCover.renderRearPage({ projectMeta: { ref: meta.ref, name: meta.name } });
+        if (_rear && _rear.dataUrl) {
+          pdf.addPage();
+          const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
+          pdf.addImage(_rear.dataUrl, 'JPEG', 0, 0, pageW, pageH, 'rear-html');
+          try {
+            pdf.__sonorPageStamps__ = pdf.__sonorPageStamps__ || [];
+            pdf.__sonorPageStamps__.push({ page: (typeof pdf.internal.getCurrentPageInfo === 'function' ? pdf.internal.getCurrentPageInfo().pageNumber : pdf.internal.pages.length - 1), x: 0, y: 0, clearW: 0, clearH: 0, clearOffsetY: 0, format: 'noop', source: 'html-rear-suppress' });
+          } catch (_) {}
+        }
+      }
+    } catch (e) { console.warn('[fullDocument v5.249.0] rear page failed:', e); }
 
     // v1.99.1 — Final pagination pass. The page-total estimate computed
     // before CCTV / Electrical / per-service slice pages is stale by the

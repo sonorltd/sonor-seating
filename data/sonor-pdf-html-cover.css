@@ -3234,3 +3234,32 @@ body {
 .oc-headend-table tr.oc-he-unpriced td { color: #6b7280; }
 .oc-he-tag { display: inline-block; font-size: 7px; letter-spacing: 0.06em; text-transform: uppercase; color: #e8892b; border: 1px solid #e8892b; border-radius: 3px; padding: 0 4px; margin-left: 4px; vertical-align: middle; }
 .oc-headend-foot { grid-column: 1 / -1; font-size: 8px; font-style: italic; color: var(--slate-muted, #5a5750); padding: 5px 12px; border-top: 1px solid var(--paper-rule, #eceef1); margin: 0; }
+
+/* ================================================================
+ * v1.16.0 (2026-10-16, §41) — LUXURY HERO ANATOMY on the cover: the Service Contracts front page in HTML.
+ * Gold inset frame · mark + wordmark top-left · gold hairline + tracked gold eyebrow · left title · subtitle · extract pill.
+ * Colours come from sonor-pdf-theme (:root overrides appended at load); literals here are the fallback.
+ * ================================================================ */
+.hero-lux { display: block; }
+.hero-lux-frame { position: absolute; left: 18px; top: 18px; right: 18px; bottom: 18px; border: 1px solid rgba(173,153,120,0.36); pointer-events: none; }
+.hero-lux-brand { position: absolute; left: 44px; top: 36px; display: flex; align-items: center; gap: 12px; }
+.hero-lux-logo { height: 30px; width: auto; display: block; filter: brightness(0) invert(1); opacity: 0.96; }
+.hero-lux-logo-fallback { font-size: 20px; font-weight: 800; letter-spacing: 0.42em; color: #f6f2ea; }
+.hero-lux-block { position: absolute; left: 44px; right: 44px; bottom: 40px; text-align: left; }
+.hero-lux-eyebrow { display: flex; align-items: center; gap: 10px; color: #c8b48e; font-size: 9.5px; letter-spacing: 0.36em; text-transform: uppercase; font-weight: 600; }
+.hero-lux-rule { display: inline-block; width: 26px; height: 1px; background: #ad9978; }
+.hero-lux-title { margin-top: 10px; font-size: 46px; line-height: 1.02; font-weight: 800; letter-spacing: -0.015em; color: #f6f2ea; text-shadow: 0 2px 18px rgba(0,0,0,0.45); }
+.hero-lux-sub { margin-top: 8px; font-size: 13px; font-weight: 300; letter-spacing: 0.02em; color: #c8b48e; }
+.hero-lux-extract { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
+.hero-lux-extract-pill { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #090807; background: #ad9978; padding: 5px 12px; border-radius: 3px; }
+.hero-lux-extract-note { font-size: 9px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(246,242,234,0.7); }
+/* rear contact page (v1.16.0, §41) — same anatomy as the cover hero, full page */
+.rear-page { position: relative; width: 1190px; height: 842px; background: #161318; background: var(--chrome-solid); background-image: var(--chrome-gradient-mirror); color: #f6f2ea; overflow: hidden; }
+.rear-block { position: absolute; left: 44px; right: 44px; top: 300px; }
+.rear-tagline { font-size: 28px; font-weight: 300; color: #c8b48e; letter-spacing: 0.01em; }
+.rear-rule { height: 1px; background: rgba(173,153,120,0.5); margin: 34px 0 26px; }
+.rear-cells { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 40px; max-width: 760px; }
+.rear-cell-k { font-size: 8.5px; letter-spacing: 0.2em; color: #a89c88; font-weight: 600; }
+.rear-cell-v { font-size: 15px; font-weight: 600; color: #f6f2ea; margin-top: 4px; letter-spacing: 0.02em; }
+.rear-company { margin-top: 34px; font-size: 9.5px; color: #a89c88; letter-spacing: 0.02em; }
+.rear-foot { position: absolute; left: 44px; right: 44px; bottom: 40px; display: flex; justify-content: space-between; font-size: 8px; letter-spacing: 0.18em; color: #a89c88; }

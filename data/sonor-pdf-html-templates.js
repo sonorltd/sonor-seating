@@ -61,7 +61,7 @@
     const heroStyle = [`--accent: ${accent}`];
     if (o.backdropImg) {
       heroStyle.push(
-        `background-image: linear-gradient(180deg, rgba(15,18,26,0.55) 0%, rgba(15,18,26,0.85) 60%, rgba(15,18,26,0.95) 100%), url('${o.backdropImg}')`,
+        `background-image: linear-gradient(180deg, rgba(9,8,7,0.35) 0%, rgba(9,8,7,0.72) 55%, rgba(9,8,7,0.96) 100%), url('${o.backdropImg}')`   /* v1.16.0 — photo fades to BLACK (§41), not slate */,
         `background-size: cover`,
         `background-position: center`
       );
@@ -199,10 +199,26 @@
       rhsHtml = _summaryParts.join('') + _timelineHtml;
     }
 
+    // v1.16.0 (2026-10-16, sonor-platform §41 — Bryn: "cover page and PDF theme should be more inline with what we have
+    // elsewhere") — the hero takes the SERVICE CONTRACTS / luxury cover anatomy: dark hero (project cover photo fading to black
+    // when one is set), gold inset frame, mark + wordmark top-left, gold hairline + tracked gold eyebrow, left-aligned title,
+    // subtitle. The light body below (info grid, revisions, summary / legend) is unchanged. Active whenever sonor-pdf-theme is
+    // on the page; o.heroStyle === 'centred' restores the v5.4.69 centred hero.
+    const luxuryHero = (typeof window !== 'undefined' && window.SonorPdfTheme && o.heroStyle !== 'centred');
+    const heroInner = luxuryHero ? `
+    <div class="hero-lux-frame"></div>
+    <div class="hero-lux-brand">${wordmarkUrl ? `<img class="hero-lux-logo" src="${wordmarkUrl}" alt="SONOR">` : '<span class="hero-lux-logo-fallback">SONOR</span>'}</div>
+    <div class="hero-lux-block">
+      <div class="hero-lux-eyebrow"><span class="hero-lux-rule"></span>${h.esc(o.subtitle || 'PROJECT TAKE-OFF')}</div>
+      <div class="hero-lux-title">${h.esc(o.projectName || 'Untitled Project')}</div>
+      ${o.client ? `<div class="hero-lux-sub">${h.esc(o.client)}${o.address ? ' · ' + h.esc(o.address) : ''}</div>` : (o.address ? `<div class="hero-lux-sub">${h.esc(o.address)}</div>` : '')}
+      ${o.extract && o.extract.label ? `<div class="hero-lux-extract"><span class="hero-lux-extract-pill">${h.esc(o.extract.label)}</span><span class="hero-lux-extract-note">${h.esc(o.extract.note || 'Extract — refer to the full take-off export for complete project information.')}</span></div>` : ''}
+    </div>` : '';
     const body = `
-  <section class="hero hero-cover" style="${heroStyleAttr}">
+  <section class="hero hero-cover${luxuryHero ? ' hero-lux' : ''}" style="${heroStyleAttr}">
     ${heroTopHtml}
-    <div class="hero-centre hero-centre-cover">
+    ${heroInner}
+    <div class="hero-centre hero-centre-cover"${luxuryHero ? ' style="display:none"' : ''}>
       <div class="hero-logo-wrap">${heroLogo}</div>
       <div class="hero-eyebrow">${h.esc(o.subtitle || 'PROJECT TAKE-OFF')}</div>
       <div class="hero-title">${h.esc(o.projectName || 'Untitled Project')}</div>
@@ -1501,6 +1517,36 @@
     return _wrapDoc(body, css, 'Sonor — Electrical Requirements', { pdfTheme: o.pdfTheme });
   }
 
+
+  // ---- buildRearPage (v1.16.0, 2026-10-16, §41) --------------------------
+  // The REAR CONTACT PAGE every Sonor document ends on (Bryn 2026-10-16: the running footer carries page numbers only — the full
+  // contact details go on a rear page). Mirrors sonor-pdf-luxury rearPage(): dark page, mark + wordmark, tagline, gold hairline,
+  // four contact cells, company line, CEDIA. opts: { tagline, emailNew, emailService, phone, web, company, projectMeta }.
+  function buildRearPage(opts, css) {
+    const o = opts || {};
+    const h = _h();
+    const wordmarkUrl = (typeof window !== 'undefined' && (window.__SONOR_WORDMARK_PDF_WHITE__ || window.__SONOR_WORDMARK_PDF__)) || '';
+    const cells = [
+      ['NEW PROJECTS & PROPOSALS', o.emailNew || 'projects@sonor.co.uk'],
+      ['SERVICE & SUPPORT', o.emailService || 'service@sonor.co.uk'],
+      ['TELEPHONE', o.phone || '+44 7933 684 000'],
+      ['WEB', o.web || 'sonor.co.uk']
+    ];
+    const body = `
+  <section class="rear-page">
+    <div class="hero-lux-frame"></div>
+    <div class="hero-lux-brand">${wordmarkUrl ? `<img class="hero-lux-logo" src="${wordmarkUrl}" alt="SONOR">` : '<span class="hero-lux-logo-fallback">SONOR</span>'}</div>
+    <div class="rear-block">
+      <div class="rear-tagline">${h.esc(o.tagline || 'Smart homes, beautifully done.')}</div>
+      <div class="rear-rule"></div>
+      <div class="rear-cells">${cells.map(c => `<div class="rear-cell"><div class="rear-cell-k">${h.esc(c[0])}</div><div class="rear-cell-v">${h.esc(c[1])}</div></div>`).join('')}</div>
+      <div class="rear-company">${h.esc(o.company || 'Sonor Ltd  ·  Chester, England  ·  Trusted by homeowners across the North West & Wales')}</div>
+    </div>
+    <div class="rear-foot"><span class="rear-cedia">CEDIA MEMBER</span>${o.projectMeta && o.projectMeta.ref ? `<span class="rear-ref">${h.esc(o.projectMeta.ref)}</span>` : ''}</div>
+  </section>`;
+    return _wrapDoc(body, css, 'Sonor — Contact', { pdfTheme: o.pdfTheme });
+  }
+
   // ---- buildSectionDivider -------------------------------------------------
   // v1.4.0 — divider polish: bigger eyebrow, accent corner ornament,
   // service strip echoed at the bottom, the divider acts as a visual
@@ -1676,7 +1722,7 @@
   if (typeof window !== 'undefined') {
     window.SonorPdfHtmlTemplates = {
       __version: '1.16.1',   // v1.16.x — OVERALL COUNTS head-end estimate / engineered section (B-468)
-      buildCover, buildSectionDivider, buildSchedule, buildPlanPage,
+      buildCover, buildSectionDivider, buildRearPage, buildSchedule, buildPlanPage,
       buildContents, CONTENTS_METRICS,   // v5.146.0 — contents through the HTML pipeline
       buildCablingInfoPage, buildBendRadiusPage, buildOverallCountsPage,
       buildElectricalRequirementsPage,
