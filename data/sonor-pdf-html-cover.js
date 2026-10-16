@@ -398,6 +398,16 @@
   // v5.111.0 — Electrical Requirements page (Bryn: "build the electrical
   // requirements page before bulk cable and design this nicely with specs
   // and info"). Same A3 chrome pipeline as every other page.
+  // v1.10.0 — TRADES REQUIREMENTS — BUILDER (niches / pattresses / blind pockets)
+  async function renderBuilderRequirements(opts) {
+    try {
+      const css = await _loadCss();
+      const html = window.SonorPdfHtmlTemplates.buildBuilderRequirementsPage(opts || {}, css);
+      const result = await _renderHtmlToImage(html, { width: 1190, height: 842, scale: 3 });
+      try { window.__SONOR_HTMLCOVER_LAST_PATH__ = 'rendered-builderreq'; } catch (_) {}
+      return result;
+    } catch (e) { try { window.__SONOR_HTMLCOVER_LAST_ERROR__ = e; } catch (_) {} throw e; }
+  }
   async function renderElectricalRequirements(opts) {
     try {
       const css = await _loadCss();
@@ -466,6 +476,7 @@
       renderCablingInfo, renderBendRadius, renderOverallCounts,
       renderContents,   // v5.146.0
       renderElectricalRequirements,
+      renderBuilderRequirements,
       renderImagePage,
       available, setStylesheetUrl
     };

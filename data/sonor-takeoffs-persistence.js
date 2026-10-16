@@ -515,6 +515,11 @@
       activeLedId:   floor.activeLedId   || 'strip-w',
       backgroundImage: null,
       exportFrame:   floor.exportFrame || null,   // v1.4.0 — PDF export frame passthrough
+      // v1.6.0 (2026-10-16) — floor-level scalars that are NOT buckets and were silently dropped on the cloud round trip:
+      // the lighting circuit → type map (floor.circuitTypes, pairs.js _circuitTypesMapFor) and the mirrored-outline flags
+      circuitTypes:  (floor.circuitTypes && typeof floor.circuitTypes === 'object') ? floor.circuitTypes : {},
+      buildingOutlineOffset: floor.buildingOutlineOffset || null,
+      buildingOutlineOptOut: floor.buildingOutlineOptOut ? true : null,
     };
     for (const k of FLOOR_BUCKETS) {
       content[k] = Array.isArray(floor[k]) ? floor[k] : [];
@@ -584,6 +589,9 @@
       activeLedId:   c.activeLedId   || 'strip-w',
       backgroundImage: (localBgByFloorId && localBgByFloorId[row.floor_id]) || null,
       exportFrame:   c.exportFrame || null,       // v1.4.0 — PDF export frame passthrough
+      circuitTypes:  (c.circuitTypes && typeof c.circuitTypes === 'object') ? c.circuitTypes : {},   // v1.6.0
+      buildingOutlineOffset: c.buildingOutlineOffset || null,
+      buildingOutlineOptOut: c.buildingOutlineOptOut ? true : null,
       version: row.version || 1,
     };
     for (const k of FLOOR_BUCKETS) {

@@ -1091,11 +1091,37 @@
     //
     // Each section heads with the 00.X numbered pill + title in a tinted
     // banner (.info-section-head-row), then its body block underneath.
+    // v1.17.0 (Bryn 16.10.26: "check how the intro plan notes and revisions is generated because it seems to be duplicated in
+    // an odd way") — ONE front page. Revision history + notes, taxonomy, symbol convention, mounting and annotations used to
+    // spread over three mostly-empty A3 sheets (and the legacy 00.4 revision table repeated the revision panel). They now
+    // share a single PROJECT INFORMATION page in a two-column grid; long plan notes still continue on their own pages.
+    const _fs = Object.assign({ tax: true, key: true }, (o.frontSections || {}));
+    const _section_front = `
+      <section class="info-section info-section-fullwidth info-section-taxonomy info-front-merged">
+        ${_exportNotesHtml}
+        ${_fs.tax ? _section00_taxonomy : ''}
+        <div class="info-front-grid">
+          <div class="info-front-col">
+            <section class="rev-history-panel rev-history-panel-full">
+              <header class="panel-head">REVISION HISTORY</header>
+              <div class="rev-history-body">${revisionRowsHtml}</div>
+              ${_revGeneralCommentsHtml}
+            </section>
+            ${_revCloudLegendHtml}
+            ${_fs.key ? _section00_5 : ''}
+          </div>
+          <div class="info-front-col">
+            ${_fs.tax ? _section00_3 : ''}
+            ${_fs.key ? _section00_7 : ''}
+          </div>
+        </div>
+      </section>
+    `;
     const _PAGE_ROWS = [
-      { label: 'REVISION HISTORY',      rows: [_section00_1], full: true },   // v5.145.0 — was PROJECT AT A GLANCE
+      { label: 'PROJECT INFORMATION',   rows: [_section_front], full: true },   // v1.17.0 — merged front page (was REVISION HISTORY + 2 more)
       { label: 'TAXONOMY & CONVENTIONS',rows: [_section00_taxonomy, _section00_3] },
       { label: 'KEY & ANNOTATIONS',     rows: [_section00_5, _section00_7] },
-      { label: 'CABLING STANDARDS',     rows: [_section00_2, _section00_4] },
+      { label: 'CABLING STANDARDS — CABLE ID & TYPES', rows: [_section00_2, _section00_4] },
       { label: 'CABLING STANDARDS — INSTALL & TAILS', rows: [_section00_6, _section00_9] }
     ];
     if (revHistory.length) {
@@ -1108,16 +1134,21 @@
     const innerBody = _page.full
       ? `<div class="info-fullpage">${_page.rows.join('')}</div>`
       : `<div class="info-fullpage info-rowstack">${_page.rows.join('')}</div>`;
-    const sectionTitle = 'INFORMATION & STANDARDS — ' + _page.label;
+    // v1.17.0 — two families, each numbered on its own: PROJECT INFORMATION (front) and CABLING STANDARDS (the pack before the
+    // cable schedule). The old single 'INFORMATION & STANDARDS (x of 6)' ran across both and read as a duplicated section.
+    const _isPack = (_notesContIdx < 0) && pageIndex >= 3;
+    const _fam = _isPack ? 'CABLING STANDARDS' : 'PROJECT INFORMATION';
+    const _sub = String(_page.label).replace(/^(CABLING STANDARDS|PROJECT INFORMATION)( — )?/, '');
+    const sectionTitle = _fam + (_sub && _sub !== _fam ? ' — ' + _sub : '');
     // v5.170.0 — with per-page ticks, skipped pages must not leave holes in
     // the '(x of y)' label: the orchestrator passes the emit ORDINAL.
     const _ord = (typeof o.pageOrdinal === 'number') ? o.pageOrdinal : pageIndex;
-    const pageLabel = `(${_ord + 1} of ${totalInfoPages})`;
+    const pageLabel = (Number(totalInfoPages) > 1) ? `(${_ord + 1} of ${totalInfoPages})` : '';   // v1.17.0 — no '(1 of 1)'
 
     const body = `
   <div class="page page-info" style="--accent: ${accent}">
     ${c.pageHeader(Object.assign({}, o, {
-      sectionTitle: sectionTitle + ' ' + pageLabel
+      sectionTitle: (sectionTitle + ' ' + pageLabel).trim()
     }))}
     <main class="page-body page-body-info">
       ${innerBody}
@@ -1465,7 +1496,7 @@
 
     const body = `
   <div class="page page-elecreq${_compact}" style="--accent: ${accent}">
-    ${c.pageHeader(Object.assign({}, o, { sectionTitle: o.sectionTitle || 'ELECTRICAL REQUIREMENTS' }))}
+    ${c.pageHeader(Object.assign({}, o, { sectionTitle: o.sectionTitle || 'TRADES REQUIREMENTS — ELECTRICAL' }))}
     <main class="page-body page-body-elecreq">
       <div class="page-section-head">
         <div class="page-section-title">
@@ -1520,6 +1551,94 @@
     return _wrapDoc(body, css, 'Sonor — Electrical Requirements', { pdfTheme: o.pdfTheme });
   }
 
+
+  // ---- buildBuilderRequirementsPage (v1.17.0, 2026-10-16) -----------------
+  // TRADES REQUIREMENTS — BY BUILDER (Bryn: "the pdf needs a trades requirements section for listing parts like this"):
+  // TV niches, ply pattresses (TV stud walls + AT screens), blind pockets. Same er-* chrome as the electrical page so the two
+  // trades sheets read as one family. o.builder = window._builderRequirementsData().
+  function buildBuilderRequirementsPage(opts, css) {
+    const o = opts || {};
+    const h = _h(), c = _c();
+    const accent = h.esc(o.accentHex || '#8d6e4b');   // 12 Construction
+    const d = o.builder || {};
+    const niches = Array.isArray(d.niches) ? d.niches : [];
+    const pats = Array.isArray(d.pattresses) ? d.pattresses : [];
+    const pockets = Array.isArray(d.pockets) ? d.pockets : [];
+    const _populated = [niches, pats, pockets].filter(a => a.length).length;
+    const MAX_ROWS = Math.max(6, Math.floor(30 / Math.max(1, _populated)));
+    const _compact = (niches.length + pats.length + pockets.length) > 14 ? ' er-compact' : '';
+    const _rows = (arr, emptyMsg) => {
+      if (!arr.length) return `<tr class="er-empty"><td colspan="5">${h.esc(emptyMsg)}</td></tr>`;
+      let html = arr.slice(0, MAX_ROWS).map(r => `
+      <tr>
+        <td>${h.esc(r.floor || '—')}</td>
+        <td>${h.esc(r.room || '—')}${r.id ? ` <span class="er-dim">· ${h.esc(r.id)}</span>` : ''}</td>
+        <td>${h.esc(r.what || '')}</td>
+        <td class="er-req">${h.esc(r.dims || '')}</td>
+        <td>${h.esc(r.note || '')}</td>
+      </tr>`).join('');
+      if (arr.length > MAX_ROWS) html += `<tr class="er-more"><td colspan="5">+ ${arr.length - MAX_ROWS} more — see the Displays / Shades schedules</td></tr>`;
+      return html;
+    };
+    const chips = [
+      { cap: 'TV niches', val: niches.length }, { cap: 'Ply pattresses', val: pats.length }, { cap: 'Blind pockets', val: pockets.length }
+    ].map(x => `<div class="er-chip"><div class="er-chip-val">${h.esc(String(x.val))}</div><div class="er-chip-cap">${h.esc(x.cap)}</div></div>`).join('');
+    const notes = [
+      'All builder\'s work shown is BY THE MAIN CONTRACTOR / JOINER and must be complete before Sonor second fix. Sizes are the finished opening — confirm the chosen display and bracket with the Sonor engineer before forming any niche.',
+      'TV niches: form with a solid back (18 mm ply) for the bracket fixings; allow a 230 V double socket and the Sonor back-boxes INSIDE the recess, with cable access to the adjacent containment. Equipment recesses need ventilation top and bottom.',
+      'Ply pattresses on stud walls: 18 mm WBP ply let in flush between studs over the full bracket footprint, screwed to studs, before boarding. Full-motion and motorised brackets carry the panel 600 mm+ off the wall — the pattress takes the whole load.',
+      'Blind pockets: minimum 120 × 120 mm clear, square and plumb, full width of the opening plus 25 mm each side; motor side as drawn. Wired systems need the control cable brought into the pocket before plastering.',
+      'Keep every opening clear of 230 V runs except the sockets shown; maintain 300 mm separation from Sonor ELV cabling.'
+    ].map(n => `<li>${h.esc(n)}</li>`).join('');
+    const body = `
+  <div class="page page-elecreq${_compact}" style="--accent: ${accent}">
+    ${c.pageHeader(Object.assign({}, o, { sectionTitle: o.sectionTitle || 'TRADES REQUIREMENTS — BUILDER' }))}
+    <main class="page-body page-body-elecreq">
+      <div class="page-section-head">
+        <div class="page-section-title">
+          <span class="page-section-eyebrow">BY MAIN CONTRACTOR / JOINER</span>
+          <span class="page-section-name">Builder's Work</span>
+          <span class="page-section-accent-line"></span>
+        </div>
+        <div class="er-chips">${chips}</div>
+      </div>
+      <div class="er-grid">
+        <div class="er-col">
+          <section class="er-card">
+            <header class="er-card-head">TV NICHES — FLUSH &amp; EQUIPMENT RECESSES</header>
+            <table class="er-table">
+              <thead><tr><th>Floor</th><th>Room</th><th>Item</th><th>Opening (W × H × D)</th><th>Notes</th></tr></thead>
+              <tbody>${_rows(niches, 'No TV niches on this takeoff.')}</tbody>
+            </table>
+          </section>
+          <section class="er-card">
+            <header class="er-card-head">PLY PATTRESSES — STUD WALLS &amp; SCREENS</header>
+            <table class="er-table">
+              <thead><tr><th>Floor</th><th>Room</th><th>Item</th><th>Requirement</th><th>Notes</th></tr></thead>
+              <tbody>${_rows(pats, 'No pattresses flagged — every display is on a solid wall.')}</tbody>
+            </table>
+          </section>
+        </div>
+        <div class="er-col er-col-side">
+          <section class="er-card">
+            <header class="er-card-head">BLIND POCKETS &amp; RECESSED HEADERS</header>
+            <table class="er-table">
+              <thead><tr><th>Floor</th><th>Room</th><th>Item</th><th>Size</th><th>Notes</th></tr></thead>
+              <tbody>${_rows(pockets, 'No pocketed or recessed blinds on this takeoff.')}</tbody>
+            </table>
+          </section>
+          <section class="er-card er-card-notes">
+            <header class="er-card-head">STANDARDS &amp; COORDINATION</header>
+            <ul class="er-notes">${notes}</ul>
+          </section>
+        </div>
+      </div>
+    </main>
+    ${c.pageFooter(o)}
+  </div>
+    `;
+    return _wrapDoc(body, css, 'Sonor — Trades Requirements (Builder)', { pdfTheme: o.pdfTheme });
+  }
 
   // ---- buildRearPage (v1.16.0, 2026-10-16, §41) --------------------------
   // The REAR CONTACT PAGE every Sonor document ends on (Bryn 2026-10-16: the running footer carries page numbers only — the full
@@ -1729,6 +1848,7 @@
       buildContents, CONTENTS_METRICS,   // v5.146.0 — contents through the HTML pipeline
       buildCablingInfoPage, buildBendRadiusPage, buildOverallCountsPage,
       buildElectricalRequirementsPage,
+      buildBuilderRequirementsPage,
       buildImagePage
     };
   }

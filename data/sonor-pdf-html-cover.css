@@ -3263,3 +3263,12 @@ body {
 .rear-cell-v { font-size: 15px; font-weight: 600; color: #f6f2ea; margin-top: 4px; letter-spacing: 0.02em; }
 .rear-company { margin-top: 34px; font-size: 9.5px; color: #a89c88; letter-spacing: 0.02em; }
 .rear-foot { position: absolute; left: 44px; right: 44px; bottom: 40px; display: flex; justify-content: space-between; font-size: 8px; letter-spacing: 0.18em; color: #a89c88; }
+
+/* v1.17.0 (templates) — merged PROJECT INFORMATION front page: two columns, rows sized to content (never stretched to fill) */
+.info-front-merged { display: flex; flex-direction: column; gap: 14px; }
+.info-front-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
+.info-front-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.info-front-col .info-section-numbered, .info-front-col .rev-history-panel, .info-front-col .rev-cloud-legend { width: 100%; margin: 0; flex: 0 0 auto; }
+.info-front-col .info-section-head-row { padding: 8px 14px; }
+.info-front-merged > .info-section-taxonomy { width: 100%; margin: 0; flex: 0 0 auto; }
+.info-front-col .info-section-body { padding: 10px 14px; }

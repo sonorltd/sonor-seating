@@ -60,7 +60,7 @@
   // header History, boot banner and host cache-bust all disagreeing).
   // Bump THIS on every functional change to the module; the banner and
   // window.SonorPdf.__version derive from it.
-  var SONOR_PDF_VERSION = '2.5.0';
+  var SONOR_PDF_VERSION = '2.6.0';   // v2.6.0 2026-10-16 — merged PROJECT INFORMATION front page, CABLING STANDARDS numbered on its own, TRADES REQUIREMENTS — BUILDER sheet
 
 // ============================================================
 // Boot diagnostic — resolved PDF pipeline
@@ -11217,11 +11217,15 @@ const SonorPdf = (function () {
     // immediately BEFORE the first cable schedule aspect. Tick keys are
     // unchanged so persisted export presets keep working — infoinstall /
     // infotails now gate the two pack pages.
+    // v5.253.0 (Bryn: "the intro plan notes and revisions … seems to be duplicated in an odd way") — ONE merged front page:
+    // revision history + notes + taxonomy + symbol convention + mounting + annotations (html-templates 1.17.0). The taxonomy
+    // / key ticks now switch those sections inside the page instead of adding sheets; the legacy 00.4 revision-table page
+    // (idx 5) is gone — it repeated the revision panel.
     const _INFO_FRONT = [
-      { key: 'inforev',     idx: 0 },   // Revision history & notes
-      { key: 'infotax',     idx: 1 },   // 00.0 Taxonomy + 00.1 Symbol Convention
-      { key: 'infokey',     idx: 2 }    // 00.2 Mounting + 00.3 Annotations
+      { key: 'inforev',     idx: 0 }    // PROJECT INFORMATION (merged)
     ];
+    const _frontSectionsOn = () => ({ tax: _secOn('infotax'), key: _secOn('infokey') });
+    const _builderPagesCount = () => { try { const b = (typeof window !== 'undefined' && typeof window._builderRequirementsData === 'function') ? window._builderRequirementsData() : null; return (b && b.total) ? 1 : 0; } catch (_) { return 0; } };
     const _INFO_PACK = [
       { key: 'infoinstall', idx: 3 },   // 00.5 Cable ID + 00.6 Types & Bend Radii
       { key: 'infotails',   idx: 4 }    // 00.7 Install Notes + 00.8 Tails Protocol
@@ -11247,8 +11251,7 @@ const SonorPdf = (function () {
       // FRONT pages only (the pack emits later, before the Cable Schedule).
       const l = _INFO_FRONT.filter(pg => _secOn(pg.key)).map(pg => pg.idx);
       if (l.indexOf(0) >= 0) { const nC = _pdfNoteChunks().length; const extra = []; for (let k = 1; k < nC; k++) extra.push(100 + k); l.splice(l.indexOf(0) + 1, 0, ...extra); }
-      if (hasRev && _secOn('inforev')) l.push(5);   // 00.4 legacy rev table rides the rev tick
-      return l;
+      return l;   // v5.253.0 — no legacy 00.4 revision-table page (duplicate of the revision panel)
     };
     const _infoPackIdxList = () => _INFO_PACK.filter(pg => _secOn(pg.key)).map(pg => pg.idx);
     // Map an aspect key → ticklist section key. Unknown aspects always emit.
@@ -11401,6 +11404,7 @@ const SonorPdf = (function () {
           // devices-present gate.
           if (p.key === 'electrical') {
             total += ((typeof floors !== 'undefined' && Array.isArray(floors)) ? floors.length : 0) + 1;
+            total += _builderPagesCount();   // v5.253.0 — TRADES REQUIREMENTS — BUILDER sheet (niches / pattresses / pockets)
             return;
           }
           total += _specialPlanFloorSet(p, _all2.symbols).size;   // v5.71.0 — shared helper
@@ -11750,6 +11754,7 @@ const SonorPdf = (function () {
             pageTotal: _planFinalTotal,
             pageIndex,
             pageOrdinal: (typeof pageOrdinal === 'number') ? pageOrdinal : pageIndex,   // v5.170.0 — '(x of y)' with skips
+            frontSections: _frontSectionsOn(),   // v5.253.0 — which sections the merged front page carries
             // v5.152.0 (Bryn: "give the pdf page the same footer as all
             // others") — the REVISION HISTORY page (pageIndex 0) takes the
             // slim strip; the once-per-doc full title block latches onto
@@ -12001,7 +12006,7 @@ const SonorPdf = (function () {
     const _infoEnabledTotal = _infoIdxList.length + _packIdxListResolved.length + (_secOn('infobend') ? 1 : 0);
     if (_incInfo) {
     for (let _p = 0; _p < _infoIdxList.length; _p++) {
-      await _emitCablingPage(_infoIdxList[_p], 2 + contentsPagesAdded + _p, _p, _infoEnabledTotal);   // v5.87.0 — CONTENTS shifts info pages +1
+      await _emitCablingPage(_infoIdxList[_p], 2 + contentsPagesAdded + _p, _p, _infoIdxList.length);   // v5.253.0 — front family numbered on its own
     }
 
     }  // v5.18.0 — end _incInfo (FRONT info block)
@@ -12019,8 +12024,8 @@ const SonorPdf = (function () {
         const _result = await window.SonorPdfHtmlCover.renderBendRadius({
           accentHex: '#e37c59',
           status: meta.status,
-          sectionTitle: 'INFORMATION & STANDARDS — BEND RADIUS REFERENCE',
-          totalInfoPages: TOTAL_INFO_PAGES,
+          sectionTitle: 'CABLING STANDARDS — BEND RADIUS REFERENCE',
+          totalInfoPages: _packIdxListResolved.length + 1,   // v5.253.0 — pack family
           appName: 'TAKEOFFS',
           reference: meta.ref || '',
           projectName: meta.name,
@@ -12072,11 +12077,11 @@ const SonorPdf = (function () {
       _cablePackDone = true;
       let added = 0;
       try {
-        const _frontCount = _infoIdxList.length;
+        const _packTotal = _packIdxListResolved.length + (_secOn('infobend') ? 1 : 0);   // v5.253.0 — pack family numbered on its own
         for (let _q = 0; _q < _packIdxListResolved.length; _q++) {
           if (added === 0) _cablePackPageStart = currentPageNumIn + 1;
           await _emitCablingPage(_packIdxListResolved[_q], currentPageNumIn + added + 1,
-            _frontCount + _q, _infoEnabledTotal);
+            _q, _packTotal);
           added++;
         }
         if (_secOn('infobend')) {
@@ -12306,6 +12311,39 @@ const SonorPdf = (function () {
     //     sweeps never duplicate it.
     // ============================================================
     let _elecBlockDone = false;
+    // v5.253.0 — one BUILDER sheet rides with the electrical block when there is builder's work (0 pages when none)
+    async function _emitBuilderRequirementsPage(pageNum) {
+      const b = (typeof window !== 'undefined' && typeof window._builderRequirementsData === 'function') ? window._builderRequirementsData() : null;
+      if (!b || !b.total) return 0;
+      pdf.addPage();
+      const _pg = (typeof pdf.internal.getCurrentPageInfo === 'function') ? pdf.internal.getCurrentPageInfo().pageNumber : pageNum;
+      if (_pg) _specialPlanPageStarts['builderreq'] = { title: 'Trades Requirements — Builder', page: _pg };
+      let ok = false;
+      try {
+        if (window.SonorPdfHtmlCover && typeof window.SonorPdfHtmlCover.renderBuilderRequirements === 'function' && window.SonorPdfHtmlCover.available()) {
+          const _res = await window.SonorPdfHtmlCover.renderBuilderRequirements({
+            accentHex: (typeof ASPECT_ACCENT !== 'undefined' && ASPECT_ACCENT['svc_12']) || '#8d6e4b',
+            status: meta.status, sectionTitle: 'TRADES REQUIREMENTS — BUILDER', appName: 'TAKEOFFS',
+            reference: meta.ref || '', projectName: meta.name, client: meta.client, address: meta.address,
+            revision: meta.revision, issueDate: meta.dateUk || meta.date, pageNum: _pg, pageTotal: _planFinalTotal,
+            services: _servicesForChrome, builder: b, revAdded: meta.revAdded || 0, revMoved: meta.revMoved || 0, revRemoved: meta.revRemoved || 0, revRfi: meta.revRfi || 0, revNote: meta.revNote || 0
+          });
+          if (_res && _res.dataUrl) {
+            pdf.addImage(_res.dataUrl, 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), 'builderreq-html');
+            ok = true;
+          }
+        }
+      } catch (e) { console.warn('[v5.253.0] builder requirements html failed:', e); }
+      if (!ok) {
+        try {
+          paintHeader(pdf, { title: 'TRADES REQUIREMENTS — BUILDER', subtitle: "Builder's work — niches, pattresses, blind pockets", aspect: 'cabling', meta });
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10.5);
+          let _y = 58;
+          ['TV niches: ' + b.niches.length, 'Ply pattresses: ' + b.pattresses.length, 'Blind pockets: ' + b.pockets.length].forEach(l => { pdf.text(l, 24, _y); _y += 7; });
+        } catch (e) { console.warn('[v5.253.0] builder requirements native fallback failed:', e); }
+      }
+      return 1;
+    }
     async function _emitElectricalRequirementsBlock() {
       if (_elecBlockDone) return 0;
       _elecBlockDone = true;
@@ -12327,7 +12365,7 @@ const SonorPdf = (function () {
         pdf.addPage(); added++;
         const _reqPage = (typeof pdf.internal.getCurrentPageInfo === 'function')
           ? pdf.internal.getCurrentPageInfo().pageNumber : null;
-        if (_reqPage) _specialPlanPageStarts['elecreq'] = { title: 'Electrical Requirements', page: _reqPage };
+        if (_reqPage) _specialPlanPageStarts['elecreq'] = { title: 'Trades Requirements — Electrical', page: _reqPage };
         let _reqOk = false;
         try {
           if (typeof window !== 'undefined' && window.SonorPdfHtmlCover
@@ -12336,7 +12374,7 @@ const SonorPdf = (function () {
             if (typeof setStatus === 'function') setStatus('Rendering Electrical Requirements (HTML/CSS) …');
             const _res = await window.SonorPdfHtmlCover.renderElectricalRequirements({
               accentHex: _accent,
-              status: meta.status, sectionTitle: 'ELECTRICAL REQUIREMENTS', appName: 'TAKEOFFS',
+              status: meta.status, sectionTitle: 'TRADES REQUIREMENTS — ELECTRICAL', appName: 'TAKEOFFS',
               reference: meta.ref || '', projectName: meta.name, client: meta.client,
               address: meta.address, revision: meta.revision, issueDate: meta.dateUk || meta.date,
               pageNum: _reqPage || 0, pageTotal: _planFinalTotal,
@@ -12387,6 +12425,8 @@ const SonorPdf = (function () {
             _lines.forEach(l => { pdf.text(l, 24, _y); _y += 7; });
           } catch (e) { console.warn('[v5.111.0] elec requirements native fallback failed:', e); }
         }
+        // ---- 1b. TRADES REQUIREMENTS — BUILDER (v5.253.0) ----
+        try { added += await _emitBuilderRequirementsPage((_reqPage || 0) + 1); } catch (e) { console.warn('[v5.253.0] builder page emit failed:', e); }
         // ---- 2. ELECTRICAL PLAN — every floor, watermark when empty ----
         if (typeof floors !== 'undefined' && Array.isArray(floors) && floors.length
             && typeof switchFloor === 'function') {
@@ -13376,12 +13416,12 @@ const SonorPdf = (function () {
       // otherwise, so p must NOT advance here).
       if (_incInfo && REF_PAGES_COUNT > 0) {   // v5.170.0 — bookmarks follow the ticked pages
         const refIdx = entries.length;
-        entries.push({ title: 'Information & Standards', page: p });
+        entries.push({ title: 'Project Information', page: p });   // v5.253.0
         if (_cablingSectionPages > 0) {
           // v5.198.0 — one child per FRONT info page (was a single "Project
           // Information" row pointing at page 3 for three pages).
-          const _INFO_TITLES = { 0: 'Revision History', 1: 'Taxonomy & Conventions', 2: 'Key & Annotations', 3: 'Cable ID Format & Types', 4: 'Install Notes & Tails', 5: 'Revision Table' };
-          _infoIdxList.forEach((idx, k) => entries.push({ title: _INFO_TITLES[idx] || ('Information ' + (k + 1)), page: p + k, parentIdx: refIdx }));
+          const _INFO_TITLES = { 0: 'Project Information', 1: 'Taxonomy & Conventions', 2: 'Key & Annotations', 3: 'Cable ID Format & Types', 4: 'Install Notes & Tails', 5: 'Revision Table' };   // v5.253.0 — 0 = merged front page
+          _infoIdxList.forEach((idx, k) => entries.push({ title: _INFO_TITLES[idx] || (idx >= 100 ? 'Plan Notes (continued)' : ('Information ' + (k + 1))), page: p + k, parentIdx: refIdx }));
           p += _cablingSectionPages;
         }
         // v5.185.0 — bend radius rides the CABLING STANDARDS pack now
@@ -13418,6 +13458,8 @@ const SonorPdf = (function () {
         const _spRecs = [];
         const _erq = _specialPlanPageStarts['elecreq'];
         if (_erq) _spRecs.push(_erq);
+        const _brq = _specialPlanPageStarts['builderreq'];   // v5.253.0
+        if (_brq) _spRecs.push(_brq);
         _spOrder.forEach(sp => {
           const rec = _specialPlanPageStarts[sp.key];
           if (rec) _spRecs.push(rec);
