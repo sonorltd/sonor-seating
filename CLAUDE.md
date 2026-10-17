@@ -1,4 +1,4 @@
-# Seating Configurator — Claude Code Context (v0.25.0)
+# Seating Configurator — Claude Code Context (v0.25.1)
 
 > **Active theme: locked custom / slate canvas** — client-facing surface, `data-theme-lock` (sonor-platform §2 exemption); the cross-app ◐ cookie never flips it.
 
