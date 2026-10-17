@@ -900,7 +900,7 @@
           '<tr class="tot"><td colspan="3">Total (inc VAT)</td><td class="r">' + money(Math.round(vb.gross)) + '</td></tr>' +
         '</tbody></table>' +
         finNote +
-        '<div class="actions"><button class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button>' +
+        '<div class="actions"><button hidden data-csv-tool class="btn ghost" onclick="SeatingApp.csv()">⬇ Export CSV</button>' +
           (global.__SEATING_CLIENT__ ? '' : '<button class="btn ghost" onclick="SeatingApp.saveBom()" title="Single-page bill of materials — internal use only">⬇ BOM (internal)</button>') +
           '<button class="btn primary" onclick="SeatingApp.savePdf()">⬇ Download PDF proposal</button></div>' +
         '<div class="disc">Indicative MSRP from the Sonor library, including ' + esc(delLbl.toLowerCase()) + (lt ? ' and a typical ' + esc(lt) + ' lead time' : '') + ' for ' + esc(r.manufacturer) + '. Final pricing, fabric grades, delivery and lead times are confirmed on a formal quotation. VAT at ' + Math.round(vatRate() * 100) + '%. <b style="color:var(--gold2)">' + esc(CFG.paymentTerms || '') + '</b>.</div>' +

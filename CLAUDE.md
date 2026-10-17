@@ -1,6 +1,8 @@
-# Seating Configurator — Claude Code Context (v0.26.0)
+# Seating Configurator — Claude Code Context (v0.26.1)
 
 > **Active theme: locked custom / slate canvas** — client-facing surface, `data-theme-lock` (sonor-platform §2 exemption); the cross-app ◐ cookie never flips it.
+
+> Current version: v0.26.1 — 2026-10-17 sonor-platform §4: the Summary "⬇ Export CSV" button carries `hidden data-csv-tool` (no CSV controls shown; `SeatingApp.csv()` kept).
 
 > **v0.26.0 (2026-10-17) — ★ FINAL → `projects.metadata.seating_spec` + version self-report.** Summary → Saved configurations gains **★ Set as final** (shown only when a project is selected in the bar): saves the configuration (linking it to the project), then publishes a compact summary `{source, app_version, config_id, manufacturer, range, range_id, rows, seats_per_row, seats, upholstery, colour, motor, updated_at}` through `sonor_merge_project_metadata` — never a rebuilt metadata object (Cinema Tools pattern). The dashboard also calls `db.versions.report('seating', APP_VERSION, …)` once after boot (the shell runs `supabase:false`).
 
