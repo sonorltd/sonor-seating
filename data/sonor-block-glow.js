@@ -1,5 +1,5 @@
 /*!
- * sonor-block-glow.js — BLOCK GLOW + INFO CARD (root master, synced to every app's data/) — v1.0.1 · 2026-10-12
+ * sonor-block-glow.js — BLOCK GLOW + INFO CARD (root master, synced to every app's data/) — v1.2.0 · 2026-10-16
  * ----------------------------------------------------------------------------------------------------------------
  * Bryn: "make the takeoffs icons glow and be ref'd to info … without it becoming a ball and chain to manage".
  *
@@ -17,6 +17,13 @@
  *     related(obj)  -> [obj]           // optional — fainter halos
  *     enabled()     -> bool            // optional — false while drawing tools are active
  *   })
+ *   SonorBlockGlow.attachSvg(svgEl, {
+ *     selector: '.cd-el',               // the hoverable element groups inside the svg (default '[data-id]')
+ *     resolve(el)  -> info | null,      // same info shape as attachFabric — built from the element's own data
+ *     related(el)  -> [el],             // optional — fainter halos (a speaker's pair, a zone's strips)
+ *     selected()   -> el | null,        // optional — the app's current selection keeps its halo (no card)
+ *     enabled()    -> bool              // optional — false while a drawing tool is active
+ *   })                                   // v1.2.0 — SVG canvases (Cinema Takeoff / Design). Same painter, same card, same rules.
  *   SonorBlockGlow.paintHalo(ctx, cx, cy, r, colour, {dpr, strength})   // pure painter (other canvases can reuse)
  *   SonorBlockGlow.cardHtml(info)                                        // pure HTML builder
  * Styling uses kit tokens (graphite first, slate fallback). The halo is a canvas effect for plan blocks — it is NOT
@@ -24,7 +31,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.1.0';   // 1.1.0 (2026-10-13, Bryn: "needs to also disappear upon click and drag because it obscures the view") — card hides on mouse-down / drag; selection keeps the halo only; ⌥-click (Alt) pins the card
+  var VERSION = '1.2.0';   // 1.2.0 (2026-10-16, Bryn: "things like the glowing and mouseovers we now have in main takeoffs app, CD and CT has fallen well behind") — attachSvg(): the same halo + card for SVG canvases (Cinema Takeoff, Cinema Design plans)   // 1.1.0 (2026-10-13, Bryn: "needs to also disappear upon click and drag because it obscures the view") — card hides on mouse-down / drag; selection keeps the halo only; ⌥-click (Alt) pins the card
 
   function hexA(hex, a) {
     var h = String(hex || '#f5d05c').replace('#', '');
@@ -182,5 +189,112 @@
     canvas.__sonorBlockGlow = api; return api;
   }
 
-  global.SonorBlockGlow = { VERSION: VERSION, attachFabric: attachFabric, paintHalo: paintHalo, cardHtml: cardHtml, ensureStyles: ensureStyles, hexA: hexA };
+  // ── v1.2.0 — SVG canvases (Cinema Takeoff #drawSvg, Cinema Design plans): same halo painted on an overlay <canvas>
+  //    over the svg's positioned parent, same card, same rules (hover → halo + card · mouse-down hides the card ·
+  //    selection keeps the halo · ⌥-click pins · Esc clears). Screen coords come from getBoundingClientRect, so zoom /
+  //    pan / viewBox changes need no bookkeeping. Nothing is written into the svg (exports stay clean).
+  function attachSvg(svg, opts) {
+    opts = opts || {};
+    if (!svg || svg.__sonorBlockGlow) return svg && svg.__sonorBlockGlow;
+    ensureStyles();
+    var hostEl = svg.parentNode; if (!hostEl) return null;
+    try { if (getComputedStyle(hostEl).position === 'static') hostEl.style.position = 'relative'; } catch (e) {}
+    var ov = document.createElement('canvas'); ov.className = 'sonor-block-glow-layer'; ov.setAttribute('aria-hidden', 'true');
+    ov.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:5;';
+    var card = document.createElement('div'); card.className = 'sbg-card'; card.style.display = 'none';
+    hostEl.appendChild(ov); hostEl.appendChild(card);
+    var ctx = ov.getContext('2d'), hover = null, pinned = null, sel = null, info = null, raf = 0, suppressed = false, pressed = false, downId = null;
+    var selector = opts.selector || '[data-id]';
+    function idOf(o) { return o && o.getAttribute ? (o.getAttribute('data-id') || o.getAttribute('data-spk') || null) : null; }
+    function enabled() { try { return opts.enabled ? !!opts.enabled() : true; } catch (e) { return true; } }
+    function resolve(o) { try { return o ? opts.resolve(o) : null; } catch (e) { console.warn('[block-glow] resolve', e && e.message); return null; } }
+    function related(o) { try { return (o && opts.related) ? (opts.related(o) || []) : []; } catch (e) { return []; } }
+    function selected() { try { return opts.selected ? opts.selected() : null; } catch (e) { return null; } }
+    function alive(o) { return !!(o && o.isConnected && svg.contains(o)); }
+    function screenBox(o) {
+      var r = o.getBoundingClientRect(), h = hostEl.getBoundingClientRect();
+      var box = { left: r.left - h.left + hostEl.scrollLeft, top: r.top - h.top + hostEl.scrollTop, width: r.width, height: r.height };
+      return { cx: box.left + box.width / 2, cy: box.top + box.height / 2, r: Math.max(8, Math.max(box.width, box.height) / 2 + 5), box: box };
+    }
+    function size() {
+      var W = hostEl.clientWidth, H = hostEl.clientHeight, dpr = global.devicePixelRatio || 1;
+      if (ov.width !== Math.round(W * dpr) || ov.height !== Math.round(H * dpr)) { ov.width = Math.round(W * dpr); ov.height = Math.round(H * dpr); ov.style.width = W + 'px'; ov.style.height = H + 'px'; }
+      return { W: W, H: H, dpr: dpr };
+    }
+    function paint() {
+      var s = size(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, ov.width, ov.height);
+      var focus = pinned || hover || sel; if (!focus) return; if (!alive(focus)) { clear(); return; }
+      if (!info) { info = resolve(focus); if (!info) return; }
+      var t = (Date.now() % 1600) / 1600, breathe = 0.82 + 0.18 * Math.sin(t * Math.PI * 2), rel = [];
+      related(focus).forEach(function (o) { if (!alive(o)) return; var rb = screenBox(o); rel.push(rb); paintHalo(ctx, rb.cx * s.dpr, rb.cy * s.dpr, rb.r * s.dpr, info.colour, { dpr: s.dpr, strength: 0.45 }); });
+      var b = screenBox(focus); paintHalo(ctx, b.cx * s.dpr, b.cy * s.dpr, b.r * s.dpr, info.colour, { dpr: s.dpr, strength: breathe });
+      place(b, rel, s);
+    }
+    function place(b, rel, s) {
+      if (card.style.display === 'none') return;
+      var W = s.W, H = s.H, cw = card.offsetWidth || 240, ch = card.offsetHeight || 120, g = 14;
+      try { var hr = hostEl.getBoundingClientRect(), vw = global.innerWidth || W, vh = global.innerHeight || H; W = Math.min(W, vw - hr.left); H = Math.min(H, vh - hr.top - 34); } catch (e) {}
+      var cands = [[b.box.left + b.box.width + g, b.cy - ch / 2], [b.box.left - cw - g, b.cy - ch / 2], [b.cx - cw / 2, b.box.top + b.box.height + g], [b.cx - cw / 2, b.box.top - ch - g]];
+      var best = null, bestScore = 1e9;
+      cands.forEach(function (c, i) {
+        var x = Math.max(6, Math.min(W - cw - 6, c[0])), y = Math.max(6, Math.min(H - ch - 6, c[1]));
+        var cover = (rel || []).concat([b]).filter(function (r) { return r.cx > x - r.r && r.cx < x + cw + r.r && r.cy > y - r.r && r.cy < y + ch + r.r; }).length;
+        var score = cover * 100 + i; if (score < bestScore) { bestScore = score; best = [x, y]; }
+      });
+      card.style.left = Math.round(best[0]) + 'px'; card.style.top = Math.round(best[1]) + 'px';
+    }
+    function loop() { cancelAnimationFrame(raf); if (!(hover || pinned || sel)) return; paint(); raf = requestAnimationFrame(loop); }
+    function show(o, pin) {
+      info = resolve(o); if (!info) { clear(); return; }
+      card.style.setProperty('--sbg-c', info.colour || '#f5d05c');
+      card.innerHTML = cardHtml(info); card.classList.toggle('pinned', !!pin); card.style.display = '';
+      Array.prototype.forEach.call(card.querySelectorAll('[data-sbg-link]'), function (btn) {
+        var l = info.links[+btn.getAttribute('data-sbg-link')];
+        btn.addEventListener('click', function (ev) { ev.stopPropagation(); try { l.onClick && l.onClick(o); } catch (e) { console.warn('[block-glow] link', e && e.message); } });
+      });
+      loop();
+    }
+    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint(); }
+    function target(ev) { var t = ev.target && ev.target.closest ? ev.target.closest(selector) : null; return (t && svg.contains(t)) ? t : null; }
+    svg.addEventListener('pointerover', function (ev) {
+      if (pinned || pressed || !enabled()) return; var o = target(ev); if (!o || o === hover || !resolve(o)) return;
+      // after a click the card stays away from THAT element (and its re-rendered twin) until the pointer moves to another
+      if (suppressed) { if (idOf(o) && idOf(o) === downId) return; suppressed = false; }
+      hover = o; show(o, false);
+    }, true);
+    svg.addEventListener('pointerout', function (ev) {
+      if (pinned) return; var o = target(ev); var to = ev.relatedTarget && ev.relatedTarget.closest ? ev.relatedTarget.closest(selector) : null;
+      if (o && o === hover && to !== o) { hover = null; info = null; card.style.display = 'none'; if (sel) loop(); else paint(); }
+      // suppression lifts only when the pointer truly leaves the svg (pointerleave) — a re-render swapping the node under a
+      // still-pressed / just-clicked pointer must NOT bring the card straight back
+    }, true);
+    svg.addEventListener('pointerdown', function (ev) {
+      var o = target(ev); pressed = true; downId = idOf(o);
+      if (ev.altKey && o && enabled() && resolve(o)) { pinned = o; hover = null; suppressed = false; show(o, true); ev.preventDefault(); return; }
+      if (pinned) pinned = null;
+      suppressed = true; hover = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint();
+    }, true);   // capture — the app's own element handlers may stop propagation (drag engines do)
+    document.addEventListener('pointerup', function () { pressed = false; }, true);
+    document.addEventListener('pointercancel', function () { pressed = false; }, true);
+    // a real leave (no button down — pointer-capture release fires a synthetic leave/enter pair while pressed) clears the hover
+    svg.addEventListener('pointerleave', function (ev) { if (pressed || (ev && ev.buttons)) return; suppressed = false; downId = null; if (!pinned) { hover = null; info = null; card.style.display = 'none'; if (sel) loop(); else paint(); } });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && (pinned || hover)) clear(); });
+    // selection: the app tells us (api.select(el)) or we poll its selected() on refresh
+    var api = {
+      VERSION: VERSION,
+      clear: clear,
+      select: function (el) { if (pinned && el !== pinned) { pinned = null; card.style.display = 'none'; } sel = (el && enabled() && resolve(el)) ? el : null; info = null; loop(); },
+      _state: function () { return { hover: !!hover, pinned: !!pinned, sel: !!sel, suppressed: suppressed, card: card.style.display !== 'none' }; },
+      refresh: function () {   // call after the svg re-renders (elements are rebuilt): re-find hover/sel by data-id
+        var id = function (o) { return o && o.getAttribute ? o.getAttribute('data-id') : null; };
+        var find = function (o) { var i = id(o); if (!i) return null; return svg.querySelector(selector + '[data-id="' + CSS.escape(i) + '"]'); };
+        if (hover && !alive(hover)) hover = find(hover); if (pinned && !alive(pinned)) pinned = find(pinned);
+        var s2 = selected(); if (s2 !== undefined) sel = (s2 && resolve(s2)) ? s2 : null;
+        info = null; var o = pinned || hover; if (o) show(o, !!pinned); else loop();
+      }
+    };
+    svg.__sonorBlockGlow = api; return api;
+  }
+
+  global.SonorBlockGlow = { VERSION: VERSION, attachFabric: attachFabric, attachSvg: attachSvg, paintHalo: paintHalo, cardHtml: cardHtml, ensureStyles: ensureStyles, hexA: hexA };
 })(typeof window !== 'undefined' ? window : this);

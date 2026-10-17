@@ -23,6 +23,7 @@
  * v1.3.1 · 2026-10-02 — QUICK REFRESH: syncProjects(rows, { quick: true }) re-reads every known quote of every row given (stage
  *   changes land — cancelled / accepted / new revision) + the newest 3 list pages for new quotes, skipping the project / customer
  *   look-ups. The Board's plain ⟳ WQ is quick over the open projects; shift-click is the full force sync.
+ * v1.7.2 · 2026-10-17 — a CUST- customer row (made by a service call or Tasks) takes the WeQuote ref when 🔗 linked, like ENQ-/SITE- (§31).
  * v1.3.0 · 2026-10-02 — LINKING: listProjects() (one /project/list_project per run), suggestProjects(row) (postcode · customer · name
  *   matches for a Sonor project with no WQ number yet, e.g. an ENQ- lead once the WQ project exists), linkProject(client, row, wqNo)
  *   (stamps wequote_id, renames an ENQ- / SITE- ref to "<no> - <WQ description>", syncs the row). Board 🔗 and Hub use it.
@@ -45,7 +46,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.7.1';
+  var VERSION = '1.7.2';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -356,7 +357,7 @@
         if (r.value_quoted == null && qs[0].subtotal != null) colPatch.value_quoted = qs[0].subtotal;
         if (qs[0].address) { patch.wequote_address = qs[0].address; if (qs[0].postcode) patch.wequote_postcode = qs[0].postcode; if (!r.address) colPatch.address = qs[0].address; if (!r.postcode && qs[0].postcode) colPatch.postcode = qs[0].postcode; }
       } else if (patch.wequote_modified_at) { patch.wequote_activity_at = patch.wequote_modified_at; }
-      if (/^(SITE-|ENQ\b|ENQ-)/.test(String(r.ref || '')) && r.metadata.wequote_id) colPatch.ref = r.metadata.wequote_id + ' - ' + (patch.wequote_name || r.name || '');   // v1.3.0: ENQ- leads take the WQ ref once linked
+      if (/^(SITE-|ENQ\b|ENQ-|CUST\b|CUST-)/.test(String(r.ref || '')) && r.metadata.wequote_id) colPatch.ref = r.metadata.wequote_id + ' - ' + (patch.wequote_name || r.name || '');   // v1.3.0: ENQ- leads take the WQ ref once linked · v1.7.2: CUST- customer rows (service calls / Tasks) too
       try {
         var fresh = await client.from('projects').select('metadata,updated_at').eq('id', r.id).single();
         var fm = (fresh.data && fresh.data.metadata) || {};
