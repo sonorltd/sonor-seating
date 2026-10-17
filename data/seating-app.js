@@ -142,7 +142,37 @@
       cfg._savedId = q.data.id;
       toast('Saved to ' + proj);
       loadSavedList();
-    } catch (e) { toast('Save failed: ' + (e && e.message)); }
+      return true;
+    } catch (e) { toast('Save failed: ' + (e && e.message)); return false; }
+  }
+  // ── v0.26.0 · ★ FINAL → projects.metadata.seating_spec (Cinema Tools pattern) ──
+  // Saves the current configuration, then publishes a compact summary to the
+  // linked project through the merge RPC (never a rebuilt metadata object).
+  // Only when the configuration is linked to a project (project bar selection).
+  function seatingSpec() {
+    var r = E.range(cfg.rangeId) || {};
+    var mat = (r.materials || []).find(function (m) { return m.id === cfg.material; });
+    var rows = Number(cfg.layout.rows) || 0, per = Number(cfg.layout.seatsPerRow) || 0;
+    return {
+      source: 'seating', app_version: CFG.version, config_id: cfg._savedId || null,
+      manufacturer: r.manufacturer || null, range: r.name || null, range_id: cfg.rangeId || null,
+      rows: rows, seats_per_row: per, seats: rows * per,
+      upholstery: cfg.material === '_com' ? 'COM' : (mat ? mat.name : null),
+      colour: cfg.colour || null, motor: cfg.motor || null,
+      updated_at: new Date().toISOString()
+    };
+  }
+  async function setFinal() {
+    if (global.__SEATING_CLIENT__) return;
+    var c = dbc(); if (!c) return toast('Offline — connect to publish');
+    if (!cfg.projectId) return toast('Select a project in the bar above first — the final seating is published to that project');
+    if (!E.range(cfg.rangeId)) return toast('Choose a range first');
+    if (!(await saveConfig()) || !cfg._savedId) return;   // save links the row to cfg.projectId
+    try {
+      var q = await c.rpc('sonor_merge_project_metadata', { p_project_id: cfg.projectId, p_patch: { seating_spec: seatingSpec() } });
+      if (q && q.error) throw q.error;
+      toast('★ Final seating published to the project');
+    } catch (e) { toast('Publish failed: ' + (e && e.message || e)); }
   }
   async function loadSavedList() {
     if (global.__SEATING_CLIENT__) return;
@@ -831,7 +861,8 @@
           '<div class="cfld-hint">Shown on the proposal cover.</div>' +
         '</div>' +
         (global.__SEATING_CLIENT__ ? '' : '<div class="panel saved-panel"><div class="ptt">Saved configurations <span class="opt-tag">per project</span>' +
-          '<button class="ghost sm" style="float:right" onclick="SeatingApp.saveConfig()">' + (cfg._savedId ? 'Update save' : 'Save this configuration') + '</button></div>' +
+          '<button class="ghost sm" style="float:right" onclick="SeatingApp.saveConfig()">' + (cfg._savedId ? 'Update save' : 'Save this configuration') + '</button>' +
+          (cfg.projectId ? '<button class="ghost sm" style="float:right;margin-right:6px" onclick="SeatingApp.setFinal()" title="Save, then publish this as the project\'s final seating (projects.metadata.seating_spec)">★ Set as final</button>' : '') + '</div>' +
           '<div id="savedList"><div class="hint">Enter a project name above, then save — configurations can be reopened later or linked from the Cinema Designer.</div></div>' +
         '</div>') +
         '<div class="strip">' +
@@ -1326,6 +1357,6 @@
     toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, saveBom: saveBom, toggleFinish: toggleFinish, setClient: setClient,
     rowSet: rowSet, rowsReset: rowsReset,
     setConfig: setConfig, setConfigShape: setConfigShape, setConfigSeats: setConfigSeats, configResetPick: configResetPick,
-    saveConfig: saveConfig, openSaved: openSaved, copySavedLink: copySavedLink, renameSaved: renameSaved, deleteSaved: deleteSaved
+    saveConfig: saveConfig, setFinal: setFinal, openSaved: openSaved, copySavedLink: copySavedLink, renameSaved: renameSaved, deleteSaved: deleteSaved
   };
 })(typeof window !== 'undefined' ? window : this);
