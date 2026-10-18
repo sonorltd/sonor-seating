@@ -1,5 +1,6 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.7.4 · 2026-10-17 — the wq-proxy fallback sends the project (anon) key (apikey + Bearer) so wq-proxy can be key-gated (EDGE_KEY_ENFORCE).
  * v1.7.3 · 2026-10-17 — MERGE-ONLY (projects.metadata law): every metadata write goes through the sonor_merge_project_metadata RPC
  *   (server-side `metadata || patch`), so a key another app wrote between our read and our write can no longer be dropped. The
  *   old read-then-replace only runs if the RPC call itself fails. Column patches (ref / client_* / address / value_quoted) are a
@@ -50,7 +51,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.7.3';
+  var VERSION = '1.7.4';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -67,7 +68,12 @@
     var cfg = await getConfig(client); if (!cfg) return null;
     try {
       var url; var headers = { 'Accept': 'application/json', 'X-Sonor-Source': 'wq-sync' };   // v1.7.1 — named for the per-source burst guard
-      if (cfg.proxy_enabled && cfg.proxy_url) { url = new URL(cfg.proxy_url); url.searchParams.set('endpoint', path); }
+      if (cfg.proxy_enabled && cfg.proxy_url) {
+        url = new URL(cfg.proxy_url); url.searchParams.set('endpoint', path);
+        // 2026-10-17 — send the project (anon) key the client already holds (apikey + Bearer, as send-email) so wq-proxy can be locked
+        var k = ''; try { k = client.supabaseKey || (client.rest && client.rest.headers && client.rest.headers.apikey) || global.SONOR_SUPABASE_ANON || (global.__SONOR_BRAND__ && global.__SONOR_BRAND__.supabase && global.__SONOR_BRAND__.supabase.anonKey) || ''; } catch (_) {}
+        if (k) { headers['apikey'] = k; headers['Authorization'] = 'Bearer ' + k; }
+      }
       else { url = new URL((cfg.api_base || 'https://app.wequote.cloud/external').replace(/\/$/, '') + path); headers['Api-Key'] = cfg.api_key; }
       Object.entries(params || {}).forEach(function (kv) { url.searchParams.set(kv[0], kv[1]); });
       var r = await fetch(url.toString(), { headers });
