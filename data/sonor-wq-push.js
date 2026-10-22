@@ -21,7 +21,11 @@
 */
 (function (global) {
   'use strict';
+<<<<<<< HEAD
   var VERSION = '1.1.0';
+=======
+  var VERSION = '1.2.0';   // 1.2.0 (2026-10-17) — addContact(): a person onto a WeQuote customer through wq-push 1.5.0 add_contact
+>>>>>>> a30db23 (Takeover v0.2.0: WQ area order, optional = active 0, prices as quotation reference, area totals via wq-proxy v5; sonor-wq-client 1.4.0 synced)
   var KEY = 'sonor-wq-push-token';
   function _token(force) {
     var t = ''; try { t = localStorage.getItem(KEY) || ''; } catch (_) {}
@@ -77,5 +81,15 @@
     status((opts.dry ? 'Dry run' : 'Pushed') + ' — quote #' + ((plan.quote && plan.quote.no) || (out && out.result && out.result.quote_no) || quoteId) + ': ' + (st.lines || 0) + ' lines, ' + (st.structures_created || 0) + ' structures, ' + (st.delta_skipped || 0) + ' already there · ' + Math.round((Date.now() - t0) / 1000) + 's');
     return out;
   }
-  global.SonorWqPush = { VERSION: VERSION, push: push, setToken: function () { return _token(true); }, hasToken: function () { try { return !!localStorage.getItem(KEY); } catch (_) { return false; } } };
+  // 1.2.0 — add a person to a WeQuote customer (WeQuote = the client CRM). wq-push looks first (find_contact) so it never duplicates.
+  async function addContact(contact, opts) {
+    opts = opts || {}; var supa = opts.supa; if (!supa) throw new Error('supa client required');
+    var url = await _pushUrl(supa); if (!url) return { ok: false, error: 'no wq-push URL' };
+    var tok = _token(false); if (!tok) return { ok: false, error: 'no push token' };
+    var res = await fetch(url, { method: 'POST', headers: Object.assign(_anonHeaders(supa), { 'Content-Type': 'application/json', 'X-Sonor-Push-Token': tok }), body: JSON.stringify({ add_contact: contact, dry: !!opts.dry }) });
+    if (res.status === 401) { try { localStorage.removeItem(KEY); } catch (_) {} return { ok: false, error: 'push token rejected' }; }
+    var j = null; try { j = await res.json(); } catch (_) {}
+    return j || { ok: false, error: 'HTTP ' + res.status };
+  }
+  global.SonorWqPush = { VERSION: VERSION, push: push, addContact: addContact, setToken: function () { return _token(true); }, hasToken: function () { try { return !!localStorage.getItem(KEY); } catch (_) { return false; } } };
 })(window);

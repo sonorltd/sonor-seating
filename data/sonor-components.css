@@ -890,6 +890,17 @@ button > .s-icon:first-child, .btn > .s-icon:first-child, a > .s-icon:first-chil
 .s-pill-solid[data-deep] { color: #fff; }
 .s-pill-status[data-tone="ok"]   { --c: #22C55E; } .s-pill-status[data-tone="warn"] { --c: #E8892B; }
 .s-pill-status[data-tone="bad"]  { --c: #DC2626; } .s-pill-status[data-tone="info"] { --c: #4bb9d3; } .s-pill-status[data-tone="dim"] { --c: #98989D; }
+
+/* ── WEQUOTE-LINKED MARK (2026-10-17 — Bryn: "a small wq in their swatch of almost red … a pill bubble against items that are wq linked").
+     ONE mark everywhere something is linked to WeQuote (project, quote, product, customer contact, tick-list line):
+     <span class="wq-pill" title="WeQuote quote #2791">WQ</span>   ·   <a class="wq-pill" href="…" target="_blank">WQ</a>
+     .wq-off = could be linked but is not yet (outline). WeQuote brand red is a THIRD-PARTY mark, not a Sonor token; white on it = 3.35:1.
+     JS helper: SonorWQClient.pill({ title, href, off }). ── */
+:root { --wq: #ff4655; }
+.wq-pill { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 20px; height: 14px; padding: 0 5px; border-radius: 999px; background: var(--wq); border: 1px solid var(--wq); color: #fff; font: 700 9px/12px 'DM Sans', system-ui, sans-serif; letter-spacing: .06em; vertical-align: middle; text-decoration: none; white-space: nowrap; cursor: default; }
+a.wq-pill { cursor: pointer; } a.wq-pill:hover { filter: brightness(1.08); box-shadow: 0 0 8px color-mix(in srgb, var(--wq) 50%, transparent); }
+.wq-pill.wq-off { background: transparent; color: var(--wq); border-color: color-mix(in srgb, var(--wq) 55%, transparent); }
+@media print { .wq-pill { background: none; color: #ff4655; } }
 .s-pill .s-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
 
 /* ── PAPER (sonor-platform §11, 2026-09-29): a DOCUMENT preview — pack page, PDF cover, print sheet — is a sheet of paper in

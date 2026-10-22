@@ -1,5 +1,15 @@
 /**
  * sonor-board-log.js — CANONICAL MASTER (sonor-platform §22 — the client-interaction contract)
+ * v1.3.0 · 2026-10-17 — ONE contact model across the apps (Bryn: "everything should be 2 way, ssot somewhere, no islands … in
+ *   harmony with wq and the crm there"): way out_third (↗ we contacted a third party — booking emails, chasers), entries may
+ *   carry contact_id (public.contacts — providers / subcontractors / trade) or wq_contact_id (WeQuote customer contact — clients);
+ *   logThird(client, projectId, opts) = logContact with party 'third'. The PEOPLE live in one place each (clients → WeQuote
+ *   customer + contacts; everyone else → public.contacts); this log is where every CONVERSATION lands.
+ * v1.2.0 · 2026-10-17 — contacts carry a DIRECTION + PARTY (Bryn: "a boards category for incoming from 3rd parties as well as
+ *   client contact outgoing"): contacts[] entries gain dir ('out' we contacted · 'in' they contacted us), party ('client' |
+ *   'third' — a provider / subcontractor / supplier) and who (free text, e.g. "Beth · Moore Secure Ltd"). Only CLIENT contacts
+ *   move contact_on / contact_kind / contact_note (the "last client interaction" every reader uses); a third-party contact lands
+ *   in history and in third_on / third_who / third_note instead. History keeps the last 20. CONTACT_WAYS + wayOf(entry) + thirdOf(p).
  * v1.1.1 · 2026-10-02 — actions carry a `kind` (call · email · quote · chase · visit · service · install · order · invoice · other)
  * v1.1.0 · 2026-10-02 — NEXT ACTIONS are a list: board.actions = [{ id, text, by, set_at, done_on, done_via, done_note }] (last 30);
  *   board.next / board.by always MIRROR the first open action so every reader of `next` keeps working. addAction · doneAction ·
@@ -15,7 +25,8 @@
  *     actions: [{ id, text, kind, by, set_at, done_on, done_via, done_note }],  — the list (open first), last 30 kept
  *     enquiry_on,                                    — enquiry date override (v1.6)
  *     contact_on, contact_kind, contact_note,        — LAST client interaction (v1.6)
- *     contacts: [{ on, kind, note, source }],        — history, last 12
+ *     contacts: [{ on, kind, note, source, dir, party, who, contact_id, wq_contact_id }], — history, last 20 (v1.2 dir/party/who · v1.3 ids)
+ *     third_on, third_who, third_note,              — LAST third-party contact (v1.2) — never counts as client contact
  *     saved_at, touched_before                       — so Board writes don't count as a human "touch"
  *   (projects.metadata.wequote_synced_at + wequote_touched_before do the same for WeQuote sync writes — v1.0.1)
  *   }
@@ -34,14 +45,25 @@
  *   SonorBoardLog.enquiryOf(project, enquiries?)       → { on, src }
  *   SonorBoardLog.touchedAt(project)                   → ISO of the last HUMAN touch (ignores Board writes)
  *   await SonorBoardLog.save(client, projectId, patch, project?)          — generic board patch (keeps the rest)
- *   await SonorBoardLog.logContact(client, projectId, { kind, on?, note?, source }, project?)
+ *   await SonorBoardLog.logContact(client, projectId, { kind, on?, note?, source, dir?, party?, who? }, project?)
+ *   SonorBoardLog.CONTACT_WAYS                         { out_client, in_client, in_third } → { dir, party, icon, label }
+ *   SonorBoardLog.wayOf(entry)                         → one of CONTACT_WAYS (old entries = out_client)
+ *   SonorBoardLog.thirdOf(project)                     → { on, who, note } | null
  *   await SonorBoardLog.setEnquiryDate(client, projectId, iso|null, project?)
  *   await SonorBoardLog.findProjectId(client, { id?, ref?, wqNo?, email?, phone? })   → uuid | null
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.1.1';
+  var VERSION = '1.3.0';
   var CONTACT_KINDS = { call: '📞', email: '✉️', whatsapp: '💬', site: '🏠', meeting: '🤝' };
+  // v1.2.0 — who started the conversation and who it was with
+  var CONTACT_WAYS = {
+    out_client: { dir: 'out', party: 'client', icon: '↗', label: 'We contacted the client' },
+    in_client:  { dir: 'in',  party: 'client', icon: '↘', label: 'Client got in touch' },
+    in_third:   { dir: 'in',  party: 'third',  icon: '⇲', label: 'Third party got in touch' },
+    out_third:  { dir: 'out', party: 'third',  icon: '⇱', label: 'We contacted a third party' }   // v1.3.0
+  };
+  function wayOf(h) { h = h || {}; var party = h.party === 'third' ? 'third' : 'client'; if (party === 'third') return h.dir === 'out' ? CONTACT_WAYS.out_third : CONTACT_WAYS.in_third; return h.dir === 'in' ? CONTACT_WAYS.in_client : CONTACT_WAYS.out_client; }
   var DONE = ['accepted', 'won', 'approved', 'complete', 'declined', 'lost', 'expired', 'cancelled'];   // WeQuote stage vocabulary + older mirror names
 
   function isoDay(v) { if (!v) return null; var d = new Date(v); return isNaN(d) ? null : d.toISOString().slice(0, 10); }
@@ -113,19 +135,26 @@
     var p = project && project.id === projectId ? project : await fetchProject(client, projectId);
     if (!p) throw new Error('project not found: ' + projectId);
     var cur = boardOf(p); var hist = Array.isArray(cur.contacts) ? cur.contacts : [];
-    var entry = { on: on, kind: kind, note: note, source: opts.source || null };
+    var party = opts.party === 'third' ? 'third' : 'client';
+    var dir = (opts.dir === 'in' || opts.dir === 'out') ? opts.dir : (party === 'third' ? 'in' : 'out');   // v1.3.0 — an explicit dir always wins
+    var who = opts.who ? String(opts.who).slice(0, 80) : null;
+    var entry = { on: on, kind: kind, note: note, source: opts.source || null, dir: dir, party: party, who: who, contact_id: opts.contact_id || null, wq_contact_id: opts.wq_contact_id || null };
+    Object.keys(entry).forEach(function (k) { if (entry[k] == null) delete entry[k]; });
     // de-dupe: same day + kind + source → don't stack (Follow-Up Portal can fire twice)
-    if (hist.some(function (h) { return h.on === on && h.kind === kind && (h.source || null) === (opts.source || null) && (h.note || null) === note; })) return cur;
-    var contacts = hist.concat([entry]).slice(-12);
+    if (hist.some(function (h) { return h.on === on && h.kind === kind && (h.source || null) === (opts.source || null) && (h.note || null) === note && (h.party || 'client') === party; })) return cur;
+    var contacts = hist.concat([entry]).slice(-20);
     var patch = { contacts: contacts };
     if (opts.done_action) {   // v1.1.0 — the contact WAS the next action: tick it off in the same write
       var list = actionsOf(p).map(function (x) { return x.id === opts.done_action ? Object.assign({}, x, { id: x.id === 'legacy' ? newId() : x.id, done_on: on, done_via: 'contact:' + kind, done_note: note }) : (x.id === 'legacy' ? Object.assign({}, x, { id: newId() }) : x); });
       Object.assign(patch, mirror(list));
     }
-    if (!cur.contact_on || on >= isoDay(cur.contact_on)) { patch.contact_on = on; patch.contact_kind = kind; patch.contact_note = note; }
+    if (party === 'third') { if (!cur.third_on || on >= isoDay(cur.third_on)) { patch.third_on = on; patch.third_who = who; patch.third_note = note; } }
+    else if (!cur.contact_on || on >= isoDay(cur.contact_on)) { patch.contact_on = on; patch.contact_kind = kind; patch.contact_note = note; }
     return save(client, projectId, patch, p);
   }
   // ── v1.1.0 next actions ──
+  function logThird(client, projectId, opts, project) { return logContact(client, projectId, Object.assign({}, opts || {}, { party: 'third' }), project); }   // v1.3.0
+  function thirdOf(p) { var b = boardOf(p); return b.third_on ? { on: isoDay(b.third_on), who: b.third_who || '', note: b.third_note || '' } : null; }
   function actionsOf(p) { var b = boardOf(p); var a = Array.isArray(b.actions) ? b.actions : []; if (!a.length && b.next) a = [{ id: 'legacy', text: b.next, by: b.by || null, set_at: b.set_at || null }]; return a; }
   function openActions(p) { return actionsOf(p).filter(function (a) { return !a.done_on; }).sort(function (x, y) { return String(x.by || '9999') < String(y.by || '9999') ? -1 : 1; }); }
   function mirror(actions) { var open = actions.filter(function (a) { return !a.done_on; }).sort(function (x, y) { return String(x.by || '9999') < String(y.by || '9999') ? -1 : 1; }); var f = open[0]; return { actions: actions.slice(-30), next: f ? f.text : null, by: f ? (f.by || null) : null, set_at: f ? (f.set_at || null) : null }; }
@@ -169,5 +198,5 @@
     return null;
   }
 
-  global.SonorBoardLog = { VERSION: VERSION, actionsOf: actionsOf, openActions: openActions, addAction: addAction, editAction: editAction, doneAction: doneAction, removeAction: removeAction, CONTACT_KINDS: CONTACT_KINDS, boardOf: boardOf, contactOf: contactOf, enquiryOf: enquiryOf, touchedAt: touchedAt, lastSent: lastSent, isoDay: isoDay, save: save, logContact: logContact, setEnquiryDate: setEnquiryDate, findProjectId: findProjectId };
+  global.SonorBoardLog = { VERSION: VERSION, actionsOf: actionsOf, openActions: openActions, addAction: addAction, editAction: editAction, doneAction: doneAction, removeAction: removeAction, CONTACT_KINDS: CONTACT_KINDS, CONTACT_WAYS: CONTACT_WAYS, wayOf: wayOf, thirdOf: thirdOf, logThird: logThird, boardOf: boardOf, contactOf: contactOf, enquiryOf: enquiryOf, touchedAt: touchedAt, lastSent: lastSent, isoDay: isoDay, save: save, logContact: logContact, setEnquiryDate: setEnquiryDate, findProjectId: findProjectId };
 })(typeof window !== 'undefined' ? window : this);
