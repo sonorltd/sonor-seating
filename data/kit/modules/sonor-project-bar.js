@@ -28,6 +28,15 @@
 //
 // Namespace: window.SonorProjectBar
 //
+// Version: 1.14.0 — three ADDITIVE init hooks (2026-10-17, so Takeoffs + Takeover can drop their own pickers):
+//                  `decorateOption(p)` → string suffix or {prefix, suffix, title} per picker option (also applied
+//                  after SonorProjectList builds the grouped options); `beforeChange(newId, prevId)` → return false
+//                  or Promise<false> to veto a switch from the picker (selection restored, no bus / LS write — for
+//                  unsaved-changes guards; a third arg { fromOtherTab } is true when another tab of the same app
+//                  switched, and false there means "don't follow"); `showNew: false` hides the bar's + New (apps with their own New modal).
+//                  Apps that pass none of them behave exactly as 1.13.0.
+// Version: 1.13.0 — picker re-fetches on open (2026-10-16): opening the dropdown reloads the list when it is older than
+//                  20 s, so ⏱ Recently edited stays accurate after another app / session saves. Bryn: "the recents isnt accurate".
 // Version: 1.12.0 — OFFLINE project list (2026-10-13): the loaded list is mirrored to localStorage `sonor_projects_cache`
 //                  (slim rows, ~1 KB each) and used when Supabase can't be reached, so a field app refreshed with no
 //                  signal still has its picker / finder / project name. Bryn: "will all this work offline on the ipad".
@@ -146,6 +155,9 @@
   let _onChange = null;
   let _readOnly = false;   // v1.3.0 — host mode: label instead of picker
   let _appKey = null;      // v1.4.0 — per-app project memory (scoped LS key)
+  let _decorate = null;    // v1.14.0 — decorateOption(p) hook
+  let _beforeChange = null;// v1.14.0 — beforeChange(newId, prevId) veto hook
+  let _showNew = true;     // v1.14.0 — showNew:false hides + New
 
   // v1.4.0 — which LS key this bar instance persists/restores from.
   // readOnly (embedded) bars use the GLOBAL key — the host stamps it.
@@ -277,6 +289,26 @@
     document.head.appendChild(style);
   }
 
+  // v1.14.0 — apply the app's decorateOption hook to every option of the picker (walks by value, so it works for the
+  // flat list AND the SonorProjectList grouped build, including the ⏱ Recently-edited duplicates).
+  function _decorateOptions(sel) {
+    if (!sel || typeof _decorate !== 'function') return;
+    const byId = {};
+    _projects.forEach(p => { if (p && p.id) byId[p.id] = p; });
+    Array.prototype.forEach.call(sel.options, o => {
+      const p = o.value && byId[o.value];
+      if (!p) return;
+      let d;
+      try { d = _decorate(p); } catch (e) { return; }
+      if (d == null || d === '') return;
+      if (typeof d === 'string') { o.textContent = o.textContent + d; return; }
+      if (typeof d === 'object') {
+        o.textContent = (d.prefix || '') + o.textContent + (d.suffix || '');
+        if (d.title) o.title = d.title;
+      }
+    });
+  }
+
   // ---- Render the bar into _hostEl ----
   function _render() {
     if (!_hostEl) return;
@@ -325,7 +357,7 @@
         ` : '<span class="note">No project selected — pick one above to load it into this app.</span>'}
         <span class="actions">
           <button id="sonorProjectRefresh" title="Re-fetch projects from Supabase">↻</button>
-          <button id="sonorProjectNew" class="primary" title="Create a new project">+ New</button>
+          ${_showNew ? '<button id="sonorProjectNew" class="primary" title="Create a new project">+ New</button>' : ''}
         </span>
       </div>
     `;
@@ -348,11 +380,34 @@
         console.warn('[ProjectBar] SonorProjectList delegate failed — flat list kept:', e && e.message);
       }
     }
+    _decorateOptions(sel);   // v1.14.0
     if (sel) {
       sel.addEventListener('change', e => {
         const newId = e.target.value || null;
+        // v1.14.0 — beforeChange veto (unsaved-changes guards). false / Promise<false> = stay where we are.
+        if (typeof _beforeChange === 'function' && newId !== _activeId) {
+          const prevId = _activeId;
+          const restore = () => { try { sel.value = prevId || ''; } catch (_) {} };
+          let r;
+          try { r = _beforeChange(newId, prevId, { fromOtherTab: false }); } catch (err) { console.warn('[ProjectBar] beforeChange threw:', err); r = true; }
+          if (r && typeof r.then === 'function') {
+            restore();   // hold the old selection while the app decides
+            r.then(ok => { if (ok === false) { restore(); return; } if (_activeId === prevId) _setActiveProject(newId); },
+                   err => { console.warn('[ProjectBar] beforeChange rejected:', err); restore(); });
+            return;
+          }
+          if (r === false) { restore(); return; }
+        }
         _setActiveProject(newId);
       });
+      // v1.13.0 (Bryn 16.10.26: "the recents isnt accurate") — the list was fetched ONCE at boot, so a project saved by
+      // another app / session after that (or created while the tab sat open) never moved into ⏱ Recently edited. Opening
+      // the picker re-fetches when the list is older than 20 s; the native dropdown keeps the stale options until the
+      // live list lands (a blink later), and the active selection is kept.
+      const _refreshIfStale = () => { if (Date.now() - _loadedAt > 20000 && !_loading) loadProjects(); };
+      sel.addEventListener('mousedown', _refreshIfStale);
+      sel.addEventListener('focus', _refreshIfStale);
+      sel.addEventListener('keydown', e => { if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') _refreshIfStale(); });
     }
     const refreshBtn = document.getElementById('sonorProjectRefresh');
     if (refreshBtn) refreshBtn.addEventListener('click', () => loadProjects());
@@ -415,16 +470,27 @@
         if (e.key !== _lsKeyFor()) return;
         const newId = e.newValue || null;
         if (newId === _activeId) return;
-        _activeId = newId;
-        _render();
-        const project = _projects.find(p => p && p.id === newId) || null;
-        const detail = { previousId: null, currentId: newId, project, fromOtherTab: true, via: 'storage-event' };
-        document.dispatchEvent(new CustomEvent('sonor:project-changed', { detail }));
-        if (typeof _onChange === 'function') {
-          try { _onChange(detail); } catch (e2) { /* ignore */ }
+        // v1.14.0 — the app may decline to follow another of its own tabs (third arg { fromOtherTab: true }); a declined
+        // follow changes nothing here and writes nothing (no tab ping-pong). Promise answers are honoured the same way.
+        if (typeof _beforeChange === 'function') {
+          let r;
+          try { r = _beforeChange(newId, _activeId, { fromOtherTab: true }); } catch (err) { r = true; }
+          if (r === false) return;
+          if (r && typeof r.then === 'function') { r.then(ok => { if (ok !== false && _activeId !== newId) _followOtherTab(newId); }, () => {}); return; }
         }
+        _followOtherTab(newId);
       });
       return;
+    }
+    function _followOtherTab(newId) {   // hoisted — used by the per-app storage listener above
+      _activeId = newId;
+      _render();
+      const project = _projects.find(p => p && p.id === newId) || null;
+      const detail = { previousId: null, currentId: newId, project, fromOtherTab: true, via: 'storage-event' };
+      document.dispatchEvent(new CustomEvent('sonor:project-changed', { detail }));
+      if (typeof _onChange === 'function') {
+        try { _onChange(detail); } catch (e2) { /* ignore */ }
+      }
     }
     if (bus && typeof bus.subscribe === 'function') {
       bus.subscribe((detail) => {
@@ -465,8 +531,10 @@
   }
 
   // ---- Project list loader ----
+  let _loadedAt = 0, _loading = false;   // v1.13.0
   async function loadProjects() {
     if (!_supa) return [];
+    _loading = true;
     if (!_projects.length) { const seed = _cacheRead(); if (seed.length) { _projects = seed; _render(); } }   // v1.12.0 instant picker from the device cache; the live list replaces it when it lands
     try {
       const { data, error } = await _supa
@@ -475,10 +543,12 @@
         .order('updated_at', { ascending: false });
       if (error) throw error;
       _projects = Array.isArray(data) ? data : [];
+      _loadedAt = Date.now(); _loading = false;
       _cacheWrite(_projects);
       _render();
       return _projects;
     } catch (e) {
+      _loading = false;
       console.warn('[ProjectBar] loadProjects failed:', e && e.message);
       // v1.12.0 OFFLINE — no signal on site (or a refresh with none): fall back to the last list this device saw, so the
       // picker, the finder and the project name still work and the field apps carry on from their own caches.
@@ -618,6 +688,9 @@
     _readOnly = !!(opts && opts.readOnly);   // v1.3.0 — host mode
     _appKey = (opts && opts.appKey) || null; // v1.4.0 — per-app memory
     _hostEl = (opts && opts.host) || null;
+    _decorate = (opts && typeof opts.decorateOption === 'function') ? opts.decorateOption : null;      // v1.14.0
+    _beforeChange = (opts && typeof opts.beforeChange === 'function') ? opts.beforeChange : null;      // v1.14.0
+    _showNew = !(opts && opts.showNew === false);                                                      // v1.14.0
     if (!_hostEl) {
       // Auto-create at top of body
       _hostEl = document.createElement('div');
@@ -661,12 +734,14 @@
   function getProjects() { return _projects.slice(); }
   function setActive(id) { _setActiveProject(id); }
   function refresh() { return loadProjects(); }
+  // v1.14.0 — re-render the picker (e.g. after the app's decorateOption answer changed) without a network fetch
+  function rerender() { _render(); }
 
   // ---- Export ----
   const api = {
     init, refresh, loadProjects,
-    getActiveId, getProject, getProjects, setActive,
-    __version: '1.12.0',
+    getActiveId, getProject, getProjects, setActive, rerender,
+    __version: '1.14.0',
     __ls_key: LS_KEY
   };
   if (typeof window !== 'undefined') window.SonorProjectBar = api;

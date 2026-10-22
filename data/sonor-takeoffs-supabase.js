@@ -101,6 +101,13 @@
   async function saveProjectViewDefaults(projectId, defaults) {
     if (!ready() || !projectId) return { ok: false, reason: 'not-wired' };
     try {
+      // 2026-10-17 — merge-only law: atomic server-side merge via the RPC; read-merge-write only if the RPC call fails.
+      try {
+        const { error: rpcErr } = await _client.rpc('sonor_merge_project_metadata', {
+          p_project_id: projectId, p_patch: { viewing_defaults: defaults }
+        });
+        if (!rpcErr) return { ok: true };
+      } catch (_) {}
       const { data: cur } = await _client.from('projects')
         .select('metadata').eq('id', projectId).single();
       const meta = (cur && cur.metadata && typeof cur.metadata === 'object') ? cur.metadata : {};

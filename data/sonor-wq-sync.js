@@ -1,5 +1,10 @@
 /**
  * sonor-wq-sync.js — CANONICAL MASTER (sonor-platform §24 — one WeQuote sync, every app)
+ * v1.7.4 · 2026-10-17 — the wq-proxy fallback sends the project (anon) key (apikey + Bearer) so wq-proxy can be key-gated (EDGE_KEY_ENFORCE).
+ * v1.7.3 · 2026-10-17 — MERGE-ONLY (projects.metadata law): every metadata write goes through the sonor_merge_project_metadata RPC
+ *   (server-side `metadata || patch`), so a key another app wrote between our read and our write can no longer be dropped. The
+ *   old read-then-replace only runs if the RPC call itself fails. Column patches (ref / client_* / address / value_quoted) are a
+ *   separate column-only update.
  * v1.7.1 · 2026-10-15 — the `wq_quote_index` table now EXISTS (B-509 closed): the index is shared by every device and built once —
  *   before this every browser / node run rebuilt it in localStorage, one /quote/get per quote (~400 calls a time). Labour + programme
  *   fields (v1.7.0) now round-trip through the table too.
@@ -46,7 +51,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.7.2';
+  var VERSION = '1.7.4';
   var _cfgCache = new Map();   // client → config | false
   async function getConfig(client) {
     if (_cfgCache.has(client)) return _cfgCache.get(client);
@@ -63,7 +68,12 @@
     var cfg = await getConfig(client); if (!cfg) return null;
     try {
       var url; var headers = { 'Accept': 'application/json', 'X-Sonor-Source': 'wq-sync' };   // v1.7.1 — named for the per-source burst guard
-      if (cfg.proxy_enabled && cfg.proxy_url) { url = new URL(cfg.proxy_url); url.searchParams.set('endpoint', path); }
+      if (cfg.proxy_enabled && cfg.proxy_url) {
+        url = new URL(cfg.proxy_url); url.searchParams.set('endpoint', path);
+        // 2026-10-17 — send the project (anon) key the client already holds (apikey + Bearer, as send-email) so wq-proxy can be locked
+        var k = ''; try { k = client.supabaseKey || (client.rest && client.rest.headers && client.rest.headers.apikey) || global.SONOR_SUPABASE_ANON || (global.__SONOR_BRAND__ && global.__SONOR_BRAND__.supabase && global.__SONOR_BRAND__.supabase.anonKey) || ''; } catch (_) {}
+        if (k) { headers['apikey'] = k; headers['Authorization'] = 'Bearer ' + k; }
+      }
       else { url = new URL((cfg.api_base || 'https://app.wequote.cloud/external').replace(/\/$/, '') + path); headers['Api-Key'] = cfg.api_key; }
       Object.entries(params || {}).forEach(function (kv) { url.searchParams.set(kv[0], kv[1]); });
       var r = await fetch(url.toString(), { headers });
@@ -235,6 +245,15 @@
       return { no: String(p.project_no), id: p.id, description: p.description, customer: p.customer_name, postcode: p.postcode, created: p.created_datetime, status: p.status, score: score, why: why.join(' · ') };
     }).filter(function (c) { return c.score > 0; }).sort(function (a, b) { return b.score - a.score || (b.created > a.created ? 1 : -1); }).slice(0, 6);
   }
+  // v1.7.3 — merge-only write of projects.metadata: RPC first (atomic `metadata || patch` on the server); read-merge-write only as
+  // the fallback when the RPC call fails. Returns the error (or null).
+  async function mergeMeta(client, id, patch) {
+    try { var rr = await client.rpc('sonor_merge_project_metadata', { p_project_id: id, p_patch: patch }); if (!rr.error) return null; } catch (e) {}
+    var cur = await client.from('projects').select('metadata').eq('id', id).single();
+    var cm = (cur.data && cur.data.metadata && typeof cur.data.metadata === 'object') ? cur.data.metadata : {};
+    var u = await client.from('projects').update({ metadata: Object.assign({}, cm, patch) }).eq('id', id);
+    return u.error || null;
+  }
   // link a Sonor project to a WQ project number, then sync it (names, customer, quotes, activity)
   async function linkProject(client, row, wqNo, opts) {
     opts = opts || {};
@@ -242,10 +261,10 @@
     var p = await findProject(client, wqNo); if (!p) throw new Error('WeQuote has no project ' + wqNo);
     var fresh = await client.from('projects').select('metadata,updated_at').eq('id', row.id).single();
     var fm = (fresh.data && fresh.data.metadata) || {};
-    var meta = Object.assign({}, fm, { wequote_id: wqNo, wequote_internal_id: p.id, wequote_linked_at: new Date().toISOString(), wequote_linked_by: opts.by || 'board', wequote_touched_before: fm.wequote_touched_before || (fresh.data && fresh.data.updated_at) || null });
-    var u = await client.from('projects').update({ metadata: meta }).eq('id', row.id);
-    if (u.error) throw u.error;
-    row.metadata = meta;
+    var lpatch = { wequote_id: wqNo, wequote_internal_id: p.id, wequote_linked_at: new Date().toISOString(), wequote_linked_by: opts.by || 'board', wequote_touched_before: fm.wequote_touched_before || (fresh.data && fresh.data.updated_at) || null };
+    var lerr = await mergeMeta(client, row.id, lpatch);   // v1.7.3 merge-only
+    if (lerr) throw lerr;
+    row.metadata = Object.assign({}, fm, lpatch);
     var n = await syncProjects(client, [row], { force: true, onProgress: opts.onProgress });
     return { project: p, changed: n };
   }
@@ -331,8 +350,7 @@
           if (before === after) continue;   // nothing moved — no write, no updated_at bump
           var qprev = qfm.wequote_synced_at && qfresh.data.updated_at && Math.abs(new Date(qfresh.data.updated_at) - new Date(qfm.wequote_synced_at)) < 120000;
           qpatch.wequote_touched_before = (qprev && qfm.wequote_touched_before) ? qfm.wequote_touched_before : (qfresh.data && qfresh.data.updated_at) || new Date().toISOString();
-          var qu = await client.from('projects').update({ metadata: Object.assign({}, qfm, qpatch) }).eq('id', r.id);
-          if (qu.error) continue;
+          if (await mergeMeta(client, r.id, qpatch)) continue;   // v1.7.3 merge-only
           r.metadata = Object.assign({}, r.metadata, qpatch); changed++;
         } catch (e) {}
         continue;
@@ -365,9 +383,8 @@
         // §22). If updated_at is still our own previous sync stamp, keep the older human date.
         var prevSync = fm.wequote_synced_at && fresh.data.updated_at && Math.abs(new Date(fresh.data.updated_at) - new Date(fm.wequote_synced_at)) < 120000;
         patch.wequote_touched_before = (prevSync && fm.wequote_touched_before) ? fm.wequote_touched_before : (fresh.data && fresh.data.updated_at) || new Date().toISOString();
-        var meta = Object.assign({}, fm, patch);
-        var u = await client.from('projects').update(Object.assign({ metadata: meta }, colPatch)).eq('id', r.id);
-        if (u.error) continue;
+        if (await mergeMeta(client, r.id, patch)) continue;   // v1.7.3 merge-only
+        if (Object.keys(colPatch).length) { var cu = await client.from('projects').update(colPatch).eq('id', r.id); if (cu.error) continue; }
         r.metadata = Object.assign({}, r.metadata, patch); Object.assign(r, colPatch); changed++;
       } catch (e) { /* keep cached */ }
     }

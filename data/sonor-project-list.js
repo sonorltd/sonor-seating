@@ -35,7 +35,7 @@
  * Pass `status` + `metadata` too when available — they drive the completed sink
  * (rows without them are treated as live, never hidden).
  *
- * @version 1.3.2
+ * @version 1.4.0
  *
  * v1.3.0 (2026-10-12, Bryn: "projects should be sorted in time last touched order anyway" — an enquiry with no WQ
  *   number (ENQ - Paul Murphy) was parked under 'Trials / no WQ' at the bottom, out of sight): the live list is now ONE
@@ -47,10 +47,13 @@
  *   block is ordered last touched first; the WQ-number sort and the 'Trials' label are gone for good.
  * v1.3.2: ⏱ Recently edited = touched by ANY Sonor app (updated_at); WQ tenders = by WeQuote activity
  *   (metadata.wequote_activity_at / _modified_at from the Master Hub sync); Enquiries = updated_at.
+ * v1.4.0 (2026-10-18, Bryn: "dont see sonor demo project here"): demo / test-subject projects
+ *   (metadata.source 'demo', metadata.demo true, or a ref starting "DEMO") are pinned in a 🧪 Demo block at the
+ *   very top of every picker, so the shared test project is one click away in every app. They leave the other blocks.
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.3.2';
+  var VERSION = '1.4.0';
 
   // Parse the WeQuote number from a ref ("1381 - Awaken Spa" -> 1381). null if none.
   function wqOf(p) {
@@ -98,6 +101,13 @@
     var t = 0; [p.wequote_activity_at || m.wequote_activity_at, p.wequote_modified_at || m.wequote_modified_at, p.wequote_created_at || m.wequote_created_at].forEach(function (v) { var n = v ? Date.parse(v) : 0; if (n && n > t) t = n; });
     return t || 0;
   }
+  // v1.4.0 — the shared demo / test-subject project(s)
+  function demoOf(p) {
+    if (!p) return false; var m = p.metadata || {};
+    if (String(p.source || m.source || '').toLowerCase() === 'demo') return true;
+    if (m.demo === true || m.demo === 'true') return true;
+    return /^\s*DEMO\b/i.test(String(p.ref || ''));
+  }
   function holdingStateOf(p) {
     if (!p) return null;
     var h = String(p.holding || ((p.metadata || {}).holding) || '').toLowerCase();
@@ -121,6 +131,8 @@
     // fallback) sink to their own group at the very bottom and stay out of
     // the live groups + the recent convenience slots.
     list = list.filter(function (p) { return !dismissedOf(p); });   // v1.2.0 — dismissed hidden everywhere
+    var demo = list.filter(demoOf);                                     // v1.4.0 — pinned at the top
+    list = list.filter(function (p) { return !demoOf(p); });
     var holding = list.filter(function (p) { return holdingOf(p) && !doneOf(p); });
     var live = list.filter(function (p) { return !doneOf(p) && !holdingOf(p); });
     var done = list.filter(doneOf);
@@ -133,6 +145,7 @@
       var wa = wqOf(a), wb = wqOf(b); if (wa != null && wb != null && wa !== wb) return wb - wa;
       return String((a && (a.name || a.ref)) || '').localeCompare(String((b && (b.name || b.ref)) || ''));
     };
+    if (demo.length) out.push({ key: 'demo', label: '🧪  Demo / test project', items: demo });
     var recent = live.filter(function (p) { return tsOf(p) > 0; }).sort(byTouch).slice(0, recentCount);
     if (recent.length) out.push({ key: 'recent', label: '⏱  Recently edited', items: recent });
     // v1.3.2 (Bryn: "recents last touched by any of our apps, the rest can be in order of when wq was touched") —
@@ -194,7 +207,7 @@
   }
 
   global.SonorProjectList = {
-    VERSION: VERSION, wqOf: wqOf, tsOf: tsOf, wqTouchOf: wqTouchOf, doneOf: doneOf,
+    VERSION: VERSION, demoOf: demoOf, wqOf: wqOf, tsOf: tsOf, wqTouchOf: wqTouchOf, doneOf: doneOf,
     holdingStateOf: holdingStateOf, holdingOf: holdingOf, dismissedOf: dismissedOf,
     group: group, populateSelect: populateSelect, defaultLabel: defaultLabel
   };
