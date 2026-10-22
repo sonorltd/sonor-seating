@@ -24,17 +24,18 @@
   var M = 48;
   var COL = {
     GOLD: [173, 153, 120], GOLDL: [200, 180, 142], GDEEP: [140, 116, 60], PUR: [128, 88, 161],
-    CREAM: [246, 242, 234], INK: [26, 24, 20], INK2: [60, 55, 47], MUT: [120, 112, 96],
+    CREAM: [251, 250, 247], INK: [26, 24, 20], INK2: [60, 55, 47], MUT: [120, 112, 96],
     DARK: [9, 8, 7], DARK2: [22, 19, 24], LINE: [214, 205, 188], LABEL: [150, 138, 116], PAGE_NO: [170, 160, 140],
     INFO: [168, 156, 136]
   };
 
+  // ── v1.4.0 (2026-10-22) — PAPER: the cream page background is gone from EVERY Sonor PDF (Bryn, on the Fabric design pack: "drop the cream backgrounds too, or maybe just a very slight tint" → "yes all pdfs re cream"). Both themes now share one paper, a very slight warm tint (251/250/247); 'luxury' keeps its warm ink / gold line tones, 'neutral' its greys. No consumer change needed — COL.CREAM is read at draw time.
   // ── v1.2.0 THEMES — Bryn: "I don't think we should have the cream background in the pdf… only maybe the luxury apps like
   // seating and lighting, everything else should be more neutral". COL is mutated in place (every painter reads it at draw
   // time), so a consumer calls theme() once before building. Default = luxury (cream) — Cinema Design / Seating / Lighting unchanged.
   var THEMES = {
-    luxury:  { CREAM: [246, 242, 234], INK: [26, 24, 20], INK2: [60, 55, 47], MUT: [120, 112, 96], LINE: [214, 205, 188], LABEL: [150, 138, 116], PAGE_NO: [170, 160, 140], INFO: [168, 156, 136] },
-    neutral: { CREAM: [255, 255, 255], INK: [24, 24, 24], INK2: [62, 62, 62], MUT: [118, 118, 118], LINE: [222, 222, 222], LABEL: [138, 138, 138], PAGE_NO: [164, 164, 164], INFO: [172, 172, 172] }
+    luxury:  { CREAM: [251, 250, 247], INK: [26, 24, 20], INK2: [60, 55, 47], MUT: [120, 112, 96], LINE: [214, 205, 188], LABEL: [150, 138, 116], PAGE_NO: [170, 160, 140], INFO: [168, 156, 136] },
+    neutral: { CREAM: [251, 250, 247], INK: [24, 24, 24], INK2: [62, 62, 62], MUT: [118, 118, 118], LINE: [222, 222, 222], LABEL: [138, 138, 138], PAGE_NO: [164, 164, 164], INFO: [172, 172, 172] }
   };
   // v1.4.0 (2026-10-16) — sonor-pdf-theme.js is the ONE palette (Bryn: "gel all the branding now so minor tweaks can be
   // system wide"): when it is on the page its luxury() sets replace the literals above — same values today, one place tomorrow.
@@ -360,7 +361,7 @@
   }
 
   global.SonorPdfLuxury = {
-    __version: '1.3.1', theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
+    __version: '1.4.0', theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
     A4: A4, M: M, COL: COL, HOUSE: HOUSE, WA: WA,
     col: col, hexRgb: hexRgb, fadePngDataUrl: fadePngDataUrl,
     fetchBytes: fetchBytes, loadImage: loadImage,
