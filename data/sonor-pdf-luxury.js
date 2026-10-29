@@ -371,7 +371,7 @@
   }
 
   global.SonorPdfLuxury = {
-    __version: '1.4.0', theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
+    __version: '1.5.1', sheet: sheet, SHEETS: SHEETS, TW: TW, theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
     A4: A4, M: M, COL: COL, HOUSE: HOUSE, WA: WA,
     col: col, hexRgb: hexRgb, fadePngDataUrl: fadePngDataUrl,
     fetchBytes: fetchBytes, loadImage: loadImage,
