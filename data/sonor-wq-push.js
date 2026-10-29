@@ -21,11 +21,7 @@
 */
 (function (global) {
   'use strict';
-<<<<<<< HEAD
-  var VERSION = '1.1.0';
-=======
   var VERSION = '1.2.0';   // 1.2.0 (2026-10-17) — addContact(): a person onto a WeQuote customer through wq-push 1.5.0 add_contact
->>>>>>> a30db23 (Takeover v0.2.0: WQ area order, optional = active 0, prices as quotation reference, area totals via wq-proxy v5; sonor-wq-client 1.4.0 synced)
   var KEY = 'sonor-wq-push-token';
   function _token(force) {
     var t = ''; try { t = localStorage.getItem(KEY) || ''; } catch (_) {}

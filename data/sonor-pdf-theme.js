@@ -23,13 +23,13 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';   // 1.1.0 (2026-10-22) — PAPER: cream gone from every PDF; one very slight warm tint everywhere (Bryn: "drop the cream backgrounds too, or maybe just a very slight tint" → "yes all pdfs re cream")
 
   var HEX = {
     black: '#090807', dark2: '#161318', graphite: '#2c2a27',
     ink: '#1a1814', ink2: '#3c372f', muted: '#787060', label: '#968a74', info: '#a89c88', pageNo: '#aaa08c',
     gold: '#ad9978', goldLight: '#c8b48e', goldDeep: '#8c743c', goldTint: '#d9c9a8',
-    cream: '#f6f2ea', creamLine: '#d6cdbc',
+    cream: '#fbfaf7', creamLine: '#d6cdbc', paper: '#fbfaf7',   // 1.1.0 — 'cream' is now the slight tint; kept under its old key so every reader keeps working
     white: '#ffffff', g50: '#f7f8fa', g100: '#f4f5f7', g200: '#eceef1', g300: '#d9dde3', g350: '#e2e5ea', g400: '#c9ced6', g500: '#8b8f96', g600: '#636c7a',
     amber: '#E8A317', green: '#78ba57', red: '#ec6061', blue: '#4bb9d3'
   };
@@ -58,13 +58,13 @@
     return {
       shared: { GOLD: rgb(HEX.gold), GOLDL: rgb(HEX.goldLight), GDEEP: rgb(HEX.goldDeep), DARK: rgb(HEX.black), DARK2: rgb(HEX.dark2), PUR: [128, 88, 161] },
       luxury: { CREAM: rgb(HEX.cream), INK: rgb(HEX.ink), INK2: rgb(HEX.ink2), MUT: rgb(HEX.muted), LINE: rgb(HEX.creamLine), LABEL: rgb(HEX.label), PAGE_NO: rgb(HEX.pageNo), INFO: rgb(HEX.info) },
-      neutral: { CREAM: rgb(HEX.white), INK: [24, 24, 24], INK2: [62, 62, 62], MUT: [118, 118, 118], LINE: rgb(HEX.g300), LABEL: [138, 138, 138], PAGE_NO: [164, 164, 164], INFO: [172, 172, 172] }
+      neutral: { CREAM: rgb(HEX.paper), INK: [24, 24, 24], INK2: [62, 62, 62], MUT: [118, 118, 118], LINE: rgb(HEX.g300), LABEL: [138, 138, 138], PAGE_NO: [164, 164, 164], INFO: [172, 172, 172] }
     };
   }
   // ── v6 tokens: white paper, black/gold 'sonor' theme as the default drawing + schedule chrome ──
   function v6() {
     return {
-      BASE: { paper: HEX.white, body: HEX.g100, text: HEX.ink, muted: HEX.muted, line: HEX.g300, footer: HEX.black, white: HEX.white },
+      BASE: { paper: HEX.paper, body: HEX.g100, text: HEX.ink, muted: HEX.muted, line: HEX.g300, footer: HEX.black, white: HEX.white },
       THEMES: {
         sonor:   { primary: HEX.gold, dark: HEX.black, mid: HEX.dark2, pale: HEX.g200 },
         takeoff: { primary: HEX.gold, dark: HEX.black, mid: HEX.dark2, pale: HEX.g200 },
@@ -84,7 +84,7 @@
       '  --chrome-gradient: ' + gradient(120) + '; --chrome-gradient-mirror: ' + gradient(300) + '; --chrome-gradient-end: ' + CHROME.end + ';\n' +
       '  --chrome-solid: ' + CHROME.mid + '; --chrome-solid-deep: ' + CHROME.deep + ';\n' +
       '  --accent: ' + HEX.gold + '; --slate-text: ' + HEX.ink + '; --slate-muted: ' + HEX.muted + '; --slate-faint: ' + HEX.label + ';\n' +
-      '  --paper: ' + HEX.white + '; --paper-tint: ' + HEX.g100 + '; --paper-rule: ' + HEX.g200 + '; --paper-soft: ' + HEX.g50 + '; --paper-edge: ' + HEX.g300 + '; --slate-tint-total: ' + HEX.g350 + ';\n' +
+      '  --paper: ' + HEX.paper + '; --paper-tint: ' + HEX.g100 + '; --paper-rule: ' + HEX.g200 + '; --paper-soft: ' + HEX.g50 + '; --paper-edge: ' + HEX.g300 + '; --slate-tint-total: ' + HEX.g350 + ';\n' +
       '  --status-for-review: ' + HEX.amber + '; --status-revised: ' + HEX.amber + ';\n' +
       '}\n' +
       '.hero-eyebrow { color: ' + HEX.goldTint + '; }\n' +
@@ -92,5 +92,5 @@
   }
 
   global.SonorPdfTheme = { VERSION: VERSION, HEX: HEX, CHROME: CHROME, SERVICES: SERVICES, STATUS: STATUS, rgb: rgb, mix: mix, gradient: gradient, luxury: luxury, v6: v6, htmlCss: htmlCss,
-    MODES: { luxury: 'cream page — Seating / Lighting / Cinema client proposals', neutral: 'white page — every other document' } };
+    MODES: { luxury: 'slight-tint page, warm ink + gold lines — Seating / Lighting / Cinema client proposals', neutral: 'slight-tint page, grey working surfaces — every other document' } };
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
