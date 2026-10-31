@@ -8,6 +8,10 @@
  * data/app-vars.css aliasing layer (never hardcodes hex).
  *
  * Namespace: `.sonor-edit-*` — avoids collisions with app-local classes.
+ *
+ * 2026-10-31 — text / input / hover fall back to the theme tokens (--text-primary,
+ * --bg-1, --bg-2) before the earthy hex: graphite defines none of --body-text /
+ * --input-bg / --hover, so labels rendered dark-on-dark and inputs white (dark law).
  */
 
 /* Backdrop (behind panel) */
@@ -36,7 +40,7 @@
   width: 420px;
   max-width: calc(100vw - 24px);
   background: var(--panel, #FFFCF7);
-  color: var(--body-text, #2C2218);
+  color: var(--body-text, var(--text-primary, #2C2218));
   box-shadow: -12px 0 32px rgba(20, 16, 8, 0.18);
   z-index: 9999;
   transform: translateX(100%);
@@ -77,7 +81,7 @@
   font-weight: 600;
   line-height: 1.25;
   margin: 0;
-  color: var(--body-text, #2C2218);
+  color: var(--body-text, var(--text-primary, #2C2218));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -110,8 +114,8 @@
   transition: background 120ms, color 120ms;
 }
 .sonor-edit-close:hover {
-  background: var(--hover, rgba(44, 34, 24, 0.06));
-  color: var(--body-text, #2C2218);
+  background: var(--hover, var(--bg-2, rgba(44, 34, 24, 0.06)));
+  color: var(--body-text, var(--text-primary, #2C2218));
 }
 
 /* Body (scrollable) */
@@ -180,7 +184,7 @@
 .sonor-edit-label {
   font-size: 12px;
   font-weight: 500;
-  color: var(--body-text, #2C2218);
+  color: var(--body-text, var(--text-primary, #2C2218));
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -205,8 +209,8 @@
   padding: 7px 10px;
   font: inherit;
   font-size: 13px;
-  color: var(--body-text, #2C2218);
-  background: var(--input-bg, #FFFFFF);
+  color: var(--body-text, var(--text-primary, #2C2218));
+  background: var(--input-bg, var(--bg-1, #FFFFFF));
   border: 1px solid var(--border-strong, rgba(44, 34, 24, 0.18));
   border-radius: 6px;
   transition: border-color 120ms, box-shadow 120ms;
@@ -225,7 +229,7 @@
   line-height: 1.4;
 }
 .sonor-edit-input[readonly] {
-  background: var(--hover, rgba(44, 34, 24, 0.04));
+  background: var(--hover, var(--bg-2, rgba(44, 34, 24, 0.04)));
   color: var(--muted, #8B7D6B);
 }
 
@@ -277,7 +281,7 @@
 }
 .sonor-edit-toggle-label {
   font-size: 13px;
-  color: var(--body-text, #2C2218);
+  color: var(--body-text, var(--text-primary, #2C2218));
 }
 
 /* Colour picker */
@@ -327,7 +331,7 @@
   cursor: pointer;
 }
 .sonor-edit-colour-clear:hover {
-  color: var(--body-text, #2C2218);
+  color: var(--body-text, var(--text-primary, #2C2218));
   border-color: var(--border-strong, rgba(44, 34, 24, 0.3));
 }
 
@@ -349,8 +353,8 @@
   font-family: inherit;
 }
 .sonor-edit-pill:hover {
-  color: var(--body-text, #2C2218);
-  background: var(--hover, rgba(44, 34, 24, 0.08));
+  color: var(--body-text, var(--text-primary, #2C2218));
+  background: var(--hover, var(--bg-2, rgba(44, 34, 24, 0.08)));
 }
 .sonor-edit-pill.is-selected {
   /* v0.2.0 — honour the per-option accent the renderer sets (--pill-accent);
@@ -413,11 +417,11 @@
 }
 .sonor-edit-btn-secondary {
   background: transparent;
-  color: var(--body-text, #2C2218);
+  color: var(--body-text, var(--text-primary, #2C2218));
   border-color: var(--border-strong, rgba(44, 34, 24, 0.18));
 }
 .sonor-edit-btn-secondary:hover:not(:disabled) {
-  background: var(--hover, rgba(44, 34, 24, 0.06));
+  background: var(--hover, var(--bg-2, rgba(44, 34, 24, 0.06)));
 }
 .sonor-edit-btn-danger {
   background: transparent;
@@ -458,13 +462,13 @@
 /* Dark theme scope (apps that opt in with [data-theme="dark"]) */
 [data-theme="dark"] .sonor-edit-panel {
   background: var(--panel, #1C1815);
-  color: var(--body-text, #F2EDE5);
+  color: var(--body-text, var(--text-primary, #F2EDE5));
   box-shadow: -12px 0 32px rgba(0, 0, 0, 0.5);
 }
 [data-theme="dark"] .sonor-edit-input,
 [data-theme="dark"] .sonor-edit-textarea,
 [data-theme="dark"] .sonor-edit-select {
   background: var(--input-bg, #242019);
-  color: var(--body-text, #F2EDE5);
+  color: var(--body-text, var(--text-primary, #F2EDE5));
   border-color: var(--border-strong, rgba(242, 237, 229, 0.15));
 }
