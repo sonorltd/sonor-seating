@@ -676,8 +676,8 @@
     try { if (global.fontkit) doc.registerFontkit(global.fontkit); } catch (e) {}
     var F;
     try {
-      F = { b: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-extrabold.otf'), { subset: false }),
-            r: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-regular.otf'), { subset: false }) };
+      F = { b: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-extrabold.otf'), { subset: false, features: { liga: false, clig: false, dlig: false } }),
+            r: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-regular.otf'), { subset: false, features: { liga: false, clig: false, dlig: false } }) };
     } catch (e) {
       var hb = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold), hr = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
       F = { b: hb, r: hr };
@@ -799,9 +799,9 @@
     try { if (global.fontkit) doc.registerFontkit(global.fontkit); } catch (e) {}
     var F;
     try {
-      F = { b: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-extrabold.otf'), { subset: false }),
-            r: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-regular.otf'), { subset: false }),
-            l: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-ultralight.otf'), { subset: false }) };
+      F = { b: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-extrabold.otf'), { subset: false, features: { liga: false, clig: false, dlig: false } }),
+            r: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-regular.otf'), { subset: false, features: { liga: false, clig: false, dlig: false } }),
+            l: await doc.embedFont(await fetchBytes(BASE + 'fonts/gilroy-ultralight.otf'), { subset: false, features: { liga: false, clig: false, dlig: false } }) };
     } catch (e) {
       var hb = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold), hr = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
       F = { b: hb, r: hr, l: hr };
