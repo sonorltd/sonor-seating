@@ -1,29 +1,29 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   SonorWho — who edited what, on every item, in every app (v1.0.0, kit 0.10.0, Hub 3.50.0, 2026-10-31)
-   Bryn: "similar to how fieldwire … whoever edits has a bubble initials by it" · "no manual entries, all is linked to users"
+   SonorWho \u2014 who edited what, on every item, in every app (v1.0.0, kit 0.10.0, Hub 3.50.0, 2026-10-31)
+   Bryn: "similar to how fieldwire \u2026 whoever edits has a bubble initials by it" \u00b7 "no manual entries, all is linked to users"
 
-   Loaded on EVERY page by the apps.sonor.co.uk gateway (v1.8.0+) — no app needs a <script> tag. Idempotent.
+   Loaded on EVERY page by the apps.sonor.co.uk gateway (v1.8.0+) \u2014 no app needs a <script> tag. Idempotent.
    Data: Supabase audit_log (stamped server-side from the signed-in login) via RPCs sonor_people / sonor_last_editors /
    sonor_audit_since / sonor_project_editors / sonor_here (presence). Calls go through the gateway's fetch wrapper, so they
    carry the person's own session.
 
-   DECLARATIVE (apps only add attributes — the module does the rest, live):
-     data-sonor-row="table:pk"        → initials bubble of the LAST person to edit that row (tooltip: name · when · what changed).
+   DECLARATIVE (apps only add attributes \u2014 the module does the rest, live):
+     data-sonor-row="table:pk"        \u2192 initials bubble of the LAST person to edit that row (tooltip: name \u00b7 when \u00b7 what changed).
                                          Goes inside a [data-sonor-who-slot] child if there is one, else at the end of the element.
-     data-sonor-person="email|name"   → that person's bubble (+ name with data-sonor-person-mode="both", name only with "name").
-     <select data-sonor-people>       → filled with the Sonor users (value = email). A stored value that is not a user stays,
-                                         marked "(not a user)". data-sonor-people="staff" limits to staff; "+none" adds "— Unassigned".
+     data-sonor-person="email|name"   \u2192 that person's bubble (+ name with data-sonor-person-mode="both", name only with "name").
+     <select data-sonor-people>       \u2192 filled with the Sonor users (value = email). A stored value that is not a user stays,
+                                         marked "(not a user)". data-sonor-people="staff" limits to staff; "+none" adds "\u2014 Unassigned".
    JS:
-     SonorWho.ready → Promise · people() · person(v) · label(v) · initials(v) · bubble(v, {size, title}) → <span>
-     fillSelect(sel, {value, kinds, none}) · lastEditor(table, pk) · watch() → re-scan now
-     events on document: 'sonor:who-change' {rows:[{table_name,row_pk,who,at,app,project_id}]} · 'sonor:who-here' {people}
-   CHROME: a small cluster beside the "who am I" pill (or inside [data-sonor-who-bar]) — who else is in this app / project
+     SonorWho.ready \u2192 Promise \u00b7 people() \u00b7 person(v) \u00b7 label(v) \u00b7 initials(v) \u00b7 bubble(v, {size, title}) \u2192 <span>
+     fillSelect(sel, {value, kinds, none}) \u00b7 lastEditor(table, pk) \u00b7 watch() \u2192 re-scan now
+     events on document: 'sonor:who-change' {rows:[{table_name,row_pk,who,at,app,project_id}]} \u00b7 'sonor:who-here' {people}
+   CHROME: a small cluster beside the "who am I" pill (or inside [data-sonor-who-bar]) \u2014 who else is in this app / project
    right now (green ring) + who last edited this project in this app.
    ═══════════════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
   if (global.SonorWho && global.SonorWho.VERSION) return;
-  var VERSION = '1.0.0';
+  var VERSION = '1.0.1';   // 1.0.1: multi-person strings are not matched to one user; non-ASCII escaped
   var U = global.__SONOR_USER__ || null;
   var SBC = global.__SONOR_SB__ || {};
   var SB = SBC.url || 'https://ysmvklstkzodlocttspy.supabase.co';
@@ -69,7 +69,7 @@
   function rowTitle(r) {
     var p = person(r.who); var what = (r.op === 'insert' ? 'added' : r.op === 'delete' ? 'deleted' : 'edited');
     var ch = (r.changed || []).filter(function (c) { return !/(_at|_by)$/.test(c); }).slice(0, 4).map(function (c) { return c.replace(/_/g, ' '); });
-    return (p ? p.name : r.who) + ' · ' + what + ' ' + ago(r.at) + (ch.length ? ' · ' + ch.join(', ') : '') + (r.saves > 1 ? ' (' + r.saves + ' saves)' : '');
+    return (p ? p.name : r.who) + ' \u00b7 ' + what + ' ' + ago(r.at) + (ch.length ? ' \u00b7 ' + ch.join(', ') : '') + (r.saves > 1 ? ' (' + r.saves + ' saves)' : '');
   }
   function paintRow(el) {
     var key = el.getAttribute('data-sonor-row'); var r = S.rows[key];
@@ -119,7 +119,7 @@
     var cur = o.value != null ? o.value : (sel.value || sel.getAttribute('data-value') || '');
     var curP = person(cur); var curV = curP ? curP.email : cur;
     var list = S.people.filter(function (p) { return p.status !== 'disabled' && p.role_key !== 'demo' && (!kinds || kinds.indexOf(p.kind) >= 0); });
-    var h = (none || !curV ? '<option value="">— Unassigned</option>' : '') +
+    var h = (none || !curV ? '<option value="">\u2014 Unassigned</option>' : '') +
       list.map(function (p) { return '<option value="' + esc(p.email) + '">' + esc(p.name) + '</option>'; }).join('');
     if (curV && !list.some(function (p) { return p.email === curV; })) h += '<option value="' + esc(curV) + '">' + esc(label(curV)) + (curP ? '' : ' (not a user)') + '</option>';
     sel.innerHTML = h; sel.value = curV; sel.__swFilled = S.people.length;
@@ -165,14 +165,14 @@
       var g = document.createElement('span'); g.className = 'sw-here';
       here.slice(0, 5).forEach(function (h) {
         var where = h.app === APP ? 'here now' : 'on this project in ' + h.app;
-        g.appendChild(bubble(h.email, { size: 'sm', ring: true, title: label(h.email) + ' · ' + where }));
+        g.appendChild(bubble(h.email, { size: 'sm', ring: true, title: label(h.email) + ' \u00b7 ' + where }));
       });
       if (here.length > 5) { var m = document.createElement('span'); m.className = 'sw-more'; m.textContent = '+' + (here.length - 5); g.appendChild(m); }
       el.appendChild(g);
     }
     if (last && last.who) {
       var l = document.createElement('span'); l.className = 'sw-last';
-      l.appendChild(bubble(last.who, { size: 'sm', title: label(last.who) + ' · last edit on this project here ' + ago(last.at) }));
+      l.appendChild(bubble(last.who, { size: 'sm', title: label(last.who) + ' \u00b7 last edit on this project here ' + ago(last.at) }));
       var t = document.createElement('span'); t.textContent = 'edited ' + ago(last.at); l.appendChild(t);
       el.appendChild(l);
     }

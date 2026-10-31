@@ -35,7 +35,8 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.3.0';   // v1.3.0 2026-10-31 — Library SSOT: SonorLedEng.load() reads v_led_catalogue (house strip types + strip products + drivers) and library_settings.led_engineering (house rules); drivers are picked from real Library products by kind / V / mA / control / IP / preferred (Bryn: "we need a central ssot … yes everything library ssot"). Built-in sizes stay as the offline fallback.
+  var VERSION = '1.3.1';   // v1.3.1 2026-10-31 — prefer matches a manufacturer OR a range / name (Bryn: "we usually use tagra drivers from ultra leds so default to those" → rule preferManufacturer = 'Tagra')
+  // was 1.3.0:   // v1.3.0 2026-10-31 — Library SSOT: SonorLedEng.load() reads v_led_catalogue (house strip types + strip products + drivers) and library_settings.led_engineering (house rules); drivers are picked from real Library products by kind / V / mA / control / IP / preferred (Bryn: "we need a central ssot … yes everything library ssot"). Built-in sizes stay as the offline fallback.
   // was 1.2.0:   // v1.1.0 2026-10-16 — control method (DMX / triac / 0-10V / DALI / switched) + DMX addressing on xx1 blocks (Bryn: "RGBW led will be dmx controlled … main also have triac dimmable driver, need options for all this … including DMX channel assignment")
 
   var DEFAULTS = {
@@ -106,7 +107,7 @@
     return { id: r.id, label: r.label, manufacturer: r.manufacturer || null, kind: r.kind || null, volts: r.volts != null ? num(r.volts) : null,
       current_ma: r.current_ma != null ? num(r.current_ma) : null, current_max_ma: r.current_max_ma != null ? num(r.current_max_ma) : null,
       output_w: r.output_w != null ? num(r.output_w) : null, control: ctl.map(function (x) { return String(x).toLowerCase(); }),
-      ip: r.ip || null, ip_num: num(r.ip_num, 0), preferred: !!r.preferred, family: !!r.family, needs_review: r.needs_review || null,
+      ip: r.ip || null, ip_num: num(r.ip_num, 0), preferred: !!r.preferred, family: !!r.family, range: r.range || (r.metadata && r.metadata.led && r.metadata.led.range) || null, needs_review: r.needs_review || null,
       img: r.img || null, sort_order: num(r.sort_order, 0) };
   }
   function applyRules(rules) {
@@ -153,9 +154,10 @@
   // → { driver_w, drivers, loaded_pct, product:{id,label,manufacturer,ip,control}|null, source:'library'|'fallback'|'forced' }
   function driverRank(q) {
     var pref = String(q.prefer || '').toLowerCase(), anyCtl = !q.control || q.control === 'dmx' || q.control === 'switched';
+    function pm(d) { return !!pref && (String(d.manufacturer || '').toLowerCase() === pref || String(d.range || '').toLowerCase() === pref || String(d.label || '').toLowerCase().indexOf(pref) >= 0); }
     return function (a, b) {
       return (b.preferred - a.preferred)
-        || ((pref && String(b.manufacturer || '').toLowerCase() === pref) - (pref && String(a.manufacturer || '').toLowerCase() === pref))
+        || (pm(b) - pm(a))
         || (anyCtl ? ((b.control.indexOf('switched') >= 0) - (a.control.indexOf('switched') >= 0)) : 0)
         || (q.minIp ? 0 : ((a.ip_num >= 65) - (b.ip_num >= 65)))   // indoors: an indoor driver before an outdoor-rated one
         || a.sort_order - b.sort_order || String(a.label).localeCompare(String(b.label));
@@ -184,9 +186,20 @@
       if (kind !== 'cv') return { driver_w: 0, drivers: 0, loaded_pct: 0, product: null, source: 'none' };
       var fb = driverFor(loadW, c); fb.product = null; fb.source = 'fallback'; return fb;
     }
-    var bySize = {}; cands.sort(driverRank(q)).forEach(function (d) { if (!bySize[d.output_w]) bySize[d.output_w] = d; });
+    // 1.3.1 — preference before size: the preferred family (first picks matching the house prefer, e.g. Tagra) is tried
+    // first, then any first pick, then everything; a lower tier is used only when the tier above has no single size that fits.
+    var pref = String(q.prefer || '').toLowerCase();
+    function pm(d) { return !!pref && (String(d.manufacturer || '').toLowerCase() === pref || String(d.range || '').toLowerCase() === pref || String(d.label || '').toLowerCase().indexOf(pref) >= 0); }
+    var tiers = [cands.filter(function (d) { return d.preferred && pm(d); }), cands.filter(function (d) { return pm(d); }), cands.filter(function (d) { return d.preferred; }), cands];
+    function sizeMap(list) { var m = {}; list.slice().sort(driverRank(q)).forEach(function (d) { if (!m[d.output_w]) m[d.output_w] = d; }); return m; }
+    for (var t = 0; t < tiers.length; t++) {
+      if (!tiers[t].length) continue;
+      var bm = sizeMap(tiers[t]), sz = Object.keys(bm).map(Number).sort(function (a, b) { return a - b; });
+      for (var i = 0; i < sz.length; i++) if (sz[i] >= minW) return { driver_w: sz[i], drivers: 1, loaded_pct: Math.round(loadW / sz[i] * 100), product: prod(bm[sz[i]]), source: 'library' };
+    }
+    var top = tiers.filter(function (l) { return l.length; })[0] || cands;   // nothing fits as one driver → split within the best tier
+    var bySize = sizeMap(top);
     var sizes = Object.keys(bySize).map(Number).sort(function (a, b) { return a - b; });
-    for (var i = 0; i < sizes.length; i++) if (sizes[i] >= minW) return { driver_w: sizes[i], drivers: 1, loaded_pct: Math.round(loadW / sizes[i] * 100), product: prod(bySize[sizes[i]]), source: 'library' };
     var big = sizes[sizes.length - 1], n = Math.ceil(minW / big), share = loadW / n / c.headroom, pick = big;
     for (var j = 0; j < sizes.length; j++) if (sizes[j] >= share) { pick = sizes[j]; break; }
     return { driver_w: pick, drivers: n, loaded_pct: Math.round(loadW / (pick * n) * 100), product: prod(bySize[pick]), source: 'library' };
