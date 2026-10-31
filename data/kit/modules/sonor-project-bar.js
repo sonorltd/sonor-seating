@@ -28,6 +28,10 @@
 //
 // Namespace: window.SonorProjectBar
 //
+// Version: 1.15.0 — NO NEW PROJECTS FROM APP BARS (2026-10-31, Bryn: "remove new project creation buttons from all apps
+//                  because they are always created from here anyway"): + New is now OPT-IN (`showNew: true`); no app passes it.
+//                  Projects are created only in the Master Hub (Database → Master Projects, + New Project) and by the
+//                  log-enquiry / new-project-kickoff skills + WeQuote adoption. `_openNewProjectDialog` kept for the opt-in only.
 // Version: 1.14.0 — three ADDITIVE init hooks (2026-10-17, so Takeoffs + Takeover can drop their own pickers):
 //                  `decorateOption(p)` → string suffix or {prefix, suffix, title} per picker option (also applied
 //                  after SonorProjectList builds the grouped options); `beforeChange(newId, prevId)` → return false
@@ -157,7 +161,7 @@
   let _appKey = null;      // v1.4.0 — per-app project memory (scoped LS key)
   let _decorate = null;    // v1.14.0 — decorateOption(p) hook
   let _beforeChange = null;// v1.14.0 — beforeChange(newId, prevId) veto hook
-  let _showNew = true;     // v1.14.0 — showNew:false hides + New
+  let _showNew = false;    // v1.15.0 — + New is opt-in (showNew:true); projects are created in the Master Hub
 
   // v1.4.0 — which LS key this bar instance persists/restores from.
   // readOnly (embedded) bars use the GLOBAL key — the host stamps it.
@@ -690,7 +694,7 @@
     _hostEl = (opts && opts.host) || null;
     _decorate = (opts && typeof opts.decorateOption === 'function') ? opts.decorateOption : null;      // v1.14.0
     _beforeChange = (opts && typeof opts.beforeChange === 'function') ? opts.beforeChange : null;      // v1.14.0
-    _showNew = !(opts && opts.showNew === false);                                                      // v1.14.0
+    _showNew = !!(opts && opts.showNew === true);                                                      // v1.14.0
     if (!_hostEl) {
       // Auto-create at top of body
       _hostEl = document.createElement('div');
