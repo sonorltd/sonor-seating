@@ -98,6 +98,7 @@ window.__SONOR_BRAND__ = {
       master:      './index.html',
       pm:          '../APP - Project Master/sonor-project-master.html',
       takeoffs:    '../APP - Takeoffs/sonor-takeoffs.html',
+      takeoffsSite: '../APP - Takeoffs/site.html',   // read-only site view (Takeoffs v5.263.0+)
       netmap:      '../APP - Network Map/sonor-network-map.html',
       rams:        '../APP - RAMS Generator/sonor-rams-generator.html',
       leads:       '../APP - Leads/dashboard/sonor-leads.html',
@@ -172,12 +173,14 @@ window.__SONOR_BRAND__ = {
       kit:            '../sonor-kit/catalogue/index.html',
       partners:       '../HUB - Partners/index.html',
       'service-contracts': '../APP - Service Contracts/dashboard/sonor-service-contracts.html',
-      takeover:       '../APP - Takeover/dashboard/sonor-takeover.html'
+      takeover:       '../APP - Takeover/dashboard/sonor-takeover.html',
+      'led-calc':     '../APP - LED Calc/dashboard/sonor-led-calc.html'
     },
     hosted: {
       master:      'https://sonorltd.github.io/sonor-master/',
       pm:          'https://sonorltd.github.io/sonor-project-master/',
       takeoffs:    'https://sonorltd.github.io/sonor-takeoffs/',
+      takeoffsSite: 'https://sonorltd.github.io/sonor-takeoffs/site.html',   // read-only site view (Takeoffs v5.263.0+)
       netmap:      'https://sonorltd.github.io/sonor-network-map/',
       rams:        'https://sonorltd.github.io/sonor-rams/',
       leads:       'https://sonorltd.github.io/sonor-leads/',
@@ -252,7 +255,8 @@ window.__SONOR_BRAND__ = {
       kit:            'https://sonorltd.github.io/sonor-kit/catalogue/',
       partners:       'https://sonorltd.github.io/sonor-partners/',
       'service-contracts': 'https://sonorltd.github.io/sonor-service-contracts/',
-      takeover:       'https://sonorltd.github.io/sonor-takeover/'
+      takeover:       'https://sonorltd.github.io/sonor-takeover/',
+      'led-calc':     'https://sonorltd.github.io/sonor-led-calc/'
     }
   },
 
@@ -272,6 +276,44 @@ window.__SONOR_BRAND__ = {
       // ?project=<ref>&device=<deviceId>#sched-{disc}
       // Scrolls to the relevant schedule view + highlights the matching device.
       device:  { params: ['project', 'device', 'disc'], hash: null }
+    },
+    takeoffs: {
+      // ?project=<projects.id>&floor=<takeoffs_floors.id>&uid=<sonorSymbol.uid>&device=<device ID e.g. CS-GF-LIV-1>
+      // Same params as the site view below; the editor ignores the ones it does not read yet.
+      device:  { params: ['project', 'floor', 'uid', 'device'], hash: null }
+    },
+    takeoffsSite: {
+      // site.html?project=<projects.id>&floor=<takeoffs_floors.id | floor_id>&uid=<sonorSymbol.uid>&device=<device ID>
+      // Read-only site view (Takeoffs v5.264.0+): opens the floor holding the device, centres on it, opens its panel
+      // (uid first, then device ID — TVs / LED runs have no uid; floor only → that floor).
+      // Used by: Tasks punch lists (v2.100.0) "📐 Open on site plan".
+      device:  { params: ['project', 'floor', 'uid', 'device'], hash: null }
+    },
+    engineering: {
+      // ?project=<projects.id>&node=<eng_state.nodes[].id>&uid=<sonorSymbol.uid>&rack=<eng_state.racks[].id>
+      //   &panel=<lighting_control.panels[].id>&circuit=<lighting_control.circuits key>&device=<device ID>
+      // Opens the sheet holding the node and selects it (node first, uid fallback); &rack= opens that rack,
+      // &panel= / &circuit= the lighting panel / circuit. &device= is the label shown, for a fallback search.
+      // Used by: Tasks punch lists (v2.100.0) "Open in Engineering".
+      device:  { params: ['project', 'node', 'uid', 'rack', 'panel', 'circuit', 'device'], hash: null }
+    },
+    netmap: {
+      // ?pid=<projects.id>&uid=<Takeoffs uid / eng:<node>>&device=<device ID>
+      // Opens the project's network config; uid / device pick the row once Network Map reads them.
+      // Used by: Service Contracts Equipment tab, Tasks equipment card (2026-10-31).
+      device:  { params: ['pid', 'uid', 'device'], hash: null }
+    },
+    tasks: {
+      // ?project=<projects.id>&view=list&device=<device ID>&uid=<source uid>
+      // Opens Tasks on the project; &device / &uid filter to that device's punch tasks (Tasks v2.101.0+).
+      // Used by: Service Contracts Equipment tab.
+      device:  { params: ['project', 'view', 'device', 'uid'], hash: null }
+    },
+    'service-contracts': {
+      // ?pid=<projects.id>&uid=<client_assets.source_uid>#equipment
+      // Opens Service Contracts on that project's equipment register (v0.19.0+); &uid highlights the row.
+      // Used by: Tasks equipment card / asset register.
+      equipment: { params: ['pid', 'uid'], hash: 'equipment' }
     }
   },
 
@@ -292,6 +334,37 @@ window.__SONOR_BRAND__ = {
     var qstr = qs.toString();
     var hash = contract.hash ? ('#' + contract.hash) : '';
     return base + (qstr ? ('?' + qstr) : '') + hash;
+  },
+
+  // ── Print render outputs (2026-10-31) ─────────────────
+  // PRINT repos serve their versioned renders from GitHub Pages at
+  // https://sonorltd.github.io/<slug>/output/… — the slug comes from
+  // appUrls.hosted[key] (github.com/sonorltd/<slug>/…), the folder from
+  // appUrls.local[key] ('../PRINT - X/output/'). No second list.
+  // printAsset('bizcards', 'v1.1.0/300dpi/dark/front_300dpi.png')
+  //   → local:  '../PRINT - Biz Cards/output/v1.1.0/300dpi/…'  (prefix opts.up extra '../')
+  //   → hosted: 'https://sonorltd.github.io/sonor-bizcards/output/v1.1.0/300dpi/…'
+  // Source: opts.source, else file: → local, anything else → hosted.
+  printAsset: function(appKey, relPath, opts) {
+    opts = opts || {};
+    var src = opts.source || ((typeof location !== 'undefined' && location.protocol === 'file:') ? 'local' : 'hosted');
+    if (src === 'local') {
+      var loc = (this.appUrls.local || {})[appKey];
+      return loc ? (new Array((opts.up || 0) + 1).join('../')) + loc + relPath : null;
+    }
+    var m = String((this.appUrls.hosted || {})[appKey] || '').match(/sonorltd(?:\.github\.io)?\/([a-z0-9-]+)/);
+    return m ? 'https://sonorltd.github.io/' + m[1] + '/output/' + relPath : null;
+  },
+  // Any path containing 'PRINT - X/output/…' (relative, %20-encoded or not) → its Pages URL, or null.
+  printHosted: function(path) {
+    var p = decodeURIComponent(String(path || ''));
+    var m = p.match(/(PRINT - [^/]+)\/output\/(.*)$/);
+    if (!m) return null;
+    var loc = this.appUrls.local || {};
+    for (var k in loc) {
+      if (String(loc[k]).indexOf('../' + m[1] + '/output/') === 0) return this.printAsset(k, m[2], { source: 'hosted' });
+    }
+    return null;
   },
 
   // Get service by nn, hex, or index

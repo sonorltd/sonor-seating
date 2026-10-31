@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0;url=dashboard/sonor-seating.html">
+  <!-- 2026-10-31: forward WITH ?pid / ?project and #hash (the meta refresh alone dropped them, so links into this app lost the project) -->
+<script>location.replace('dashboard/sonor-seating.html' + location.search + location.hash);</script>
+<noscript><meta http-equiv="refresh" content="0;url=dashboard/sonor-seating.html"></noscript>
   <title>Seating Configurator</title>
   <link rel="icon" href="data/favicon.svg" type="image/svg+xml">
 </head>
