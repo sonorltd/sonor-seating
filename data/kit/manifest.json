@@ -1,6 +1,6 @@
 {
-  "version": "0.9.0",
-  "built": "2026-10-21T17:26:07.000Z",
+  "version": "0.10.0",
+  "built": "2026-10-31T20:42:48.331776Z",
   "modules": [
     "sonor-theme.js",
     "sonor-icons.js",
@@ -13,7 +13,8 @@
     "sonor-catalogue-picker.js",
     "sonor-rack-data.js",
     "sonor-library-bar.js",
-    "sonor-links.js"
+    "sonor-links.js",
+    "sonor-who.js"
   ],
   "css": "kit.css"
 }
