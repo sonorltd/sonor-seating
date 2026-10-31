@@ -1,5 +1,5 @@
 /*!
- * sonor-block-glow.js — BLOCK GLOW + INFO CARD (root master, synced to every app's data/) — v1.2.0 · 2026-10-16
+ * sonor-block-glow.js — BLOCK GLOW + INFO CARD (root master, synced to every app's data/) — v1.3.1 · 2026-10-31
  * ----------------------------------------------------------------------------------------------------------------
  * Bryn: "make the takeoffs icons glow and be ref'd to info … without it becoming a ball and chain to manage".
  *
@@ -23,7 +23,12 @@
  *     related(el)  -> [el],             // optional — fainter halos (a speaker's pair, a zone's strips)
  *     selected()   -> el | null,        // optional — the app's current selection keeps its halo (no card)
  *     enabled()    -> bool              // optional — false while a drawing tool is active
+ *     haloShape: 'circle'|'rect'|'auto', // optional — 'auto' draws a rounded-rect halo around wide / tall elements (device cards)
+ *     hot(el)      -> [el],             // optional — elements tagged .sbg-hot while el is hovered / selected (a device's wires)
+ *     boxOf(el,pt) -> {left,top,width,height} | null   // optional — host-space box to glow instead of el's rect (a wire: around the pointer)
  *   })                                   // v1.2.0 — SVG canvases (Cinema Takeoff / Design). Same painter, same card, same rules.
+ *                                        // v1.3.0 — any positioned DOM host (React Flow panes, HTML rack grids): haloShape / hot / boxOf,
+ *                                        //          info.halo === false (card only — a wire), api.destroy() for component unmount.
  *   SonorBlockGlow.paintHalo(ctx, cx, cy, r, colour, {dpr, strength})   // pure painter (other canvases can reuse)
  *   SonorBlockGlow.cardHtml(info)                                        // pure HTML builder
  * Styling uses kit tokens (graphite first, slate fallback). The halo is a canvas effect for plan blocks — it is NOT
@@ -31,7 +36,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.2.0';   // 1.2.0 (2026-10-16, Bryn: "things like the glowing and mouseovers we now have in main takeoffs app, CD and CT has fallen well behind") — attachSvg(): the same halo + card for SVG canvases (Cinema Takeoff, Cinema Design plans)   // 1.1.0 (2026-10-13, Bryn: "needs to also disappear upon click and drag because it obscures the view") — card hides on mouse-down / drag; selection keeps the halo only; ⌥-click (Alt) pins the card
+  var VERSION = '1.3.1';   // 1.3.1 (2026-10-31, owner: "can tool tips not be direct under mouse") — attachSvg(): the card never sits under the pointer or over the hovered item (pointer corners as candidates)   // 1.3.0 (2026-10-30, Engineering polish: "flashy mouseovers like takeoffs" on React / HTML canvases) — attachSvg(): haloShape 'rect'|'auto' (rounded-rect halo for device cards), opts.hot (wires brighten with .sbg-hot), opts.boxOf, info.halo === false, api.destroy()   // 1.2.0 (2026-10-16, Bryn: "things like the glowing and mouseovers we now have in main takeoffs app, CD and CT has fallen well behind") — attachSvg(): the same halo + card for SVG canvases (Cinema Takeoff, Cinema Design plans)   // 1.1.0 (2026-10-13, Bryn: "needs to also disappear upon click and drag because it obscures the view") — card hides on mouse-down / drag; selection keeps the halo only; ⌥-click (Alt) pins the card
 
   function hexA(hex, a) {
     var h = String(hex || '#f5d05c').replace('#', '');
@@ -50,6 +55,18 @@
     ctx.shadowColor = hexA(colour, 0.95 * k); ctx.shadowBlur = 14 * dpr * k;
     ctx.strokeStyle = hexA(colour, 0.85 * k); ctx.lineWidth = 2 * dpr;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // v1.3.0 — the same breathing halo around a rectangle (a device card / rack face): soft wash + glowing edge.
+  function paintHaloRect(ctx, b, colour, o) {
+    o = o || {}; var dpr = o.dpr || 1, k = o.strength == null ? 1 : o.strength, pad = 5 * dpr, rad = (o.radius == null ? 7 : o.radius) * dpr;
+    function rr(x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+    ctx.save();
+    for (var i = 4; i >= 1; i--) { ctx.fillStyle = hexA(colour, 0.045 * k); rr(b.x - pad * i, b.y - pad * i, b.w + 2 * pad * i, b.h + 2 * pad * i, rad + pad * i); ctx.fill(); }
+    ctx.shadowColor = hexA(colour, 0.95 * k); ctx.shadowBlur = 14 * dpr * k;
+    ctx.strokeStyle = hexA(colour, 0.85 * k); ctx.lineWidth = 2 * dpr;
+    rr(b.x - pad / 2, b.y - pad / 2, b.w + pad, b.h + pad, rad); ctx.stroke();
     ctx.restore();
   }
 
@@ -76,7 +93,8 @@
       '.sbg-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}',
       '.sbg-links a,.sbg-links button{font-size:11px;font-weight:600;color:var(--text-primary,#F5F5F7);background:transparent;',
       ' border:1px solid var(--border,#3a3a3c);border-radius:5px;padding:2px 8px;cursor:pointer;text-decoration:none;}',
-      '.sbg-hint{margin-top:6px;font-size:10px;color:var(--text-muted,#98989D);}'
+      '.sbg-hint{margin-top:6px;font-size:10px;color:var(--text-muted,#98989D);}',
+      '.sbg-hot{--sbg-hot:1;}'   /* v1.3.0 — the app styles .sbg-hot (a hovered device\'s wires brighten); the class alone changes nothing */
     ].join('\n');
     var el = document.createElement('style'); el.id = 'sbg-styles'; el.textContent = css; document.head.appendChild(el);
   }
@@ -197,24 +215,38 @@
     opts = opts || {};
     if (!svg || svg.__sonorBlockGlow) return svg && svg.__sonorBlockGlow;
     ensureStyles();
-    var hostEl = svg.parentNode; if (!hostEl) return null;
+    var hostEl = opts.host || svg.parentNode; if (!hostEl) return null;   // v1.3.0 — opts.host: paint over a given positioned element (the host may BE the listened element)
     try { if (getComputedStyle(hostEl).position === 'static') hostEl.style.position = 'relative'; } catch (e) {}
     var ov = document.createElement('canvas'); ov.className = 'sonor-block-glow-layer'; ov.setAttribute('aria-hidden', 'true');
     ov.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:5;';
     var card = document.createElement('div'); card.className = 'sbg-card'; card.style.display = 'none';
     hostEl.appendChild(ov); hostEl.appendChild(card);
     var ctx = ov.getContext('2d'), hover = null, pinned = null, sel = null, info = null, raf = 0, suppressed = false, pressed = false, downId = null;
-    var selector = opts.selector || '[data-id]';
-    function idOf(o) { return o && o.getAttribute ? (o.getAttribute('data-id') || o.getAttribute('data-spk') || null) : null; }
+    var selector = opts.selector || '[data-id]', haloShape = opts.haloShape || 'circle', lastPt = null, hotEls = [];
+    function idOf(o) { return o && o.getAttribute ? (o.getAttribute('data-id') || o.getAttribute('data-spk') || o.getAttribute('data-device') || o.getAttribute('data-item-id') || null) : null; }
     function enabled() { try { return opts.enabled ? !!opts.enabled() : true; } catch (e) { return true; } }
     function resolve(o) { try { return o ? opts.resolve(o) : null; } catch (e) { console.warn('[block-glow] resolve', e && e.message); return null; } }
     function related(o) { try { return (o && opts.related) ? (opts.related(o) || []) : []; } catch (e) { return []; } }
     function selected() { try { return opts.selected ? opts.selected() : null; } catch (e) { return null; } }
-    function alive(o) { return !!(o && o.isConnected && svg.contains(o)); }
+    function inHost(o) { if (!o) return false; if (svg.contains(o)) return true; try { var r = o.getRootNode && o.getRootNode(); return !!(r && r.host && svg.contains(r.host)); } catch (e) { return false; } }   // v1.3.0 — shadow-DOM items (web-component grids) count when their host is inside
+    function alive(o) { return !!(o && o.isConnected && inHost(o)); }
     function screenBox(o) {
-      var r = o.getBoundingClientRect(), h = hostEl.getBoundingClientRect();
-      var box = { left: r.left - h.left + hostEl.scrollLeft, top: r.top - h.top + hostEl.scrollTop, width: r.width, height: r.height };
+      var box = null;
+      if (opts.boxOf) { try { box = opts.boxOf(o, lastPt) || null; } catch (e) { box = null; } }
+      if (!box) { var r = o.getBoundingClientRect(), h = hostEl.getBoundingClientRect(); box = { left: r.left - h.left + hostEl.scrollLeft, top: r.top - h.top + hostEl.scrollTop, width: r.width, height: r.height }; }
       return { cx: box.left + box.width / 2, cy: box.top + box.height / 2, r: Math.max(8, Math.max(box.width, box.height) / 2 + 5), box: box };
+    }
+    // v1.3.0 — circle (plan blocks) or rounded rect (device cards / rack faces); 'auto' picks by aspect
+    function halo(b, colour, o) {
+      var shape = haloShape; if (shape === 'auto') { var a = b.box.width / Math.max(1, b.box.height); shape = (a > 1.6 || a < 0.625 || Math.max(b.box.width, b.box.height) > 140) ? 'rect' : 'circle'; }
+      if (shape === 'rect') paintHaloRect(ctx, { x: b.box.left * o.dpr, y: b.box.top * o.dpr, w: b.box.width * o.dpr, h: b.box.height * o.dpr }, colour, o);
+      else paintHalo(ctx, b.cx * o.dpr, b.cy * o.dpr, b.r * o.dpr, colour, o);
+    }
+    function setHot(o) {
+      hotEls.forEach(function (el) { try { el.classList.remove('sbg-hot'); } catch (e) {} }); hotEls = [];
+      if (!o || !opts.hot) return;
+      try { hotEls = (opts.hot(o) || []).filter(Boolean); } catch (e) { hotEls = []; }
+      hotEls.forEach(function (el) { try { el.classList.add('sbg-hot'); } catch (e) {} });
     }
     function size() {
       var W = hostEl.clientWidth, H = hostEl.clientHeight, dpr = global.devicePixelRatio || 1;
@@ -226,20 +258,30 @@
       var focus = pinned || hover || sel; if (!focus) return; if (!alive(focus)) { clear(); return; }
       if (!info) { info = resolve(focus); if (!info) return; }
       var t = (Date.now() % 1600) / 1600, breathe = 0.82 + 0.18 * Math.sin(t * Math.PI * 2), rel = [];
-      related(focus).forEach(function (o) { if (!alive(o)) return; var rb = screenBox(o); rel.push(rb); paintHalo(ctx, rb.cx * s.dpr, rb.cy * s.dpr, rb.r * s.dpr, info.colour, { dpr: s.dpr, strength: 0.45 }); });
-      var b = screenBox(focus); paintHalo(ctx, b.cx * s.dpr, b.cy * s.dpr, b.r * s.dpr, info.colour, { dpr: s.dpr, strength: breathe });
+      related(focus).forEach(function (o) { if (!alive(o)) return; var rb = screenBox(o); rel.push(rb); halo(rb, info.colour, { dpr: s.dpr, strength: 0.45 }); });
+      var b = screenBox(focus); if (info.halo !== false) halo(b, info.colour, { dpr: s.dpr, strength: breathe });
       place(b, rel, s);
     }
     function place(b, rel, s) {
       if (card.style.display === 'none') return;
       var W = s.W, H = s.H, cw = card.offsetWidth || 240, ch = card.offsetHeight || 120, g = 14;
-      try { var hr = hostEl.getBoundingClientRect(), vw = global.innerWidth || W, vh = global.innerHeight || H; W = Math.min(W, vw - hr.left); H = Math.min(H, vh - hr.top - 34); } catch (e) {}
+      var hr = { left: 0, top: 0 };
+      try { hr = hostEl.getBoundingClientRect(); var vw = global.innerWidth || W, vh = global.innerHeight || H; W = Math.min(W, vw - hr.left); H = Math.min(H, vh - hr.top - 34); } catch (e) {}
       var cands = [[b.box.left + b.box.width + g, b.cy - ch / 2], [b.box.left - cw - g, b.cy - ch / 2], [b.cx - cw / 2, b.box.top + b.box.height + g], [b.cx - cw / 2, b.box.top - ch - g]];
-      var best = null, bestScore = 1e9;
+      // v1.3.1 (owner 2026-10-31: "can tool tips not be direct under mouse so clicking and moving devices is still possible")
+      // — the card never sits under the pointer or over the hovered item: corners round the pointer join the candidates,
+      // and a spot covering the pointer (+ a 28 px margin) or the hovered item's own box is ruled out before anything else.
+      var P = lastPt, M = 28;
+      if (P) cands.push([P.x + M, P.y + M], [P.x - cw - M, P.y + M], [P.x + M, P.y - ch - M], [P.x - cw - M, P.y - ch - M]);
+      var minX = 6, minY = 6;   // v1.3.0 — a host scrolled partly off the top / left (a tall rack frame) keeps the card on screen
+      try { if (hr.left < 0) minX = 6 - hr.left; if (hr.top < 0) minY = 6 - hr.top; } catch (e) {}
+      var bx = b.box, best = null, bestScore = 1e9;
       cands.forEach(function (c, i) {
-        var x = Math.max(6, Math.min(W - cw - 6, c[0])), y = Math.max(6, Math.min(H - ch - 6, c[1]));
+        var x = Math.max(minX, Math.min(W - cw - 6, c[0])), y = Math.max(minY, Math.min(H - ch - 6, c[1]));
+        var underPointer = P && P.x > x - M && P.x < x + cw + M && P.y > y - M && P.y < y + ch + M;
+        var overItem = bx && x < bx.left + bx.width && x + cw > bx.left && y < bx.top + bx.height && y + ch > bx.top;
         var cover = (rel || []).concat([b]).filter(function (r) { return r.cx > x - r.r && r.cx < x + cw + r.r && r.cy > y - r.r && r.cy < y + ch + r.r; }).length;
-        var score = cover * 100 + i; if (score < bestScore) { bestScore = score; best = [x, y]; }
+        var score = (underPointer ? 100000 : 0) + (overItem ? 10000 : 0) + cover * 100 + i; if (score < bestScore) { bestScore = score; best = [x, y]; }
       });
       card.style.left = Math.round(best[0]) + 'px'; card.style.top = Math.round(best[1]) + 'px';
     }
@@ -252,42 +294,70 @@
         var l = info.links[+btn.getAttribute('data-sbg-link')];
         btn.addEventListener('click', function (ev) { ev.stopPropagation(); try { l.onClick && l.onClick(o); } catch (e) { console.warn('[block-glow] link', e && e.message); } });
       });
+      setHot(o);
       loop();
     }
-    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint(); }
-    function target(ev) { var t = ev.target && ev.target.closest ? ev.target.closest(selector) : null; return (t && svg.contains(t)) ? t : null; }
-    svg.addEventListener('pointerover', function (ev) {
+    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; setHot(null); cancelAnimationFrame(raf); paint(); }
+    function target(ev) {
+      // v1.3.0 — walk the composed path first so items inside a web component's shadow root (e.g. a slot grid) resolve
+      var path = ev.composedPath ? ev.composedPath() : null;
+      if (path) { for (var i = 0; i < path.length; i++) { var n = path[i]; if (n === svg) break; if (n && n.matches && n.matches(selector) && inHost(n)) return n; } }
+      var t = ev.target && ev.target.closest ? ev.target.closest(selector) : null; return (t && inHost(t)) ? t : null;
+    }
+    function pt(ev) { try { var h = hostEl.getBoundingClientRect(); lastPt = { x: ev.clientX - h.left + hostEl.scrollLeft, y: ev.clientY - h.top + hostEl.scrollTop }; } catch (e) {} }
+    var L = [];   // v1.3.0 — every listener, so destroy() can take them off (React unmount / re-mount)
+    function on(el, ev, fn, cap) { el.addEventListener(ev, fn, cap); L.push([el, ev, fn, cap]); }
+    on(svg, 'pointermove', function (ev) {
+      pt(ev);
+      // v1.3.0 — pointerover is not reliable across shadow roots / SVG faces (Chromium skips the boundary event when the
+      // pointer crosses from a label into an <svg> inside a web component), so the move itself settles the hover too
+      if (pinned || pressed || !enabled()) return;
+      var o = target(ev); if (o === hover) return;
+      if (!o || !resolve(o)) { if (hover) { hover = null; info = null; card.style.display = 'none'; setHot(null); if (sel) loop(); else paint(); } return; }
+      if (suppressed) { if (idOf(o) && idOf(o) === downId) return; suppressed = false; }
+      hover = o; show(o, false);
+    }, true);
+    on(svg, 'pointerover', function (ev) {
       if (pinned || pressed || !enabled()) return; var o = target(ev); if (!o || o === hover || !resolve(o)) return;
       // after a click the card stays away from THAT element (and its re-rendered twin) until the pointer moves to another
       if (suppressed) { if (idOf(o) && idOf(o) === downId) return; suppressed = false; }
       hover = o; show(o, false);
     }, true);
-    svg.addEventListener('pointerout', function (ev) {
-      if (pinned) return; var o = target(ev); var to = ev.relatedTarget && ev.relatedTarget.closest ? ev.relatedTarget.closest(selector) : null;
-      if (o && o === hover && to !== o) { hover = null; info = null; card.style.display = 'none'; if (sel) loop(); else paint(); }
+    on(svg, 'pointerout', function (ev) {
+      if (pinned) return; var o = target(ev); var rt = ev.relatedTarget;
+      // v1.3.0 — a relatedTarget inside a shadow root is retargeted to its host; look through to what is really under the pointer
+      try { while (rt && rt.shadowRoot && rt.shadowRoot.elementFromPoint) { var deep = rt.shadowRoot.elementFromPoint(ev.clientX, ev.clientY); if (!deep || deep === rt) break; rt = deep; } } catch (e) {}
+      var to = rt && rt.closest ? rt.closest(selector) : null;
+      if (o && o === hover && to !== o) { hover = null; info = null; card.style.display = 'none'; setHot(null); if (sel) loop(); else paint(); }
       // suppression lifts only when the pointer truly leaves the svg (pointerleave) — a re-render swapping the node under a
       // still-pressed / just-clicked pointer must NOT bring the card straight back
     }, true);
-    svg.addEventListener('pointerdown', function (ev) {
-      var o = target(ev); pressed = true; downId = idOf(o);
+    on(svg, 'pointerdown', function (ev) {
+      var o = target(ev); pressed = true; downId = idOf(o); pt(ev);
       if (ev.altKey && o && enabled() && resolve(o)) { pinned = o; hover = null; suppressed = false; show(o, true); ev.preventDefault(); return; }
       if (pinned) pinned = null;
-      suppressed = true; hover = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint();
+      suppressed = true; hover = null; info = null; card.style.display = 'none'; setHot(null); cancelAnimationFrame(raf); paint();
     }, true);   // capture — the app's own element handlers may stop propagation (drag engines do)
-    document.addEventListener('pointerup', function () { pressed = false; }, true);
-    document.addEventListener('pointercancel', function () { pressed = false; }, true);
+    on(document, 'pointerup', function () { pressed = false; }, true);
+    on(document, 'pointercancel', function () { pressed = false; }, true);
     // a real leave (no button down — pointer-capture release fires a synthetic leave/enter pair while pressed) clears the hover
-    svg.addEventListener('pointerleave', function (ev) { if (pressed || (ev && ev.buttons)) return; suppressed = false; downId = null; if (!pinned) { hover = null; info = null; card.style.display = 'none'; if (sel) loop(); else paint(); } });
-    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && (pinned || hover)) clear(); });
+    on(svg, 'pointerleave', function (ev) { if (pressed || (ev && ev.buttons)) return; suppressed = false; downId = null; if (!pinned) { hover = null; info = null; card.style.display = 'none'; setHot(null); if (sel) loop(); else paint(); } });
+    on(document, 'keydown', function (ev) { if (ev.key === 'Escape' && (pinned || hover)) clear(); });
     // selection: the app tells us (api.select(el)) or we poll its selected() on refresh
     var api = {
       VERSION: VERSION,
       clear: clear,
+      destroy: function () {   // v1.3.0 — take the overlay, card and listeners away (React unmount); the host can be attached again later
+        clear(); L.forEach(function (l) { try { l[0].removeEventListener(l[1], l[2], l[3]); } catch (e) {} }); L = [];
+        try { ov.remove(); card.remove(); } catch (e) {} delete svg.__sonorBlockGlow;
+      },
       select: function (el) { if (pinned && el !== pinned) { pinned = null; card.style.display = 'none'; } sel = (el && enabled() && resolve(el)) ? el : null; info = null; loop(); },
       _state: function () { return { hover: !!hover, pinned: !!pinned, sel: !!sel, suppressed: suppressed, card: card.style.display !== 'none' }; },
       refresh: function () {   // call after the svg re-renders (elements are rebuilt): re-find hover/sel by data-id
-        var id = function (o) { return o && o.getAttribute ? o.getAttribute('data-id') : null; };
-        var find = function (o) { var i = id(o); if (!i) return null; return svg.querySelector(selector + '[data-id="' + CSS.escape(i) + '"]'); };
+        var find = function (o) {   // v1.3.0 — by any id attribute, honouring a comma selector
+          var i = idOf(o); if (!i) return null; var q = CSS.escape(i), all = svg.querySelectorAll('[data-id="' + q + '"], [data-device="' + q + '"], [data-item-id="' + q + '"]');
+          for (var k = 0; k < all.length; k++) { if (all[k].matches(selector)) return all[k]; } return null;
+        };
         if (hover && !alive(hover)) hover = find(hover); if (pinned && !alive(pinned)) pinned = find(pinned);
         var s2 = selected(); if (s2 !== undefined) sel = (s2 && resolve(s2)) ? s2 : null;
         info = null; var o = pinned || hover; if (o) show(o, !!pinned); else loop();
@@ -296,5 +366,5 @@
     svg.__sonorBlockGlow = api; return api;
   }
 
-  global.SonorBlockGlow = { VERSION: VERSION, attachFabric: attachFabric, attachSvg: attachSvg, paintHalo: paintHalo, cardHtml: cardHtml, ensureStyles: ensureStyles, hexA: hexA };
+  global.SonorBlockGlow = { VERSION: VERSION, attachFabric: attachFabric, attachSvg: attachSvg, paintHalo: paintHalo, paintHaloRect: paintHaloRect, cardHtml: cardHtml, ensureStyles: ensureStyles, hexA: hexA };
 })(typeof window !== 'undefined' ? window : this);
