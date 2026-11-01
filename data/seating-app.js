@@ -1264,19 +1264,22 @@
       });
     } catch (e) { console.warn('[seating] quote log failed', e); }
   }
-  async function savePdf() {
+  // v0.26.3 (2026-11-01) — savePdf(opts): opts.noLog → no seating_quotes insert (example / preview / test exports
+  // write nothing); the window.print() fallback is gone (Bryn: "make all exports work in the best pdf version") —
+  // a failure says so instead of opening the browser print dialog. Returns true when the PDF was produced.
+  async function savePdf(opts) {
+    opts = opts || {};
+    if (!(global.SeatingPdf && global.SeatingPdf.available())) { toast('PDF engine not loaded — reload the page and try again'); return false; }
     try {
-      if (global.SeatingPdf && global.SeatingPdf.available()) {
-        toast('Building PDF…');
-        var _m = pdfModel();
-        _m.quoteRef = cfg._lastQuoteRef = makeQuoteRef();
-        _m.filename = 'sonor-' + String(cfg.rangeId || 'seating') + '-' + _m.quoteRef + '.pdf';
-        logQuote(_m.quoteRef, _m);
-        var ok = await global.SeatingPdf.generate(_m);
-        if (ok) { toast('PDF downloaded'); return; }
-      }
-    } catch (e) { console.warn('[SeatingPdf]', e && e.message); toast('PDF failed — using print'); }
-    global.print();
+      toast('Building PDF…');
+      var _m = pdfModel();
+      _m.quoteRef = cfg._lastQuoteRef = makeQuoteRef();
+      _m.filename = 'sonor-' + String(cfg.rangeId || 'seating') + '-' + _m.quoteRef + '.pdf';
+      if (!opts.noLog) logQuote(_m.quoteRef, _m);
+      var ok = await global.SeatingPdf.generate(_m);
+      if (ok) { toast('PDF downloaded'); return true; }
+      toast('PDF failed — try again'); return false;
+    } catch (e) { console.warn('[SeatingPdf]', e && e.message); toast('PDF failed: ' + (e && e.message || e)); return false; }
   }
   // v0.22.0 — single-page internal BOM (never in the client build; no quote logging)
   // v0.22.1 — TRADE breakdown: fetches seating_prices trade values on demand (in-house
@@ -1348,13 +1351,14 @@
     var csvs = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csvs], { type: 'text/csv' })); a.download = 'seating-msrp-' + cfg.rangeId + '.csv'; a.click(); toast('CSV exported');
   }
-  function print() { global.print(); }
+  // v0.26.3 — the old window.print() entry point now gives the proposal PDF (no log when called as a preview)
+  function print(opts) { return savePdf(opts); }
 
   global.SeatingApp = {
     boot: boot, enter: enter, backToIntro: backToIntro, goBack: goBack, jumpTo: jumpTo, restart: restart,
     setLayout: setLayout, setLayout2: setLayout2, togglePref: togglePref,
     pickRange: pickRange, setMaterial: setMaterial, setColour: setColour, setMotor: setMotor,
-    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, saveBom: saveBom, toggleFinish: toggleFinish, setClient: setClient,
+    toggleArm: toggleArm, acc: acc, csv: csv, print: print, savePdf: savePdf, pdfModel: pdfModel, saveBom: saveBom, toggleFinish: toggleFinish, setClient: setClient,
     rowSet: rowSet, rowsReset: rowsReset,
     setConfig: setConfig, setConfigShape: setConfigShape, setConfigSeats: setConfigSeats, configResetPick: configResetPick,
     saveConfig: saveConfig, setFinal: setFinal, openSaved: openSaved, copySavedLink: copySavedLink, renameSaved: renameSaved, deleteSaved: deleteSaved
