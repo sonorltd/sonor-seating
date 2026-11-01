@@ -44,7 +44,8 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.7.1';   // v1.7.1 2026-11-01 — an outdoor strip's PSU at a HEAD END is an indoor (IP20) driver; IP65+ only when the PSU is local beside an outdoor strip
+  var VERSION = '1.7.2';   // v1.7.2 2026-11-01 — the house pixel strip is 24 V (Library PIXEL; 5 V kept as PIXEL-5V) and pixel types are not held to the COB house style
+  // was 1.7.1:   // v1.7.1 2026-11-01 — an outdoor strip's PSU at a HEAD END is an indoor (IP20) driver; IP65+ only when the PSU is local beside an outdoor strip
   // was 1.7.0:   // v1.7.0 2026-11-01 — CABLING kept apart from CONTROL and every cable type distinct (Bryn: "sepaate controls and cabling in tables and be distinct about the difff elements"): eng.cabling = LV field cable by role + core count (2C 24 V feed · nC decoder output = channels + common · 3C pixel V+ / data / 0 V) and csa, DMX data (link leads + 120 Ω terminators), Cat6 to the network, board wiring, and the 230 V circuits the electrical contractor provides; run.cable.cores / label
   // was 1.6.0:   // v1.6.0 2026-11-01 — every head-end item carries its Library MOUNT (metadata.mount → din | rack | surface; Bryn: "led panels are not necessarily din rail, they are psus and decoders mounted on the surface of 18mm ply usually. only make it din if a device has that property … a device is either din, racked or not") — SonorLedEng.mountOf(row)
   // was 1.5.0:   // v1.5.0 2026-11-01 — local drivers are fed by an FCU or a plug-in socket (Bryn: "local also needs options for plug-in or fcu which should be a criteria that carries through all apps" — run.localSupply 'fcu' | 'plug', rule localSupply) · head end or local per run (Bryn: "there should be a toggle for head end or local per circuit"), head-end boards, mains / dimmed-feed / fused-spur ELECTRICAL REQUIREMENTS shared with the other apps ("include electrical requirements which are linked with other apps") — SonorLedEng.electrical(); drawings in sonor-led-drawings.js
@@ -218,7 +219,8 @@
     if (force) { var f = strip(force); if (f && f.supply) return f; }
     var c = cfg(o), ss = c.stripSupply || {}, opts = supplyOptions(type.id, q, c);
     var best = opts[0] || null;
-    if (best && ss.style && best.supply.style !== ss.style && !q.allowOtherStyle) return null;   // house style only (COB) — no SMD fallback unless chosen
+    var dataType = num(type.dmx_channels, 0) >= 10 || /pixel|address/i.test(String(type.label || type.id || ''));   // 1.7.2 — pixel strip is never COB: house style does not apply
+    if (best && ss.style && best.supply.style !== ss.style && !q.allowOtherStyle && !dataType) return null;   // house style only (COB) — no SMD fallback unless chosen
     if (best && q.minIp && !(best.ip_num >= num(q.minIp))) return null;
     return best;
   }
@@ -449,7 +451,7 @@
         else noSupply = CAT.strips.length > 0;
       }
       var e = run(rn, st, c); if (!e) return; out.push(e);
-      if (noSupply) e.notes.push('no ' + String((c.stripSupply && c.stripSupply.style) || '').toUpperCase() + (outdoorQ ? ' IP' + c.outdoorMinIp + '+' : '') + ' supplier option under ' + (st.label || st.id) + ' — add one in Library › LED Strips');
+      if (noSupply) e.notes.push(['no', num(st.dmx_channels, 0) >= 10 ? '' : String((c.stripSupply && c.stripSupply.style) || '').toUpperCase(), outdoorQ ? 'IP' + c.outdoorMinIp + '+' : '', 'supplier option under'].filter(Boolean).join(' ') + ' ' + (st.label || st.id) + ' — add one in Library › LED Strips');
       var tk = (e.strip.typeId || e.strip.id || e.strip.label) + '|' + (e.strip.product ? e.strip.product.id : '');
       var t = byType[tk] = byType[tk] || { id: e.strip.typeId || e.strip.id, label: e.strip.label, volts: e.strip.volts, wpm: e.strip.wpm, reelM: e.strip.reelM, product: e.strip.product, metres: 0, runs: 0, load_w: 0 };
       t.metres += e.metres; t.runs++; t.load_w += e.load_w;
