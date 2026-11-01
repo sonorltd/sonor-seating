@@ -174,7 +174,8 @@ window.__SONOR_BRAND__ = {
       partners:       '../HUB - Partners/index.html',
       'service-contracts': '../APP - Service Contracts/dashboard/sonor-service-contracts.html',
       takeover:       '../APP - Takeover/dashboard/sonor-takeover.html',
-      'led-calc':     '../APP - LED Calc/dashboard/sonor-led-calc.html'
+      'led-calc':     '../APP - LED Calc/dashboard/sonor-led-calc.html',
+      'knx-panel':    '../APP - KNX Panel Builder/dashboard/sonor-knx-panel.html'
     },
     hosted: {
       master:      'https://apps.sonor.co.uk/sonor-master/',
@@ -256,7 +257,8 @@ window.__SONOR_BRAND__ = {
       partners:       'https://apps.sonor.co.uk/sonor-partners/',
       'service-contracts': 'https://apps.sonor.co.uk/sonor-service-contracts/',
       takeover:       'https://apps.sonor.co.uk/sonor-takeover/',
-      'led-calc':     'https://apps.sonor.co.uk/sonor-led-calc/'
+      'led-calc':     'https://apps.sonor.co.uk/sonor-led-calc/',
+      'knx-panel':    'https://apps.sonor.co.uk/sonor-knx-panel/'
     }
   },
 

@@ -1,4 +1,12 @@
-/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.6.0, root master)
+/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.7.0, root master)
+   v1.7.0 (2026-11-01, cover art set — Bryn: "use the file list and review notes in 027, then ingest … and check the actual A3/A4 cover
+   overlays and crops" · "obvs when we have a1 a0 these should be stretched out"): cover({ layout: 'art' }) (alias background: true) — the
+   house cover ART (Branding - CORE/PDF-COVERS, black void, subject lower-right / right 45 %) drawn full bleed, cover-fit at ANY sheet size
+   (A4 → A0, never capped), with NO fade / band; mark + wordmark, eyebrow, title (wraps up to 3 lines, steps down 54 → 28 pt), subtitle
+   (2 lines) and the info cells are set INSIDE the clean zone — portrait: the top of the page down to 52 % of its height · landscape:
+   the left 55 % column. Every size scales with the sheet's short side (an A3 copy = the A4 one enlarged). opts.heroLandscape picks the
+   landscape image on a landscape sheet. loadCoverArt(doc, url, landscape?) loads <name>-landscape.jpg on a landscape sheet (the default
+   is the current sheet()) and falls back to the other twin. A project photo cover (no layout) is unchanged — byte-identical.
    v1.6.0 (2026-11-01, LED Calc — Bryn: "drawing could be better like it is from other apps"): the DRAWING SHEET anatomy the Stretched
    Fabric design pack proved (fabric-pack.js head / foot / lay / legend / scaleBar), lifted here so every app's drawing pages share it:
    drawingSheet(P, F, o) → { box, notes } paints the head (mark + project / drawing no. + revision, eyebrow "<no> · DESIGN DEVELOPMENT",
@@ -254,11 +262,103 @@
     P.page.drawSvgPath(WA, { x: phX - 14, y: 45.6, scale: 9.5 / 24, color: col(GDEEP) });
   }
 
+  // ── COVER ART (v1.7.0) — the house background art: full bleed, no fade, text only in the clean zone ─────
+  function isLandscape() { return A4.w > A4.h; }
+  function artTwinUrl(url, landscape) {
+    var u = String(url || ''), m = /^(.*?)(-landscape)?(\.[a-z0-9]+)(\?.*)?$/i.exec(u);
+    if (!m) return u;
+    return m[1] + (landscape ? '-landscape' : '') + m[3] + (m[4] || '');
+  }
+  // load the cover art for the sheet's orientation: <name>.jpg (portrait) / <name>-landscape.jpg (landscape), falling back to the twin
+  async function loadCoverArt(doc, url, landscape) {
+    if (landscape == null) landscape = isLandscape();
+    var want = artTwinUrl(url, landscape), other = artTwinUrl(url, !landscape);
+    try { return await loadImage(doc, want); } catch (e) { return await loadImage(doc, other); }
+  }
+  function coverArt(P, F, opts) {
+    var W = A4.w, H = A4.h, LAND = W > H, k = Math.min(W, H) / 595.28, m = M * k, fi = M * 0.62 * k;
+    P.rect(0, 0, W, H, COL.DARK);
+    var img = (LAND && opts.heroLandscape) ? opts.heroLandscape : (!LAND && opts.heroPortrait) ? opts.heroPortrait : opts.hero;
+    if (img) {   // cover-fit, centred — the art is 1:1.414 like every ISO sheet, so A4 → A0 fills with no crop and no distortion
+      var iw = img.width, ih = img.height, s = Math.max(W / iw, H / ih), dw = iw * s, dh = ih * s;
+      P.image(img, (W - dw) / 2, (H - dh) / 2, dw, dh, 1);
+    }
+    P.rectB(fi, fi, W - fi * 2, H - fi * 2, COL.GOLD, 0.7 * k, 0.34);
+    var bc = opts.brandColour || COL.CREAM, brandTop = fi + 22 * k;
+    P.logo(m, brandTop, 30 * k, bc);
+    P.tracked('SONOR', m + 37 * k, fi + 28 * k, 18 * k, F.b, bc, 4.2 * k);
+    // the clean zone
+    var zx = m, zw = LAND ? W * 0.55 - m - 14 * k : W - m * 2;
+    var zTop = brandTop + 30 * k + 46 * k, zBot = LAND ? H - fi - 34 * k : H * 0.52;
+    var title = String(opts.title || 'Proposal'), eyebrow = String(opts.eyebrow || 'PROPOSAL').toUpperCase();
+    var sub = opts.subtitle ? String(opts.subtitle) : '', info = (opts.info || []).slice(0, 3);
+    function fitLines(str, font, size, width, max) {
+      var ls = wrap(str, font, size, width);
+      var hb = []; ls.forEach(function (ln) { while (font.widthOfTextAtSize(ln, size) > width && ln.length > 1) { var n = ln.length; while (n > 1 && font.widthOfTextAtSize(ln.slice(0, n), size) > width) n--; hb.push(ln.slice(0, n)); ln = ln.slice(n); } hb.push(ln); }); ls = hb;   // a word wider than the cell breaks onto the next line, never clipped
+      if (ls.length > max) { var keep = ls.slice(0, max), last = keep[max - 1] + '…'; while (last.length > 1 && font.widthOfTextAtSize(last, size) > width) last = last.slice(0, -2) + '…'; keep[max - 1] = last; return keep; }
+      return ls;
+    }
+    var cols = info.length || 1, cw = zw / cols, infoSize = (cw < 150 * k ? 11 : 12.5) * k, infoLh = infoSize * 1.2;
+    var infoVals = info.map(function (c) {   // a value too wide for its cell breaks at its ' · ' separators first, then by words
+      var v = String(c[1] || '—'), cwi = cw - 16 * k;
+      if (F.b.widthOfTextAtSize(v, infoSize) <= cwi || v.indexOf('·') < 0) return fitLines(v, F.b, infoSize, cwi, 3);
+      var out = []; v.split(/\s*·\s*/).filter(Boolean).forEach(function (part) { out = out.concat(fitLines(part, F.b, infoSize, cwi, 3)); });
+      return out.length > 3 ? fitLines(out.join(' '), F.b, infoSize, cwi, 3) : out;
+    });
+    var infoLines = infoVals.reduce(function (a, v) { return Math.max(a, v.length); }, 1);
+    var subSize = 19 * k, subLh = 24 * k;
+    function layout(tsz) {
+      var tl = wrap(title, F.b, tsz, zw);
+      var sl = sub ? fitLines(sub, F.l, subSize, zw, 2) : [];
+      var h = 8.5 * k + 22 * k + tl.length * tsz * 1.06 + (sl.length ? 14 * k + sl.length * subLh : 0) + (info.length ? 34 * k + 13 * k + infoLines * infoLh : 0);
+      return { tsz: tsz, tl: tl, sl: sl, h: h };
+    }
+    var sizes = [54, 46, 40, 34, 30, 26].map(function (v) { return v * k; }), L = null;
+    for (var i = 0; i < sizes.length; i++) {   // the biggest size that keeps the title to 2 lines (3 at the small end) and the block inside the zone
+      var c = layout(sizes[i]), wide = c.tl.some(function (ln) { return F.b.widthOfTextAtSize(ln, sizes[i]) > zw; });
+      if (!wide && c.tl.length <= (i < 3 ? 2 : 3) && c.h <= zBot - zTop) { L = c; break; }
+    }
+    if (!L) { L = layout(sizes[sizes.length - 1]); L.tl = fitLines(title, F.b, L.tsz, zw, 3); }
+    var room = Math.max(0, zBot - zTop - L.h), y = zTop + room * (LAND ? 0.5 : 0.62);
+    P.hline(zx, zx + 26 * k, y + 4 * k, COL.GOLD, 1 * k, 0.95);
+    P.tracked(eyebrow, zx + 34 * k, y, 8.5 * k, F.r, COL.GOLDL, 3.2 * k);
+    y += 8.5 * k + 22 * k;
+    L.tl.forEach(function (ln) { P.text(ln, zx - 2 * k, y, L.tsz, F.b, COL.CREAM); y += L.tsz * 1.06; });
+    if (L.sl.length) { y += 14 * k; L.sl.forEach(function (ln) { P.text(ln, zx, y, subSize, F.l, COL.GOLDL); y += subLh; }); }
+    if (info.length) {
+      y += 34 * k;
+      P.hline(zx, zx + zw, y - 16 * k, COL.GOLD, 0.5 * k, 0.45);
+      info.forEach(function (c, i) {
+        var x = zx + i * cw;
+        P.tracked(String(c[0] || ''), x, y, 7 * k, F.r, COL.INFO, 1.8 * k);
+        infoVals[i].forEach(function (ln, j) { P.text(ln, x, y + 13 * k + j * infoLh, infoSize, F.b, COL.CREAM); });
+      });
+    }
+    // logo strip — the clear band BELOW the frame, as on the photo cover (CEDIA right, or first in a partner strip)
+    var cyL = H - 14 * k;
+    if (opts.footLogos && opts.footLogos.length) {
+      var fx = m, fh = 12 * k, gapF = 22 * k;
+      if (opts.cediaImg) { var ch0 = ((opts.cediaImg.width / opts.cediaImg.height) < 3 ? 13 : 9) * k; var cw0 = ch0 * (opts.cediaImg.width / opts.cediaImg.height); P.image(opts.cediaImg, fx, cyL - ch0 / 2, cw0, ch0, 0.92); fx += cw0 + gapF + 6 * k; }
+      opts.footLogos.filter(Boolean).forEach(function (im) { var fw = im.width * (fh / im.height), h2 = fh; if (fw > 70 * k) { fw = 70 * k; h2 = im.height * (fw / im.width); } P.image(im, fx, cyL - h2 / 2, fw, h2, 0.9); fx += fw + gapF; });
+    } else if (opts.cediaImg) {
+      var ch = ((opts.cediaImg.width / opts.cediaImg.height) < 3 ? 13 : 9) * k, cwd = ch * (opts.cediaImg.width / opts.cediaImg.height);
+      P.image(opts.cediaImg, W - m - cwd, cyL - ch / 2, cwd, ch, 0.92);
+    } else {
+      P.trackedRight('CEDIA MEMBER', W - m, cyL - 3 * k, 6 * k, F.r, COL.INFO, 1.2 * k);
+    }
+    if (opts.centreLogoImg) {
+      var mlh = 10 * k, mlw = opts.centreLogoImg.width * (mlh / opts.centreLogoImg.height);
+      if (mlw > 95 * k) { mlw = 95 * k; mlh = opts.centreLogoImg.height * (mlw / opts.centreLogoImg.width); }
+      P.image(opts.centreLogoImg, (W - mlw) / 2, cyL - mlh / 2, mlw, mlh, 0.92);
+    }
+  }
+
   // ── COVER — dark hero cover, identical anatomy to the seating proposal ─────
   // opts: { hero, fadeImg, eyebrow, title, subtitle, info:[[LABEL,value]×3],
   //         centreLogoImg, cediaImg }
   function cover(P, F, opts) {
     opts = opts || {};
+    if (opts.layout === 'art' || opts.background === true) return coverArt(P, F, opts);   // v1.7.0 — the house art layout
     P.rect(0, 0, A4.w, A4.h, COL.DARK);
     if (opts.hero) {
       var iw = opts.hero.width, ih = opts.hero.height, s = Math.max(A4.w / iw, A4.h / ih);
@@ -433,12 +533,12 @@
 
   global.SonorPdfLuxury = {
     drawingSheet: drawingSheet, scaleBar: scaleBar, scaleOf: scaleOf,
-    __version: '1.6.0', sheet: sheet, SHEETS: SHEETS, TW: TW, theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
+    __version: '1.7.0', sheet: sheet, SHEETS: SHEETS, TW: TW, theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
     A4: A4, M: M, COL: COL, HOUSE: HOUSE, WA: WA,
     col: col, hexRgb: hexRgb, fadePngDataUrl: fadePngDataUrl,
     fetchBytes: fetchBytes, loadImage: loadImage,
     mk: mk, wrap: wrap, money: money, mm: mm,
     makeFonts: makeFonts, pageHead: pageHead, pageFoot: pageFoot,
-    cover: cover, specRows: specRows, sectionHead: sectionHead
+    cover: cover, coverArt: coverArt, loadCoverArt: loadCoverArt, artTwinUrl: artTwinUrl, isLandscape: isLandscape, specRows: specRows, sectionHead: sectionHead
   };
 })(window);
