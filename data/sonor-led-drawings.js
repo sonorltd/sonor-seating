@@ -23,7 +23,8 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.2.0';
+  var VERSION = '1.2.2';   // 1.2.2 2026-11-01 — field cables read their real cores (engine 1.7.0 cable.label: 5C for an RGBW decoder output, 3C pixel)
+  // was 1.2.1:   // 1.2.1 2026-11-01 — ply board drawn neutral (no cream / brown tint), Sonor PDF paper law
   function num(x, d) { var n = Number(x); return isFinite(n) ? n : (d || 0); }
   function r1(x) { return Math.round(x * 10) / 10; }
   function pad3(n) { return ('00' + n).slice(-3); }
@@ -51,9 +52,9 @@
   };
   var THEME = {
     dark:  { bg: '#16191e', text: '#eef0f3', muted: '#98a1ac', faint: '#59606a', line: '#3a4049', box: '#22262d', boxLine: '#56606b', encl: '#7d8792', tab: '#2b3038',
-             board: '#262b32', boardLine: '#6b7480', ply: '#3b342a', plyEdge: '#8a7a5e', grain: '#4a4134', trunk: '#3a4049', trunkSlot: '#4b525c', rail: '#9aa3ae', mcb: '#d9dde2', mcbInk: '#16191e', term: '#c9ced4', knock: '#16191e', dim: '#98a1ac' },
+             board: '#262b32', boardLine: '#6b7480', ply: '#24272c', plyEdge: '#6b7480', grain: '#2e3238', trunk: '#3a4049', trunkSlot: '#4b525c', rail: '#9aa3ae', mcb: '#d9dde2', mcbInk: '#16191e', term: '#c9ced4', knock: '#16191e', dim: '#98a1ac' },
     paper: { bg: null, text: [24, 24, 24], muted: [112, 112, 112], faint: [190, 190, 190], line: [214, 214, 214], box: [255, 255, 255], boxLine: [70, 70, 70], encl: [120, 120, 120], tab: [244, 243, 240],
-             board: [250, 249, 246], boardLine: [90, 90, 90], ply: [238, 226, 203], plyEdge: [150, 128, 92], grain: [222, 206, 176], trunk: [226, 226, 226], trunkSlot: [196, 196, 196], rail: [150, 150, 150], mcb: [255, 255, 255], mcbInk: [24, 24, 24], term: [236, 236, 236], knock: [251, 250, 247], dim: [70, 70, 70] }
+             board: [250, 249, 246], boardLine: [90, 90, 90], ply: [250, 250, 249], plyEdge: [90, 90, 90], grain: [232, 232, 230], /* 1.2.1 — no cream (Bryn: "get rid of the cream background of panels") */ trunk: [226, 226, 226], trunkSlot: [196, 196, 196], rail: [150, 150, 150], mcb: [255, 255, 255], mcbInk: [24, 24, 24], term: [236, 236, 236], knock: [251, 250, 247], dim: [70, 70, 70] }
   };
   var NOMINAL = { driver: function (w) { var t = [[30, 158, 46], [60, 160, 58], [75, 170, 45], [100, 170, 45], [150, 179, 63], [200, 195, 67], [240, 210, 72], [320, 215, 78]]; for (var i = 0; i < t.length; i++) if (w <= t[i][0]) return [t[i][1], t[i][2]]; return [230, 80]; },
     decoder: [175, 46], node: [90, 62], pixel: [120, 70], din: [72, 90] };
@@ -114,9 +115,9 @@
     function two(n) { return ('0' + n).slice(-2); }
     function runCard(e) {
       var triac = e.control === 'triac', inL = e.decoder ? { label: 'PWM IN', chip: (e.dmx && e.dmx.channels > 1 ? e.dmx.channels + ' ch' : '1 ch'), wire: 'pwm' } : (e.pixel ? { label: 'DATA + ' + (e.strip.volts || 5) + ' V', chip: 'SPI', wire: 'data' } : { label: (e.strip.volts || 24) + ' V IN', chip: '+ −', wire: 'lv' });
-      var foot = (e.feeds || []).length + ' feed' + ((e.feeds || []).length === 1 ? '' : 's') + (e.cable ? '  ·  2C ' + e.cable.csa + ' mm²  ·  ' + e.cable.length_m + ' m  ·  ' + e.cable.drop_pct + ' %' : '') + (e.dmx && e.dmx.address ? '  ·  U' + e.dmx.universe + ' ' + pad3(e.dmx.address) : '') + (e.pixel && e.pixel.output ? '  ·  ' + e.pixel.output : '');
+      var foot = (e.feeds || []).length + ' feed' + ((e.feeds || []).length === 1 ? '' : 's') + (e.cable ? '  ·  ' + (e.cable.label || '2C ' + e.cable.csa + ' mm²') + '  ·  ' + e.cable.length_m + ' m  ·  ' + e.cable.drop_pct + ' %' : '') + (e.dmx && e.dmx.address ? '  ·  U' + e.dmx.universe + ' ' + pad3(e.dmx.address) : '') + (e.pixel && e.pixel.output ? '  ·  ' + e.pixel.output : '');
       return { kind: 'run', role: 'run', id: String(e.id), title: e.strip.label, sub: (e.strip.product && e.strip.product.sku ? e.strip.product.sku + '  ·  ' : '') + r1(e.metres) + ' m  ·  ' + Math.round(e.load_w) + ' W  ·  ' + (e.strip.volts || 24) + ' V', tag: 'LED', left: [inL], right: [], foot: foot, loc: (e.floor ? e.floor + '  ·  ' : '') + (e.room || ''), run: e,
-        info: [['Strip', e.strip.label + (e.strip.product && e.strip.product.sku ? ' (' + e.strip.product.sku + ')' : '')], ['Length · load', r1(e.metres) + ' m · ' + Math.round(e.load_w) + ' W'], ['Control', triac ? 'Triac (mains-dimmed PSU)' : (e.controlLabel || e.control)], ['Feeds', (e.feeds || []).length + (e.cable ? ' · 2C ' + e.cable.csa + ' mm² · ' + e.cable.length_m + ' m · ' + e.cable.drop_pct + ' % drop' : '')]].concat(e.dmx && e.dmx.address ? [['DMX', 'U' + e.dmx.universe + ' ' + pad3(e.dmx.address) + (e.dmx.channels > 1 ? '–' + pad3(e.dmx.address + e.dmx.channels - 1) : '') + (e.dmx.node ? ' · ' + e.dmx.node : '')]] : []) };
+        info: [['Strip', e.strip.label + (e.strip.product && e.strip.product.sku ? ' (' + e.strip.product.sku + ')' : '')], ['Length · load', r1(e.metres) + ' m · ' + Math.round(e.load_w) + ' W'], ['Control', triac ? 'Triac (mains-dimmed PSU)' : (e.controlLabel || e.control)], ['Feeds', (e.feeds || []).length + (e.cable ? ' · ' + (e.cable.label || '2C ' + e.cable.csa + ' mm²') + ' · ' + e.cable.length_m + ' m · ' + e.cable.drop_pct + ' % drop' : '')]].concat(e.dmx && e.dmx.address ? [['DMX', 'U' + e.dmx.universe + ' ' + pad3(e.dmx.address) + (e.dmx.channels > 1 ? '–' + pad3(e.dmx.address + e.dmx.channels - 1) : '') + (e.dmx.node ? ' · ' + e.dmx.node : '')]] : []) };
     }
     function psuCard(e) {
       var dr = e.driver || {}, triac = e.control === 'triac', n = ++seq.psu;
@@ -215,7 +216,7 @@
               wires.push({ cls: 'lv', id: e.id + '-V', from: [psuOf[e.id], 'r', 0], to: [ctl, 'l', k + 1] });
               wires.push({ cls: ctl.role === 'pixel' ? 'data' : 'pwm', id: e.id + (ctl.role === 'pixel' ? '-D' : '-P'), from: [ctl, 'r', k], to: [runOf[e.id], 'l', 0], label: ctl.right[k].label });
             });
-          } else cl.runs.forEach(function (e) { wires.push({ cls: 'lv', id: e.id + '-V', from: [psuOf[e.id], 'r', 0], to: [runOf[e.id], 'l', 0], spec: e.cable ? (e.strip.volts || 24) + ' V  ·  2C ' + e.cable.csa + ' mm²  ·  ' + e.cable.length_m + ' m' : null, note: e.control === 'triac' ? 'mains-dimmed at the PSU — no decoder' : '' }); });
+          } else cl.runs.forEach(function (e) { wires.push({ cls: 'lv', id: e.id + '-V', from: [psuOf[e.id], 'r', 0], to: [runOf[e.id], 'l', 0], spec: e.cable ? (e.strip.volts || 24) + ' V  ·  ' + (e.cable.label || '2C ' + e.cable.csa + ' mm²') + '  ·  ' + e.cable.length_m + ' m' : null, note: e.control === 'triac' ? 'mains-dimmed at the PSU — no decoder' : '' }); });
           yc = ctop + H;
         });
         // head-end supply cards — at the mean of their PSUs, pushed apart

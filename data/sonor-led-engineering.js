@@ -44,7 +44,9 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.6.0';   // v1.6.0 2026-11-01 — every head-end item carries its Library MOUNT (metadata.mount → din | rack | surface; Bryn: "led panels are not necessarily din rail, they are psus and decoders mounted on the surface of 18mm ply usually. only make it din if a device has that property … a device is either din, racked or not") — SonorLedEng.mountOf(row)
+  var VERSION = '1.7.1';   // v1.7.1 2026-11-01 — an outdoor strip's PSU at a HEAD END is an indoor (IP20) driver; IP65+ only when the PSU is local beside an outdoor strip
+  // was 1.7.0:   // v1.7.0 2026-11-01 — CABLING kept apart from CONTROL and every cable type distinct (Bryn: "sepaate controls and cabling in tables and be distinct about the difff elements"): eng.cabling = LV field cable by role + core count (2C 24 V feed · nC decoder output = channels + common · 3C pixel V+ / data / 0 V) and csa, DMX data (link leads + 120 Ω terminators), Cat6 to the network, board wiring, and the 230 V circuits the electrical contractor provides; run.cable.cores / label
+  // was 1.6.0:   // v1.6.0 2026-11-01 — every head-end item carries its Library MOUNT (metadata.mount → din | rack | surface; Bryn: "led panels are not necessarily din rail, they are psus and decoders mounted on the surface of 18mm ply usually. only make it din if a device has that property … a device is either din, racked or not") — SonorLedEng.mountOf(row)
   // was 1.5.0:   // v1.5.0 2026-11-01 — local drivers are fed by an FCU or a plug-in socket (Bryn: "local also needs options for plug-in or fcu which should be a criteria that carries through all apps" — run.localSupply 'fcu' | 'plug', rule localSupply) · head end or local per run (Bryn: "there should be a toggle for head end or local per circuit"), head-end boards, mains / dimmed-feed / fused-spur ELECTRICAL REQUIREMENTS shared with the other apps ("include electrical requirements which are linked with other apps") — SonorLedEng.electrical(); drawings in sonor-led-drawings.js
   // was 1.4.0:   // v1.4.0 2026-11-01 — generic strip types stay master, supplier products sit under each type (Bryn: "keep the library generic strip types as the master but make ultra leds an option for supplier of each type as a sub of it, ali express and other suppliers also"), default = COB from UltraLEDs (Bryn: "only use cob type strips from ultra leds"); DMX lines patch to Art-Net nodes / interfaces — several per project (Bryn: "option for which node a dmx line connects to, sometimes there will be multiple"), Art-Net default = Sonor custom ESP node · pixel strip = its own controller (Bryn: "single colour as triac dimmed psu, rgbw is dmx, pixel is own controller"); DMX decoders, DMX interfaces and pixel controllers are Library products (pm_lighting_control_types.metadata.led) picked per zone / universe / control system (Bryn: "include d4e and other dmx decoders and c4 edidio + artnet nodes")
   // was 1.3.1:   // v1.3.1 2026-10-31 — prefer matches a manufacturer OR a range / name (Bryn: "we usually use tagra drivers from ultra leds so default to those" → rule preferManufacturer = 'Tagra')
@@ -369,8 +371,9 @@
     var ch = num(st.dmx_channels, 1), data = ch >= 10 || /pixel|address/i.test(String(st.label || st.id || ''));
     var ctl = controlFor(rn, st);
     var outdoor = !!(rn.outdoor || (o && o.outdoor));
-    var drv = pickDriver(load, { kind: 'cv', volts: volts, control: ctl.id, minIp: outdoor ? c.outdoorMinIp : (rn.minIp || null), prefer: rn.preferManufacturer || c.preferManufacturer, driverProductId: rn.driverProductId || null }, c);   // 1.3.0 — a real Library product
-    if (drv.source === 'fallback' && CAT.drivers.length) notes.push('no Library driver matches ' + volts + ' V / ' + ctl.label + (outdoor ? ' / IP' + c.outdoorMinIp + '+' : '') + ' — generic size shown');
+    var drvOut = outdoor && loc !== 'head-end';   // 1.7.1 — a head-end PSU sits indoors on the board: IP20, even when its strip is outside
+    var drv = pickDriver(load, { kind: 'cv', volts: volts, control: ctl.id, minIp: drvOut ? c.outdoorMinIp : (rn.minIp || null), prefer: rn.preferManufacturer || c.preferManufacturer, driverProductId: rn.driverProductId || null }, c);   // 1.3.0 — a real Library product
+    if (drv.source === 'fallback' && CAT.drivers.length) notes.push('no Library driver matches ' + volts + ' V / ' + ctl.label + (drvOut ? ' / IP' + c.outdoorMinIp + '+' : '') + ' — generic size shown');
     var dmxCh = ctl.id === 'dmx' ? (data ? 0 : Math.max(1, ch)) : 0;   // data strips take a pixel-controller output, not channels
     return {
       id: rn.id || rn.label || '', label: rn.label || rn.id || '', floor: rn.floor || '', room: rn.room || '',
@@ -547,7 +550,54 @@
       headEnds: headEnds
     };
     res.electrical = electrical(res, c);   // 1.5.0
+    res.cabling = cabling(res, c);   // 1.7.0
     return res;
+  }
+
+  // ── cabling (1.7.0) — every cable type distinct, never mixed with the control kit ─────────────────────────
+  // field  — the LV cable from the head end / local PSU to the strip, by what it carries: 24 V feed (2C), decoder output (channels + a common
+  //          +V: 1 ch 2C, tunable 3C, RGB 4C, RGBW 5C, RGBCCT 6C) or pixel (3C V+ / data / 0 V; extra injection feeds are 2C). Metres per csa
+  //          from the feed cables, + 15 %.
+  // data   — DMX: one link lead per decoder (node → decoder → decoder daisy chain) + a 120 Ω terminator on the last decoder of each universe;
+  //          Cat6 from the network switch to each node / pixel controller (PoE where the node takes it).
+  // board  — short PSU → decoder / controller links on the board (count, cut on site).
+  // mains  — the 230 V circuits, by the electrical contractor (radials, dimmed feeds, FCUs / sockets — see electrical()).
+  function coresFor(e) { if (e.pixel) return 3; if (e.decoder && e.dmx && !e.dmx.data) return Math.max(1, num(e.dmx.channels, 1)) + 1; return 2; }
+  function cableRole(e) { return e.pixel ? 'pixel' : (e.decoder ? 'decoder' : 'feed'); }
+  function cabling(eng, c) {
+    var field = {}, board = 0, dec = 0, buses = {}, cat6 = 0;
+    (eng.runs || []).forEach(function (e) {
+      var cores = coresFor(e), role = cableRole(e);
+      (e.cables || []).forEach(function (cb, k) {
+        var nC = role === 'pixel' && k > 0 ? 2 : cores, rl = role === 'pixel' && k > 0 ? 'feed' : role;
+        cb.cores = nC; cb.label = nC + 'C ' + cb.csa + ' mm²';
+        var key = rl + '|' + nC + '|' + cb.csa, f = field[key] = field[key] || { role: rl, cores: nC, csa: cb.csa, metres: 0, runs: [] };
+        f.metres += num(cb.length_m); if (f.runs.indexOf(e.id) < 0) f.runs.push(e.id);
+      });
+      if (e.cable) { e.cable.cores = cores; e.cable.label = cores + 'C ' + e.cable.csa + ' mm²'; e.cable.role = role; }
+      if (e.decoder || e.pixel) board++;
+    });
+    var ctl = eng.controllers || {};
+    (ctl.decoderProducts || []).forEach(function (d) { dec += num(d.qty); });
+    (eng.runs || []).forEach(function (e) { if (e.decoder && e.dmx && e.dmx.universe) buses[(e.dmx.node || '?') + '|' + e.dmx.universe] = 1; });
+    (ctl.nodes || []).forEach(function (n) { if (n.runs) cat6 += Math.max(1, (n.interface && n.interface.qty) || 1); });
+    cat6 += num(ctl.pixel && ctl.pixel.controllers);
+    var ROLE = { feed: '24 V feed (PSU to strip)', decoder: 'Decoder output (decoder to strip)', pixel: 'Pixel strip (controller to strip)' };
+    var CORES = { feed: 'V+ / 0 V', pixel: 'V+ / data / 0 V' };
+    var fieldRows = Object.keys(field).map(function (k) { var f = field[k]; return { role: f.role, what: ROLE[f.role], cores: f.cores, csa: f.csa, label: f.cores + 'C ' + f.csa + ' mm²', conductors: f.role === 'decoder' ? 'common +V / ' + (f.cores - 1) + ' channel' + (f.cores === 2 ? '' : 's') : CORES[f.role], metres: Math.ceil(f.metres * 1.15), runs: f.runs }; })
+      .sort(function (a, b) { var o = { feed: 0, decoder: 1, pixel: 2 }; return o[a.role] - o[b.role] || a.cores - b.cores || parseFloat(a.csa) - parseFloat(b.csa); });
+    var el = eng.electrical || {}, t = el.totals || {};
+    return {
+      field: fieldRows,
+      data: [].concat(dec ? [{ kind: 'dmx-link', what: 'DMX link lead (node → decoder → decoder)', spec: 'Screened DMX / Cat6 STP, RJ45 or terminal per decoder', qty: dec }] : [])
+        .concat(Object.keys(buses).length ? [{ kind: 'dmx-term', what: 'DMX 120 Ω terminator', spec: 'On the last decoder of each universe', qty: Object.keys(buses).length }] : [])
+        .concat(cat6 ? [{ kind: 'cat6', what: 'Cat6 to the network switch', spec: 'One per DMX node / pixel controller (PoE where the node takes it)', qty: cat6 }] : []),
+      board: board ? [{ kind: 'board', what: 'PSU → decoder / controller link', spec: 'Short 2C on the board, cut on site', qty: board }] : [],
+      mains: [].concat(t.circuits ? [{ kind: 'radial', what: 'Head-end radial', spec: 'Unswitched, ' + num(c.headEndCircuitA, 10) + ' A type C MCB at the DB, to a DP isolator on the board', qty: t.circuits }] : [])
+        .concat(t.dimmedFeeds ? [{ kind: 'dimmed', what: 'Dimmed feed', spec: 'From the lighting control dimmer channel to a JB on the board / local driver', qty: t.dimmedFeeds }] : [])
+        .concat(t.fcus ? [{ kind: 'fcu', what: 'Fused spur (FCU) for a local driver', spec: 'Accessible, beside the driver', qty: t.fcus }] : [])
+        .concat(t.sockets ? [{ kind: 'socket', what: 'Socket for a plug-in local driver', spec: 'Accessible, beside the driver', qty: t.sockets }] : [])
+    };
   }
   // ── electrical requirements (1.5.0) ───────────────────────────────────────
   // What the electrical contractor provides for the LED lighting, from the engineered project:
