@@ -1,4 +1,10 @@
-/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.5.2, root master)
+/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.6.0, root master)
+   v1.6.0 (2026-11-01, LED Calc — Bryn: "drawing could be better like it is from other apps"): the DRAWING SHEET anatomy the Stretched
+   Fabric design pack proved (fabric-pack.js head / foot / lay / legend / scaleBar), lifted here so every app's drawing pages share it:
+   drawingSheet(P, F, o) → { box, notes } paints the head (mark + project / drawing no. + revision, eyebrow "<no> · DESIGN DEVELOPMENT",
+   title, sub), the notes column (landscape: right · portrait: below) with o.notes blocks, the legend strip (o.legend items + o.legendRight)
+   and the foot ("NOT FOR CONSTRUCTION · DESIGN DEVELOPMENT · date" · project · drawing · Page n / total); scaleBar(P, F, x, top, ptPerMm,
+   totalMm, label) and scaleOf(ptPerMm) → 1:N. Fabric can move onto these (B-585d).
    v1.5.2 (2026-11-01, LED Calc): makeFonts embeds Gilroy with ligatures OFF (features liga / clig / dlig false). pdf-lib maps "ff" / "fi"
    to Gilroy's ligature glyphs but advances by the single-letter widths, so "Takeoffs" printed as "Takeoff s" — the reason consumers
    inserted "f f" spaces. Every pack on this chrome now sets "ff" correctly; the "f f" workaround in a consumer can go.
@@ -374,8 +380,60 @@
     return Math.max(y, 156);
   }
 
+  // ── DRAWING SHEET (v1.6.0) ─────────────────────────────────────────────────
+  function scaleOf(ptPerMm) { return Math.round((72 / 25.4) / ptPerMm); }
+  function scaleBar(P, F, x, top, ptPerMm, totalMm, label) {
+    totalMm = totalMm || 1000; var seg = totalMm / 4;
+    if (label) P.text(label, x, top - 12, 6.5, F.b, COL.INK2);
+    for (var i = 0; i < 4; i++) P.rect(x + i * seg * ptPerMm, top, seg * ptPerMm, 3, i % 2 ? COL.CREAM : COL.INK2);
+    P.rectB(x, top, totalMm * ptPerMm, 3, COL.INK2, 0.5);
+    [0, 2, 4].forEach(function (k) { var v = k * seg, t = totalMm >= 1000 ? (v / 1000) + '' : Math.round(v) + ''; var w = F.r.widthOfTextAtSize(t, 6); P.text(t, x + v * ptPerMm - w / 2, top + 6, 6, F.r, COL.MUT); });
+    P.text(totalMm >= 1000 ? 'metres' : 'mm', x + totalMm * ptPerMm + 8, top - 1, 6, F.r, COL.MUT);
+  }
+  // o = { drawingNo, title, sub, projectNo, rev, option, dateText, status, pageNo, total, notes: [{ head, lines: [..] | rows: [[k, v]..] }],
+  //       legend: [{ label, colour:[r,g,b], dash:[..], w }], legendRight, notesWidth (fraction, landscape) }
+  function drawingSheet(P, F, o) {
+    o = o || {}; var LAND = A4.w > A4.h, W = A4.w, H = A4.h, safeT = o.safe || function (x) { return x; };
+    P.logo(M, 30, 22, COL.GOLD); P.tracked('SONOR', M + 27, 34.5, 14, F.b, COL.INK, 3.6);
+    P.tracked(safeT(((o.projectNo ? o.projectNo + '  ·  ' : '') + (o.drawingNo || 'DRAWING')).toUpperCase()), M + 118, 42, 8, F.r, COL.LABEL, 2.4);
+    P.trackedRight(safeT(((o.option ? o.option + '  ·  ' : '') + (o.rev || 'R1')).toUpperCase()), W - M, 42, 8, F.r, COL.LABEL, 2.4);
+    P.hline(M, W - M, 68, COL.LINE, 0.8);
+    P.tracked(safeT((o.drawingNo ? o.drawingNo + '  ·  ' : '') + (o.status || 'DESIGN DEVELOPMENT')), M, 88, 8.5, F.r, COL.GOLD, 2.6);
+    P.text(safeT(o.title || ''), M - 1, 100, 24, F.b, COL.INK);
+    var subBottom = 128;
+    if (o.sub) wrap(safeT(o.sub), F.r, 9.5, Math.min(W - M * 2, 820)).slice(0, 2).forEach(function (ln, i) { P.text(ln, M, 134 + i * 13, 9.5, F.r, COL.INK2); subBottom = 134 + (i + 1) * 13; });
+    var top = Math.max(160, subBottom + 14), bottom = H - 76, box, notes;
+    if (LAND) { var nx = Math.round(W * (1 - (o.notesWidth || 0.27))); box = { x: M, top: top, w: nx - M - 28, h: bottom - top - 8 }; notes = { x: nx, top: top, w: W - M - nx }; P.vline(nx - 14, top, bottom - 8, COL.LINE, 0.6); }
+    else { var bh = Math.round((bottom - top) * 0.62); box = { x: M, top: top, w: W - M * 2, h: bh }; notes = { x: M, top: top + bh + 18, w: W - M * 2 }; P.hline(M, W - M, top + bh + 8, COL.LINE, 0.6); }
+    // notes column
+    var ny = notes.top, colBottom = bottom - 10, cols = LAND ? 1 : 2, cw = (notes.w - (cols - 1) * 22) / cols, ci = 0, cx = notes.x;
+    (o.notes || []).forEach(function (b) {
+      if (!b) return;
+      var need = 18 + ((b.rows || []).length * 11) + ((b.lines || []).length * 11);
+      if (!LAND && ny + Math.min(need, 60) > colBottom && ci < cols - 1) { ci++; cx = notes.x + ci * (cw + 22); ny = notes.top; }
+      if (ny > colBottom - 20) return;
+      P.tracked(safeT(String(b.head || '').toUpperCase()), cx, ny, 7, F.r, COL.GOLD, 1.8); P.hline(cx, cx + cw, ny + 12, COL.LINE, 0.5);
+      ny += 19;
+      (b.rows || []).forEach(function (r) { if (ny > colBottom) return; var k = safeT(String(r[0])), v = safeT(String(r[1] == null ? '' : r[1])); P.text(k, cx, ny, 7.2, F.b, COL.INK); var vl = wrap(v, F.r, 7.2, cw * 0.58); vl.slice(0, 2).forEach(function (ln, i) { P.right(ln, cx + cw, ny + i * 9.5, 7.2, F.r, COL.INK2); }); ny += Math.max(1, Math.min(2, vl.length)) * 9.5 + 2.5; });
+      (b.lines || []).forEach(function (t) { wrap(safeT(t), F.r, 7.2, cw).forEach(function (ln) { if (ny > colBottom) return; P.text(ln, cx, ny, 7.2, F.r, COL.INK2); ny += 9.6; }); ny += 2.5; });
+      ny += 9;
+    });
+    // legend strip
+    var ly = H - 58; P.hline(M, W - M, ly - 10, COL.GOLD, 0.6, 0.6);
+    var lx = M; (o.legend || []).forEach(function (it) {
+      var c = global.PDFLib.rgb(it.colour[0] / 255, it.colour[1] / 255, it.colour[2] / 255), opt = { start: { x: lx, y: H - ly - 3.5 }, end: { x: lx + 20, y: H - ly - 3.5 }, thickness: it.w || 1.2, color: c }; if (it.dash) opt.dashArray = it.dash; P.page.drawLine(opt);
+      var lab = safeT(it.label); P.text(lab, lx + 25, ly, 6.5, F.r, COL.MUT); lx += 25 + F.r.widthOfTextAtSize(lab, 6.5) + 18;
+    });
+    if (o.legendRight) P.right(safeT(o.legendRight), W - M, ly + 0.5, 6.5, F.r, COL.MUT);
+    // foot
+    P.tracked(safeT(('NOT FOR CONSTRUCTION  ·  ' + (o.status || 'DESIGN DEVELOPMENT') + '  ·  ' + (o.dateText || '')).toUpperCase()), M, H - 30, 6.5, F.r, COL.INFO, 1.4);
+    if (o.pageNo) P.trackedRight(safeT((o.projectNo ? o.projectNo + '  ·  ' : '') + (o.drawingNo ? o.drawingNo + '  ·  ' : '') + 'Page ' + o.pageNo + (o.total ? ' / ' + o.total : '')), W - M, H - 30, 7, F.r, COL.PAGE_NO, 1.2);
+    return { box: box, notes: notes, land: LAND };
+  }
+
   global.SonorPdfLuxury = {
-    __version: '1.5.2', sheet: sheet, SHEETS: SHEETS, TW: TW, theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
+    drawingSheet: drawingSheet, scaleBar: scaleBar, scaleOf: scaleOf,
+    __version: '1.6.0', sheet: sheet, SHEETS: SHEETS, TW: TW, theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
     A4: A4, M: M, COL: COL, HOUSE: HOUSE, WA: WA,
     col: col, hexRgb: hexRgb, fadePngDataUrl: fadePngDataUrl,
     fetchBytes: fetchBytes, loadImage: loadImage,
