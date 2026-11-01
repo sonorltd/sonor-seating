@@ -35,7 +35,7 @@
 //                  app actions, ↻. Dark (project bar) and light (Takeoffs header) via CSS vars — no cream anywhere.
 (function (global) {
   'use strict';
-  var VERSION = '1.5.0';   // 1.5.0 (2026-10-13) WeQuote API call budget readout (wq_api_usage) in the menu foot · 1.4.6 // 2026-10-02 §26 stage law: chips on the status tokens (amber ours · blue client · green yes · red no)
+  var VERSION = '1.5.1';   // 1.5.0 (2026-10-13) WeQuote API call budget readout (wq_api_usage) in the menu foot · 1.4.6 // 2026-10-02 §26 stage law: chips on the status tokens (amber ours · blue client · green yes · red no)
   var WQ_QUOTE_URL = 'https://app.wequote.cloud/sonor-ltd/quote/';   // + <id>/editor
   var LOCK_STAGES = { sent: 1, accepted: 1, complete: 1 };
   var STAGE_LABEL = { in_progress: 'in progress', sent: 'sent', accepted: 'accepted', complete: 'complete', cancelled: 'cancelled', declined: 'declined', draft: 'draft' };
@@ -53,7 +53,7 @@
   var _open = false, _channel = null, _timer = null, _observer = null;
 
   function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function _refNo(ref) { var m = String(ref || '').match(/^\s*(\d{3,})/); return m ? m[1] : null; }
+  function _refNo(ref) { var m = String(ref || '').match(/^\s*(\d{3,}|DEMO)\b/); return m ? m[1] : null; }   // 1.5.1: the Demo project (ref 'DEMO - …') has a sample quote too
   function _ago(iso) { if (!iso) return ''; var d = (Date.now() - new Date(iso).getTime()) / 1000; if (d < 60) return 'just now'; if (d < 3600) return Math.round(d / 60) + ' min ago'; if (d < 86400) return Math.round(d / 3600) + ' h ago'; return Math.round(d / 86400) + ' d ago'; }
   function _stageCls(st) { return 'swq-stage swq-stage-' + String(st || 'none').replace(/[^a-z]/g, '-'); }
   function _gbp(v) { var n = Number(v); return isFinite(n) ? n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(v); }
