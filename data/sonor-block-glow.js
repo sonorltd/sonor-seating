@@ -36,7 +36,7 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.3.1';   // 1.3.1 (2026-10-31, owner: "can tool tips not be direct under mouse") — attachSvg(): the card never sits under the pointer or over the hovered item (pointer corners as candidates)   // 1.3.0 (2026-10-30, Engineering polish: "flashy mouseovers like takeoffs" on React / HTML canvases) — attachSvg(): haloShape 'rect'|'auto' (rounded-rect halo for device cards), opts.hot (wires brighten with .sbg-hot), opts.boxOf, info.halo === false, api.destroy()   // 1.2.0 (2026-10-16, Bryn: "things like the glowing and mouseovers we now have in main takeoffs app, CD and CT has fallen well behind") — attachSvg(): the same halo + card for SVG canvases (Cinema Takeoff, Cinema Design plans)   // 1.1.0 (2026-10-13, Bryn: "needs to also disappear upon click and drag because it obscures the view") — card hides on mouse-down / drag; selection keeps the halo only; ⌥-click (Alt) pins the card
+  var VERSION = '1.4.0';   // 1.4.0 (2026-11-01, owner: "the tool tips on takeoffs site version buttons cannot be clicked because it disappears once mouse moves") — a card with links stays up for a short grace (GRACE_MS) after the pointer leaves the item, holds while the pointer is on it (and stops moving), and hides when the pointer leaves the card; both attachFabric and attachSvg   // 1.3.1 (2026-10-31, owner: "can tool tips not be direct under mouse") — attachSvg(): the card never sits under the pointer or over the hovered item (pointer corners as candidates)   // 1.3.0 (2026-10-30, Engineering polish: "flashy mouseovers like takeoffs" on React / HTML canvases) — attachSvg(): haloShape 'rect'|'auto' (rounded-rect halo for device cards), opts.hot (wires brighten with .sbg-hot), opts.boxOf, info.halo === false, api.destroy()   // 1.2.0 (2026-10-16, Bryn: "things like the glowing and mouseovers we now have in main takeoffs app, CD and CT has fallen well behind") — attachSvg(): the same halo + card for SVG canvases (Cinema Takeoff, Cinema Design plans)   // 1.1.0 (2026-10-13, Bryn: "needs to also disappear upon click and drag because it obscures the view") — card hides on mouse-down / drag; selection keeps the halo only; ⌥-click (Alt) pins the card
 
   function hexA(hex, a) {
     var h = String(hex || '#f5d05c').replace('#', '');
@@ -77,7 +77,7 @@
       ' background:var(--card,var(--bg-1,#242426));color:var(--text-primary,#F5F5F7);border:1px solid var(--border,#3a3a3c);',
       ' border-left:3px solid var(--sbg-c,#f5d05c);border-radius:8px;padding:8px 10px;font:12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;',
       ' box-shadow:0 8px 28px rgba(0,0,0,.35);transition:opacity var(--motion,120ms ease);}',
-      '.sbg-card.pinned{pointer-events:auto;}',
+      '.sbg-card.pinned,.sbg-card.live{pointer-events:auto;}',   /* 1.4.0 — a card with links can be reached and clicked */
       '.sbg-h{display:flex;align-items:center;gap:7px;font-weight:700;font-size:12.5px;}',
       '.sbg-dot{width:9px;height:9px;border-radius:50%;background:var(--sbg-c,#f5d05c);box-shadow:0 0 8px var(--sbg-c,#f5d05c);flex:none;}',
       '.sbg-sub{font-family:"DM Mono",ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--text-muted,#98989D);margin:1px 0 5px 16px;}',
@@ -118,6 +118,31 @@
     return h;
   }
 
+  // 1.4.0 — the reach-the-card rule. A card carrying links ("live") does not vanish the moment the pointer leaves the
+  // item: hide waits GRACE_MS, entering the card cancels it and holds the card still, leaving the card hides it (after a
+  // short beat, so stepping back onto the item keeps it). A card without links still hides at once.
+  var GRACE_MS = 450, CARD_OUT_MS = 180;
+  function linger(card, hideNow) {
+    var t = 0, onCard = false;
+    function cancel() { if (t) { clearTimeout(t); t = 0; } }   // a pending hide keeps the card frozen in place (it must not flee the pointer heading for it)
+    function later(ms) { cancel(); t = setTimeout(function () { t = 0; if (!onCard) hideNow(); }, ms); }
+    card.addEventListener('pointerenter', function () { onCard = true; cancel(); });
+    // presses, clicks and wheel on the card belong to the card: they must not pan / zoom / deselect in the host page
+    ['pointerdown', 'mousedown', 'click', 'dblclick', 'wheel'].forEach(function (n) { card.addEventListener(n, function (ev) { ev.stopPropagation(); }, n === 'wheel' ? { passive: true } : false); });
+    card.addEventListener('pointerleave', function () { onCard = false; if (card.style.display !== 'none') later(CARD_OUT_MS); });
+    return {
+      leave: function () {   // the pointer left the hovered item
+        if (card.style.display !== 'none' && card.classList.contains('live') && !card.classList.contains('pinned')) { if (!t && !onCard) later(GRACE_MS); return; }
+        cancel(); hideNow();
+      },
+      cancel: cancel,
+      reset: function () { cancel(); onCard = false; },
+      onCard: function () { return onCard; },
+      still: function () { return onCard || !!t; },   // hold the card where it is (pointer on it, or on its way)
+      owns: function (el) { return !!(el && card.contains(el)); }
+    };
+  }
+
   function attachFabric(canvas, opts) {
     opts = opts || {};
     if (!canvas || !canvas.on || canvas.__sonorBlockGlow) return canvas && canvas.__sonorBlockGlow;
@@ -149,7 +174,7 @@
       place(b, rel);
     }
     function place(b, rel) {
-      if (card.style.display === 'none') return;
+      if (card.style.display === 'none' || lg.still()) return;   // 1.4.0 — the card holds still while the pointer heads for it / is on it
       var W = canvas.getWidth(), H = canvas.getHeight(), cw = card.offsetWidth || 240, ch = card.offsetHeight || 120, g = 14;
       try {   // v1.0.1 — clamp to the VISIBLE part of the canvas (the canvas can be taller/wider than the window or its scroller)
         var hr = hostEl.getBoundingClientRect(), vw = global.innerWidth || W, vh = global.innerHeight || H;
@@ -169,20 +194,23 @@
     function show(o, pin) {
       info = resolve(o); if (!info) { clear(); return; }
       card.style.setProperty('--sbg-c', info.colour || '#f5d05c');
-      card.innerHTML = cardHtml(info); card.classList.toggle('pinned', !!pin); card.style.display = '';
+      card.innerHTML = cardHtml(info); card.classList.toggle('pinned', !!pin); card.classList.toggle('live', !!(info.links && info.links.length)); card.style.display = '';
+      lg.cancel();
       Array.prototype.forEach.call(card.querySelectorAll('[data-sbg-link]'), function (btn) {
         var l = info.links[+btn.getAttribute('data-sbg-link')];
         btn.addEventListener('click', function (ev) { ev.stopPropagation(); try { l.onClick && l.onClick(o); } catch (e) { console.warn('[block-glow] link', e && e.message); } });
       });
       loop();
     }
-    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint(); }
+    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; lg.reset(); cancelAnimationFrame(raf); paint(); }
+    function unhover() { hover = null; info = null; card.style.display = 'none'; if (sel) loop(); else paint(); }
+    var lg = linger(card, function () { if (!pinned) unhover(); });
 
     canvas.on('mouse:over', function (e) {
       if (pinned || suppressed || !enabled()) return; var o = e && e.target; if (!o || !resolve(o)) return;
       hover = o; show(o, false);
     });
-    canvas.on('mouse:out', function (e) { if (pinned) return; if (e && e.target === hover) { hover = null; info = null; card.style.display = 'none'; if (sel) loop(); else paint(); } });
+    canvas.on('mouse:out', function (e) { if (pinned) return; if (e && e.target === hover) lg.leave(); });   // 1.4.0 — a card with links lingers so it can be reached
     // 1.1.0 — the card gets out of the way: any mouse-down on the canvas hides it (click, drag, marquee) and it stays hidden
     // until the pointer leaves and re-enters a block. Selecting a block keeps the HALO (paint) but no card; ⌥/Alt-click pins
     // the interactive card on purpose.
@@ -191,7 +219,7 @@
       var ev = e && e.e, o = e && e.target;
       if (ev && ev.altKey && o && o.type !== 'activeSelection' && enabled() && resolve(o)) { pinned = o; hover = null; suppressed = false; show(o, true); return; }
       if (pinned) { pinned = null; }
-      suppressed = true; hover = null; info = null; card.style.display = 'none'; cancelAnimationFrame(raf); paint();
+      suppressed = true; hover = null; info = null; card.style.display = 'none'; lg.reset(); cancelAnimationFrame(raf); paint();
     });
     canvas.on('mouse:out', function () { suppressed = false; });
     function onSel() {
@@ -263,7 +291,7 @@
       place(b, rel, s);
     }
     function place(b, rel, s) {
-      if (card.style.display === 'none') return;
+      if (card.style.display === 'none' || lg.still()) return;   // 1.4.0 — the card holds still while the pointer heads for it / is on it
       var W = s.W, H = s.H, cw = card.offsetWidth || 240, ch = card.offsetHeight || 120, g = 14;
       var hr = { left: 0, top: 0 };
       try { hr = hostEl.getBoundingClientRect(); var vw = global.innerWidth || W, vh = global.innerHeight || H; W = Math.min(W, vw - hr.left); H = Math.min(H, vh - hr.top - 34); } catch (e) {}
@@ -289,7 +317,8 @@
     function show(o, pin) {
       info = resolve(o); if (!info) { clear(); return; }
       card.style.setProperty('--sbg-c', info.colour || '#f5d05c');
-      card.innerHTML = cardHtml(info); card.classList.toggle('pinned', !!pin); card.style.display = '';
+      card.innerHTML = cardHtml(info); card.classList.toggle('pinned', !!pin); card.classList.toggle('live', !!(info.links && info.links.length)); card.style.display = '';
+      lg.cancel();
       Array.prototype.forEach.call(card.querySelectorAll('[data-sbg-link]'), function (btn) {
         var l = info.links[+btn.getAttribute('data-sbg-link')];
         btn.addEventListener('click', function (ev) { ev.stopPropagation(); try { l.onClick && l.onClick(o); } catch (e) { console.warn('[block-glow] link', e && e.message); } });
@@ -297,7 +326,9 @@
       setHot(o);
       loop();
     }
-    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; setHot(null); cancelAnimationFrame(raf); paint(); }
+    function clear() { hover = null; pinned = null; sel = null; info = null; card.style.display = 'none'; setHot(null); lg.reset(); cancelAnimationFrame(raf); paint(); }
+    function unhover() { hover = null; info = null; card.style.display = 'none'; setHot(null); if (sel) loop(); else paint(); }
+    var lg = linger(card, function () { if (!pinned) unhover(); });
     function target(ev) {
       // v1.3.0 — walk the composed path first so items inside a web component's shadow root (e.g. a slot grid) resolve
       var path = ev.composedPath ? ev.composedPath() : null;
@@ -308,40 +339,43 @@
     var L = [];   // v1.3.0 — every listener, so destroy() can take them off (React unmount / re-mount)
     function on(el, ev, fn, cap) { el.addEventListener(ev, fn, cap); L.push([el, ev, fn, cap]); }
     on(svg, 'pointermove', function (ev) {
+      if (lg.owns(ev.target)) return;   // 1.4.0 — the card can sit inside the listened element (opts.host === svg)
       pt(ev);
       // v1.3.0 — pointerover is not reliable across shadow roots / SVG faces (Chromium skips the boundary event when the
       // pointer crosses from a label into an <svg> inside a web component), so the move itself settles the hover too
       if (pinned || pressed || !enabled()) return;
       var o = target(ev); if (o === hover) return;
-      if (!o || !resolve(o)) { if (hover) { hover = null; info = null; card.style.display = 'none'; setHot(null); if (sel) loop(); else paint(); } return; }
+      if (!o || !resolve(o)) { if (hover) lg.leave(); return; }
       if (suppressed) { if (idOf(o) && idOf(o) === downId) return; suppressed = false; }
       hover = o; show(o, false);
     }, true);
     on(svg, 'pointerover', function (ev) {
+      if (lg.owns(ev.target)) return;
       if (pinned || pressed || !enabled()) return; var o = target(ev); if (!o || o === hover || !resolve(o)) return;
       // after a click the card stays away from THAT element (and its re-rendered twin) until the pointer moves to another
       if (suppressed) { if (idOf(o) && idOf(o) === downId) return; suppressed = false; }
       hover = o; show(o, false);
     }, true);
     on(svg, 'pointerout', function (ev) {
-      if (pinned) return; var o = target(ev); var rt = ev.relatedTarget;
+      if (pinned || lg.owns(ev.target)) return; var o = target(ev); var rt = ev.relatedTarget;
       // v1.3.0 — a relatedTarget inside a shadow root is retargeted to its host; look through to what is really under the pointer
       try { while (rt && rt.shadowRoot && rt.shadowRoot.elementFromPoint) { var deep = rt.shadowRoot.elementFromPoint(ev.clientX, ev.clientY); if (!deep || deep === rt) break; rt = deep; } } catch (e) {}
       var to = rt && rt.closest ? rt.closest(selector) : null;
-      if (o && o === hover && to !== o) { hover = null; info = null; card.style.display = 'none'; setHot(null); if (sel) loop(); else paint(); }
+      if (o && o === hover && to !== o) lg.leave();
       // suppression lifts only when the pointer truly leaves the svg (pointerleave) — a re-render swapping the node under a
       // still-pressed / just-clicked pointer must NOT bring the card straight back
     }, true);
     on(svg, 'pointerdown', function (ev) {
+      if (lg.owns(ev.target)) return;   // 1.4.0 — a click on the card's own links never hides it first
       var o = target(ev); pressed = true; downId = idOf(o); pt(ev);
       if (ev.altKey && o && enabled() && resolve(o)) { pinned = o; hover = null; suppressed = false; show(o, true); ev.preventDefault(); return; }
       if (pinned) pinned = null;
-      suppressed = true; hover = null; info = null; card.style.display = 'none'; setHot(null); cancelAnimationFrame(raf); paint();
+      suppressed = true; hover = null; info = null; card.style.display = 'none'; setHot(null); lg.reset(); cancelAnimationFrame(raf); paint();
     }, true);   // capture — the app's own element handlers may stop propagation (drag engines do)
     on(document, 'pointerup', function () { pressed = false; }, true);
     on(document, 'pointercancel', function () { pressed = false; }, true);
     // a real leave (no button down — pointer-capture release fires a synthetic leave/enter pair while pressed) clears the hover
-    on(svg, 'pointerleave', function (ev) { if (pressed || (ev && ev.buttons)) return; suppressed = false; downId = null; if (!pinned) { hover = null; info = null; card.style.display = 'none'; setHot(null); if (sel) loop(); else paint(); } });
+    on(svg, 'pointerleave', function (ev) { if (pressed || (ev && ev.buttons)) return; suppressed = false; downId = null; if (!pinned && hover) lg.leave(); });   // 1.4.0 — leaving towards the card keeps it
     on(document, 'keydown', function (ev) { if (ev.key === 'Escape' && (pinned || hover)) clear(); });
     // selection: the app tells us (api.select(el)) or we poll its selected() on refresh
     var api = {
@@ -352,7 +386,7 @@
         try { ov.remove(); card.remove(); } catch (e) {} delete svg.__sonorBlockGlow;
       },
       select: function (el) { if (pinned && el !== pinned) { pinned = null; card.style.display = 'none'; } sel = (el && enabled() && resolve(el)) ? el : null; info = null; loop(); },
-      _state: function () { return { hover: !!hover, pinned: !!pinned, sel: !!sel, suppressed: suppressed, card: card.style.display !== 'none' }; },
+      _state: function () { return { hover: !!hover, pinned: !!pinned, sel: !!sel, suppressed: suppressed, card: card.style.display !== 'none', onCard: lg.onCard() }; },
       refresh: function () {   // call after the svg re-renders (elements are rebuilt): re-find hover/sel by data-id
         var find = function (o) {   // v1.3.0 — by any id attribute, honouring a comma selector
           var i = idOf(o); if (!i) return null; var q = CSS.escape(i), all = svg.querySelectorAll('[data-id="' + q + '"], [data-device="' + q + '"], [data-item-id="' + q + '"]');
