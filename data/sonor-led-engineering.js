@@ -14,6 +14,11 @@
  *   1.3.0 — SonorLedEng.load(supabaseClient) → reads the Library (v_led_catalogue + library_settings.led_engineering);
  *            SonorLedEng.pickDriver(loadW, {kind,volts,current_ma,control,minIp,prefer,driverProductId}) → a real Library driver;
  *            SonorLedEng.strips() / drivers() / strip(id) / fromTakeoffsFloors(floors). App UI: APP - LED Calc (sonor-led-calc).
+ *   1.4.0 — generic house strip types are the master; supplier products hang under them (lighting_items.metadata.led.strip_types):
+ *            SonorLedEng.supplyOptions(typeId, {minIp,style}) / supplyFor(type, {productId,minIp}) — default = stripSupply.style (COB) from the
+ *            first supplier in stripSupply.supplierOrder (UltraLEDs, AliExpress, other). Control kit from pm_lighting_control_types.metadata.led:
+ *            decoders (per room zone), DMX interfaces / Art-Net nodes (opts.nodes [{id,label,productId}], run.node → own universes per node;
+ *            Art-Net default = Sonor custom ESP32 node), pixel controllers (every pixel run = own controller output).
  *
  * Inputs (all plain objects, no DOM):
  *   run  = { id, label, floor, room, metres, ledId, feeds: [m, m, …] | null, feedCableM: number | [per feed], driverAt: text,
@@ -35,7 +40,8 @@
  */
 (function (global) {
   'use strict';
-  var VERSION = '1.3.1';   // v1.3.1 2026-10-31 — prefer matches a manufacturer OR a range / name (Bryn: "we usually use tagra drivers from ultra leds so default to those" → rule preferManufacturer = 'Tagra')
+  var VERSION = '1.4.0';   // v1.4.0 2026-11-01 — generic strip types stay master, supplier products sit under each type (Bryn: "keep the library generic strip types as the master but make ultra leds an option for supplier of each type as a sub of it, ali express and other suppliers also"), default = COB from UltraLEDs (Bryn: "only use cob type strips from ultra leds"); DMX lines patch to Art-Net nodes / interfaces — several per project (Bryn: "option for which node a dmx line connects to, sometimes there will be multiple"), Art-Net default = Sonor custom ESP node · pixel strip = its own controller (Bryn: "single colour as triac dimmed psu, rgbw is dmx, pixel is own controller"); DMX decoders, DMX interfaces and pixel controllers are Library products (pm_lighting_control_types.metadata.led) picked per zone / universe / control system (Bryn: "include d4e and other dmx decoders and c4 edidio + artnet nodes")
+  // was 1.3.1:   // v1.3.1 2026-10-31 — prefer matches a manufacturer OR a range / name (Bryn: "we usually use tagra drivers from ultra leds so default to those" → rule preferManufacturer = 'Tagra')
   // was 1.3.0:   // v1.3.0 2026-10-31 — Library SSOT: SonorLedEng.load() reads v_led_catalogue (house strip types + strip products + drivers) and library_settings.led_engineering (house rules); drivers are picked from real Library products by kind / V / mA / control / IP / preferred (Bryn: "we need a central ssot … yes everything library ssot"). Built-in sizes stay as the offline fallback.
   // was 1.2.0:   // v1.1.0 2026-10-16 — control method (DMX / triac / 0-10V / DALI / switched) + DMX addressing on xx1 blocks (Bryn: "RGBW led will be dmx controlled … main also have triac dimmable driver, need options for all this … including DMX channel assignment")
 
@@ -53,7 +59,9 @@
     dmxBlock: 10,                                    // Sonor house rule (Bryn 16.10.26): every device starts on an xx1 address — 001, 011, 021 … (10-address blocks; a device needing more spans blocks)
     pixelControllerOutputs: 4,                       // outputs per pixel controller (data runs)
     outdoorMinIp: 65,                                // 1.3.0 — outdoor runs only take drivers rated ≥ this
+    controlSystem: 'artnet',                         // 1.4.0 — DMX interface family: artnet | control4 | lutron | rako (per project in LED Calc)
     preferManufacturer: null,                        // 1.3.0 — tie-break when two Library drivers share a size
+    stripSupply: { style: 'cob', supplierOrder: ['ultraleds', 'aliexpress', 'other'] },   // 1.4.0 — supplier option picked under each generic strip type
     maxFeedM: function (st) {                        // single-feed length by W/m and V when the type carries none
       var v = Number(st.volts) || 24, w = Number(st.watts_per_metre) || 10;
       if (v <= 5) return 3; if (v <= 12) return 5;
@@ -73,13 +81,16 @@
     triac:    { id: 'triac',    label: 'Triac dimmable',    driver: 'Triac-dimmable CV driver (mains-dimmed)', circuit: 'centralised' },
     '0-10v':  { id: '0-10v',    label: '0-10V',             driver: '0-10V dimmable CV driver',          circuit: '0-10v' },
     dali:     { id: 'dali',     label: 'DALI',              driver: 'DALI dimmable CV driver',           circuit: 'dali' },
-    switched: { id: 'switched', label: 'Switched (on/off)', driver: 'CV driver, switched',               circuit: 'centralised' }
+    switched: { id: 'switched', label: 'Switched (on/off)', driver: 'CV driver, switched',               circuit: 'centralised' },
+    pixel:    { id: 'pixel',    label: 'Pixel controller',  driver: 'CV PSU + pixel controller (data)', circuit: 'data' }   // 1.4.0
   };
   function controlFor(rn, st) {
     var ex = String((rn && rn.control) || '').toLowerCase(); if (CONTROLS[ex]) return CONTROLS[ex];
-    var md = (st && st.metadata && String(st.metadata.control_default || '').toLowerCase()) || ''; if (CONTROLS[md]) return CONTROLS[md];
     var ch = num(st && st.dmx_channels, 1), data = ch >= 10 || /pixel|address/i.test(String((st && (st.label || st.id)) || ''));
-    return (data || ch >= 2) ? CONTROLS.dmx : CONTROLS.triac;
+    if (data) return CONTROLS.pixel;   // 1.4.0 — a pixel strip is always on its own controller unless the run itself says otherwise
+    var md = (st && st.metadata && String(st.metadata.control_default || '').toLowerCase()) || ''; if (CONTROLS[md]) return CONTROLS[md];
+    // house rule (Bryn 2026-11-01): single colour → triac-dimmed PSU · RGBW / tunable (≥ 2 ch) → DMX · pixel / addressable → its own controller
+    return data ? CONTROLS.pixel : (ch >= 2 ? CONTROLS.dmx : CONTROLS.triac);
   }
   function stripMaxFeedM(st, c) { var m = st && st.metadata && Number(st.metadata.max_single_feed_m); return m > 0 ? m : c.maxFeedM(st || {}); }
 
@@ -87,9 +98,9 @@
   // ── Library catalogue (1.3.0) ────────────────────────────────────────────
   // ONE read seam: view v_led_catalogue (house strip types from pm_led_strip_types + strip products and drivers from
   // lighting_items.metadata.led) + library_settings key 'led_engineering' (house rules). Writers: the Library app only.
-  var CAT = { strips: [], drivers: [], byId: {}, rules: null, source: 'built-in', loadedAt: null };
-  var RULE_KEYS = ['headroom', 'dropTargetPct', 'dropLimitPct', 'rho', 'csaSizes', 'defaultFeedCableM', 'wastePct', 'reelM', 'decoderChannels',
-    'dmxUniverseSize', 'dmxBlock', 'pixelControllerOutputs', 'maxDriverPerRoom', 'outdoorMinIp', 'preferManufacturer'];
+  var CAT = { strips: [], drivers: [], decoders: [], interfaces: [], pixelCtl: [], byId: {}, rules: null, source: 'built-in', loadedAt: null };
+  var RULE_KEYS = ['controlSystem', 'headroom', 'dropTargetPct', 'dropLimitPct', 'rho', 'csaSizes', 'defaultFeedCableM', 'wastePct', 'reelM', 'decoderChannels',
+    'dmxUniverseSize', 'dmxBlock', 'pixelControllerOutputs', 'maxDriverPerRoom', 'outdoorMinIp', 'preferManufacturer', 'stripSupply'];
   var CACHE_KEY = 'sonor-led-catalogue-v1';
   function normStrip(r) {
     var md = r.metadata && typeof r.metadata === 'object' ? r.metadata : {};
@@ -100,7 +111,11 @@
         lm_per_m: r.lm_per_m != null ? num(r.lm_per_m) : md.lm_per_m, reel_m: r.reel_m != null ? num(r.reel_m) : md.reel_m,
         control_default: r.control_default || md.control_default || undefined,
         default_cable_run_m: r.default_cable_run_m != null ? num(r.default_cable_run_m) : md.default_cable_run_m,
-        default_cable_package: md.default_cable_package, display_colour: md.display_colour } };
+        default_cable_package: md.default_cable_package, display_colour: md.display_colour, default_product: md.default_product || null },
+      // 1.4.0 — supplier product (lighting_items) → which generic types it can supply
+      supply: r.source === 'product' ? { strip_types: (md.led && md.led.strip_types) || [], style: (md.led && md.led.style) || null, rank: num(md.led && md.led.rank, 9),
+        supplier: String((md.led && md.led.supplier_key) || r.supplier || 'other').toLowerCase(), sku: (md.led && md.led.sku) || null, kelvins: (md.led && md.led.kelvins) || null,
+        price_gbp: r.price_gbp != null ? num(r.price_gbp) : null, url: r.product_url || null } : null };
   }
   function normDriver(r) {
     var ctl = Array.isArray(r.control) ? r.control : (typeof r.control === 'string' ? (function () { try { return JSON.parse(r.control); } catch (_) { return [r.control]; } })() : []);
@@ -110,6 +125,16 @@
       ip: r.ip || null, ip_num: num(r.ip_num, 0), preferred: !!r.preferred, family: !!r.family, range: r.range || (r.metadata && r.metadata.led && r.metadata.led.range) || null, needs_review: r.needs_review || null,
       img: r.img || null, sort_order: num(r.sort_order, 0) };
   }
+  // 1.4.0 — control equipment (pm_lighting_control_types rows carrying metadata.led): decoders, DMX interfaces, pixel controllers
+  function ledMeta(r) { return (r && r.metadata && r.metadata.led) || {}; }
+  function normCtl(r) {
+    var L = ledMeta(r);
+    return { id: r.id, label: r.label, manufacturer: r.manufacturer || null, role: r.role, preferred: !!(r.preferred || L.preferred === true), family: r.family === true || L.family === true, brand: typeof L.family === 'string' ? L.family : null,
+      sort_order: num(r.sort_order, 0), sku: L.sku || null, needs_review: L.needs_review || null,
+      channels: num(L.channels, 0), amps_per_ch: num(L.amps_per_ch, 0), volts_min: num(L.volts_min, 5), volts_max: num(L.volts_max, 36), type: L.type || 'pwm', rdm: !!L.rdm,
+      universes: num(L.universes, 0), dali_lines: num(L.dali_lines, 0), systems: (L.systems || []).map(function (x) { return String(x).toLowerCase(); }),
+      outputs: num(L.outputs, 0), pixels_per_output: num(L.pixels_per_output, 0), protocol: L.protocol || null, ip: r.ip || null };
+  }
   function applyRules(rules) {
     if (!rules || typeof rules !== 'object') return;
     RULE_KEYS.forEach(function (k) { if (rules[k] !== undefined && rules[k] !== null) DEFAULTS[k] = rules[k]; });
@@ -118,18 +143,21 @@
   }
   // rows = v_led_catalogue rows (any order); rules = library_settings.led_engineering value
   function useCatalogue(rows, rules, source) {
-    CAT.strips = []; CAT.drivers = []; CAT.byId = {};
+    CAT.strips = []; CAT.drivers = []; CAT.decoders = []; CAT.interfaces = []; CAT.pixelCtl = []; CAT.byId = {};
     (rows || []).forEach(function (r) {
       if (!r || !r.id) return;
       if (r.role === 'strip') { var s = normStrip(r); CAT.strips.push(s); CAT.byId[s.id] = s; CAT.byId[String(s.id).toUpperCase()] = s; if (s.uid) CAT.byId[s.uid] = s; }
       else if (r.role === 'driver') CAT.drivers.push(normDriver(r));
+      else if (r.role === 'decoder') CAT.decoders.push(normCtl(r));
+      else if (r.role === 'interface') CAT.interfaces.push(normCtl(r));
+      else if (r.role === 'pixel-controller') CAT.pixelCtl.push(normCtl(r));
     });
     CAT.strips.sort(function (a, b) { return (a.source === b.source ? 0 : a.source === 'house' ? -1 : 1) || a.sort_order - b.sort_order || String(a.label).localeCompare(String(b.label)); });
     applyRules(rules);
     CAT.source = source || 'library'; CAT.loadedAt = new Date().toISOString();
     return catalogueInfo();
   }
-  function catalogueInfo() { return { source: CAT.source, strips: CAT.strips.length, drivers: CAT.drivers.length, loadedAt: CAT.loadedAt, rules: !!CAT.rules }; }
+  function catalogueInfo() { return { source: CAT.source, strips: CAT.strips.length, drivers: CAT.drivers.length, decoders: CAT.decoders.length, interfaces: CAT.interfaces.length, pixelControllers: CAT.pixelCtl.length, loadedAt: CAT.loadedAt, rules: !!CAT.rules }; }
   // client = a supabase-js client (window.supabase client / SonorDB().client). 4-tier: Library → cached copy → built-in.
   function load(client) {
     var ls = null; try { ls = global.localStorage; } catch (_) {}
@@ -150,10 +178,49 @@
   function strip(id) { if (id == null) return null; return CAT.byId[id] || CAT.byId[String(id).toUpperCase()] || CAT.byId['house:' + id] || CAT.byId['item:' + id] || null; }
   function stripsById() { var o = {}; CAT.strips.forEach(function (s) { o[s.id] = s; }); return o; }
 
+  // ── supplier options under a generic strip type (1.4.0) ─────────────────
+  // The house type (pm_led_strip_types) is the master; supplier products (lighting_items, metadata.led.strip_types ∋ type)
+  // are its options. Default = the house style (COB) from the first supplier in stripSupply.supplierOrder, lowest rank,
+  // whose IP suits the run (outdoor ≥ outdoorMinIp, indoor prefers IP20). Type metadata.default_product or run.productId wins.
+  function supplyOptions(typeId, q, o) {
+    var c = cfg(o); q = q || {}; var ss = c.stripSupply || {}, order = (ss.supplierOrder || []).map(function (x) { return String(x).toLowerCase(); });
+    var style = q.style !== undefined ? q.style : ss.style, minIp = num(q.minIp, 0), id = String(typeId || '').toUpperCase();
+    function sup(p) { var i = order.indexOf(p.supply.supplier); return i < 0 ? order.length : i; }
+    return CAT.strips.filter(function (p) { return p.supply && p.supply.strip_types.some(function (t) { return String(t).toUpperCase() === id; }); })
+      .map(function (p) { return { p: p, ipOk: minIp ? p.ip_num >= minIp : true, styleOk: !style || p.supply.style === style }; })
+      .sort(function (a, b) {
+        return (b.styleOk - a.styleOk) || (b.ipOk - a.ipOk) || (minIp ? 0 : ((a.p.ip_num >= 65) - (b.p.ip_num >= 65)))
+          || sup(a.p) - sup(b.p) || a.p.supply.rank - b.p.supply.rank || String(a.p.label).localeCompare(String(b.p.label));
+      })
+      .map(function (x) { return x.p; });
+  }
+  function supplyFor(type, q, o) {
+    q = q || {}; if (!type) return null;
+    var force = q.productId || (type.metadata && type.metadata.default_product) || null;
+    if (force) { var f = strip(force); if (f && f.supply) return f; }
+    var c = cfg(o), ss = c.stripSupply || {}, opts = supplyOptions(type.id, q, c);
+    var best = opts[0] || null;
+    if (best && ss.style && best.supply.style !== ss.style && !q.allowOtherStyle) return null;   // house style only (COB) — no SMD fallback unless chosen
+    if (best && q.minIp && !(best.ip_num >= num(q.minIp))) return null;
+    return best;
+  }
+  // house type + supplier product → the strip the engine engineers: product electrics (W/m, V, lm/m, feed, reel), house name / colour
+  function effectiveStrip(type, prod) {
+    if (!prod) return type;
+    var m = {}; Object.keys(type.metadata || {}).forEach(function (k) { m[k] = type.metadata[k]; });
+    ['max_single_feed_m', 'lm_per_m', 'reel_m'].forEach(function (k) { if (prod.metadata && prod.metadata[k] != null) m[k] = prod.metadata[k]; });
+    var e = {}; Object.keys(type).forEach(function (k) { e[k] = type[k]; });
+    e.watts_per_metre = prod.watts_per_metre || type.watts_per_metre; e.volts = prod.volts || type.volts;
+    e.dmx_channels = Math.max(num(type.dmx_channels, 1), num(prod.dmx_channels, 1)); e.ip_rating = prod.ip_rating || type.ip_rating; e.ip_num = prod.ip_num || type.ip_num;
+    e.metadata = m;
+    e.product = { id: prod.id, label: prod.label, manufacturer: prod.manufacturer, supplier: prod.supply.supplier, sku: prod.supply.sku, style: prod.supply.style, price_gbp: prod.supply.price_gbp, url: prod.supply.url, ip: prod.ip_rating, wpm: prod.watts_per_metre, reel_m: prod.metadata && prod.metadata.reel_m };
+    return e;
+  }
+
   // pick a driver for a load from the Library. q = { kind:'cv'|'cc', volts, current_ma, control, minIp, prefer, driverProductId }
   // → { driver_w, drivers, loaded_pct, product:{id,label,manufacturer,ip,control}|null, source:'library'|'fallback'|'forced' }
   function driverRank(q) {
-    var pref = String(q.prefer || '').toLowerCase(), anyCtl = !q.control || q.control === 'dmx' || q.control === 'switched';
+    var pref = String(q.prefer || '').toLowerCase(), anyCtl = !q.control || q.control === 'dmx' || q.control === 'switched' || q.control === 'pixel';
     function pm(d) { return !!pref && (String(d.manufacturer || '').toLowerCase() === pref || String(d.range || '').toLowerCase() === pref || String(d.label || '').toLowerCase().indexOf(pref) >= 0); }
     return function (a, b) {
       return (b.preferred - a.preferred)
@@ -173,7 +240,7 @@
       var f = CAT.drivers.filter(function (d) { return d.id === q.driverProductId; })[0];
       if (f && f.output_w > 0) { var nf = Math.max(1, Math.ceil(minW / f.output_w)); return { driver_w: f.output_w, drivers: nf, loaded_pct: Math.round(loadW / (f.output_w * nf) * 100), product: prod(f), source: 'forced' }; }
     }
-    var ctl = q.control ? String(q.control).toLowerCase() : null, needCtl = ctl && ['dmx', 'switched'].indexOf(ctl) < 0;
+    var ctl = q.control ? String(q.control).toLowerCase() : null, needCtl = ctl && ['dmx', 'switched', 'pixel'].indexOf(ctl) < 0;
     var cands = CAT.drivers.filter(function (d) {
       if (d.family || !(d.output_w > 0) || d.kind !== kind) return false;
       if (kind === 'cv' && q.volts && d.volts && num(d.volts) !== num(q.volts)) return false;
@@ -288,15 +355,59 @@
     var dmxCh = ctl.id === 'dmx' ? (data ? 0 : Math.max(1, ch)) : 0;   // data strips take a pixel-controller output, not channels
     return {
       id: rn.id || rn.label || '', label: rn.label || rn.id || '', floor: rn.floor || '', room: rn.room || '',
-      strip: { id: st.id || rn.ledId || '', label: st.label || rn.ledLabel || 'LED strip', volts: volts, wpm: wpm, channels: ch, data: data, kelvin: st.kelvin || null, ip: st.ip_rating || null, maxFeedM: maxFeed, reelM: num(st.metadata && st.metadata.reel_m) > 0 ? num(st.metadata.reel_m) : null, lmPerM: num(st.metadata && st.metadata.lm_per_m) || null },
+      strip: { id: st.id || rn.ledId || '', label: st.label || rn.ledLabel || 'LED strip', volts: volts, wpm: wpm, channels: ch, data: data, kelvin: st.kelvin || null, ip: st.ip_rating || null, maxFeedM: maxFeed, reelM: num(st.metadata && st.metadata.reel_m) > 0 ? num(st.metadata.reel_m) : null, lmPerM: num(st.metadata && st.metadata.lm_per_m) || null, product: st.product || null, typeId: st.typeId || st.id || rn.ledId || '' },
       source: rn.source || null, outdoor: outdoor, lumens: num(st.metadata && st.metadata.lm_per_m) ? Math.round(metres * num(st.metadata.lm_per_m)) : null,
       metres: r1(metres), load_w: r1(load),
       feeds: feeds, feedsManual: manual, feedLoads_w: perFeed, cables: cables, cable: worstCable,
       driver: drv, driverAt: rn.driverAt || rn.driver_location || null, driverId: rn.driverId || null, driverRemote: !!rn.driverRemote,   // 1.2.0 — remote DMX driver block feeding the run dimming: rn.dimming || (data ? 'data' : (ch > 1 ? 'dmx' : null)),
       control: ctl.id, controlLabel: ctl.label, driverType: ctl.driver, circuitType: ctl.circuit, controlExplicit: !!(rn && rn.control),
-      dmx: ctl.id === 'dmx' ? { channels: dmxCh, data: data, universe: num(rn.dmx_universe) > 0 ? num(rn.dmx_universe) : null, address: num(rn.dmx_address) > 0 ? num(rn.dmx_address) : null, manual: num(rn.dmx_address) > 0 } : null,
+      pixel: ctl.id === 'pixel' ? { output: null, controller: null } : null,   // 1.4.0
+      perChannelA: ctl.id === 'dmx' && !data ? Math.round(load / volts / Math.max(1, ch) * 100) / 100 : null,   // 1.4.0 — load each decoder channel carries
+      dmx: ctl.id === 'dmx' ? { channels: dmxCh, data: data, node: rn.node || rn.dmx_node || null, universe: num(rn.dmx_universe) > 0 ? num(rn.dmx_universe) : null, address: num(rn.dmx_address) > 0 ? num(rn.dmx_address) : null, manual: num(rn.dmx_address) > 0 } : null,
       flags: flags, notes: notes
     };
+  }
+
+  // ── control equipment (1.4.0) ─────────────────────────────────────────────
+  function ctlRank(a, b) { return (b.preferred - a.preferred) || a.sort_order - b.sort_order || String(a.label).localeCompare(String(b.label)); }
+  // decoders per DMX zone (floor · room): the smallest Library decoder that holds the zone's channels at the highest per-channel
+  // load; when none holds them all, the decoder with the most channels that carries the current, × n. Remote DMX drivers need none.
+  function chooseDecoders(out, c) {
+    var list = CAT.decoders.filter(function (d) { return !d.family && d.type !== 'relay' && d.channels > 0; });
+    if (!list.length) return { count: null, products: [] };
+    var zones = {}, prod = {}, count = 0;
+    out.forEach(function (e) {
+      if (!e.dmx || e.dmx.data || e.driverRemote) return;
+      var k = (e.floor || '') + ' · ' + (e.room || ''); var z = zones[k] = zones[k] || { key: k, ch: 0, maxA: 0, volts: e.strip.volts, runs: [] };
+      z.ch += e.dmx.channels; z.maxA = Math.max(z.maxA, num(e.perChannelA)); z.runs.push(e);
+    });
+    Object.keys(zones).forEach(function (k) {
+      var z = zones[k], ok = list.filter(function (d) { return (!d.amps_per_ch || d.amps_per_ch >= z.maxA) && z.volts >= d.volts_min && z.volts <= d.volts_max; }).sort(ctlRank);
+      var pick = null, n = 1;
+      var fit = ok.filter(function (d) { return d.channels >= z.ch; }).sort(function (a, b) { return (b.preferred - a.preferred) || a.channels - b.channels || ctlRank(a, b); })[0];
+      if (fit) pick = fit;
+      else if (ok.length) { pick = ok.slice().sort(function (a, b) { return (b.preferred - a.preferred) || b.channels - a.channels; })[0]; n = Math.ceil(z.ch / pick.channels); }
+      if (!pick) { z.runs.forEach(function (e) { e.flags.push('DECODER'); e.notes.push('no Library decoder carries ' + z.maxA + ' A a channel at ' + z.volts + ' V — split the run or add a power repeater'); }); return; }
+      count += n;
+      var p = prod[pick.id] = prod[pick.id] || { id: pick.id, label: pick.label, manufacturer: pick.manufacturer, channels: pick.channels, amps_per_ch: pick.amps_per_ch, qty: 0, zones: [] };
+      p.qty += n; p.zones.push(k);
+      z.runs.forEach(function (e) { e.decoder = { id: pick.id, label: pick.label, zone: k }; });
+    });
+    return { count: count, products: Object.keys(prod).map(function (k) { return prod[k]; }).sort(function (a, b) { return a.channels - b.channels; }) };
+  }
+  // DMX interface by lighting control system (Bryn 2026-10-16: Art-Net by default, Creative Lighting with Control4, the Lutron /
+  // Rako DMX interface with those systems) — sized to the universes in use.
+  function chooseInterface(universes, c) {
+    var sys = String(c.controlSystem || 'artnet').toLowerCase();
+    var list = CAT.interfaces.filter(function (d) { return !d.family && d.universes > 0 && d.systems.indexOf(sys) >= 0; });
+    if (!list.length) return { system: sys, product: null, qty: Math.max(1, universes), note: 'no Library DMX interface for ' + sys };
+    var fit = list.filter(function (d) { return d.universes >= universes; }).sort(function (a, b) { return (b.preferred - a.preferred) || a.universes - b.universes || ctlRank(a, b); })[0];
+    var pick = fit || list.slice().sort(function (a, b) { return (b.preferred - a.preferred) || b.universes - a.universes; })[0];
+    return { system: sys, product: { id: pick.id, label: pick.label, manufacturer: pick.manufacturer, universes: pick.universes }, qty: fit ? 1 : Math.ceil(universes / pick.universes) };
+  }
+  function pickPixelController(c) {
+    var list = CAT.pixelCtl.filter(function (d) { return !d.family && d.outputs > 0; }).sort(ctlRank);
+    return list[0] || null;
   }
 
   // ── a project ────────────────────────────────────────────────────────────
@@ -305,53 +416,75 @@
     var out = [], byType = {}, drivers = {}, dprod = {}, channels = {}, cable = {}, rooms = {};
     (runs || []).forEach(function (rn) {
       var st = stripsById[rn.ledId] || stripsById[String(rn.ledId || '').toUpperCase()] || (rn.strip || null) || strip(rn.ledId) || { id: rn.ledId, label: rn.ledLabel, watts_per_metre: rn.wpm || 10, volts: rn.volts || 24, dmx_channels: rn.channels || 1 };
+      // 1.4.0 — a generic house type takes its supplier option (default COB · UltraLEDs) and engineers on that product's spec
+      var outdoorQ = !!(rn.outdoor || c.outdoor), noSupply = false;
+      if (st && !st.supply && !st.product) {
+        var prodSel = supplyFor(st, { productId: rn.productId || null, minIp: outdoorQ ? c.outdoorMinIp : (rn.minIp || null) }, c);
+        if (prodSel) { var eff = effectiveStrip(st, prodSel); eff.typeId = st.id; st = eff; }
+        else noSupply = CAT.strips.length > 0;
+      }
       var e = run(rn, st, c); if (!e) return; out.push(e);
-      var t = byType[e.strip.id || e.strip.label] = byType[e.strip.id || e.strip.label] || { id: e.strip.id, label: e.strip.label, volts: e.strip.volts, wpm: e.strip.wpm, reelM: e.strip.reelM, metres: 0, runs: 0, load_w: 0 };
+      if (noSupply) e.notes.push('no ' + String((c.stripSupply && c.stripSupply.style) || '').toUpperCase() + (outdoorQ ? ' IP' + c.outdoorMinIp + '+' : '') + ' supplier option under ' + (st.label || st.id) + ' — add one in Library › LED Strips');
+      var tk = (e.strip.typeId || e.strip.id || e.strip.label) + '|' + (e.strip.product ? e.strip.product.id : '');
+      var t = byType[tk] = byType[tk] || { id: e.strip.typeId || e.strip.id, label: e.strip.label, volts: e.strip.volts, wpm: e.strip.wpm, reelM: e.strip.reelM, product: e.strip.product, metres: 0, runs: 0, load_w: 0 };
       t.metres += e.metres; t.runs++; t.load_w += e.load_w;
       var dk = e.driver.driver_w + ' W'; drivers[dk] = (drivers[dk] || 0) + e.driver.drivers;
       var pk = e.driver.product ? e.driver.product.id : ('generic-' + e.driver.driver_w); if (e.driver.drivers) { var dp = dprod[pk] = dprod[pk] || { id: e.driver.product ? e.driver.product.id : null, label: e.driver.product ? e.driver.product.label : ('Generic ' + e.driver.driver_w + ' W CV driver'), manufacturer: e.driver.product ? e.driver.product.manufacturer : null, size_w: e.driver.driver_w, qty: 0 }; dp.qty += e.driver.drivers; }
-      if (!e.strip.data) { var rk = (e.floor || '') + ' · ' + (e.room || ''); rooms[rk] = (rooms[rk] || 0) + e.strip.channels; }
+      if (e.dmx && !e.dmx.data && !e.driverRemote) { var rk = (e.floor || '') + ' · ' + (e.room || ''); rooms[rk] = (rooms[rk] || 0) + e.dmx.channels; }   // 1.4.0 — DMX runs only (was every non-data strip)
       e.cables.forEach(function (cb) { var ck = cb.csa + ' mm²'; cable[ck] = (cable[ck] || 0) + cb.length_m; });
     });
-    Object.keys(byType).forEach(function (k) { var t = byType[k]; t.metres = r1(t.metres); t.load_w = r1(t.load_w); var reel = num(t.reelM) > 0 ? num(t.reelM) : c.reelM; t.order_m = Math.ceil(t.metres * (1 + c.wastePct / 100) / reel) * reel; t.reels = t.order_m / reel; });
+    Object.keys(byType).forEach(function (k) { var t = byType[k]; t.metres = r1(t.metres); t.load_w = r1(t.load_w); var reel = num(t.reelM) > 0 ? num(t.reelM) : c.reelM; t.order_m = Math.ceil(t.metres * (1 + c.wastePct / 100) / reel) * reel; t.reels = t.order_m / reel; t.cost_gbp = t.product && t.product.price_gbp ? Math.round(t.reels * t.product.price_gbp * 100) / 100 : null; });
     var decoders = 0; Object.keys(rooms).forEach(function (k) { decoders += Math.ceil(rooms[k] / c.decoderChannels); channels[k] = rooms[k]; });
     // ── DMX addressing (v1.1.0): manual addresses are honoured; the rest are packed in run order from the next free address,
     // one universe of 512 then the next. Data / pixel strips take pixel-controller outputs instead (PX1, PX2 …).
-    var used = {};   // universe → [[from,to]]
-    out.forEach(function (e) { if (e.dmx && e.dmx.manual && e.dmx.channels) { var u = e.dmx.universe || 1; (used[u] = used[u] || []).push([e.dmx.address, e.dmx.address + e.dmx.channels - 1]); e.dmx.universe = u; } });
+    // 1.4.0 — DMX lines patch to nodes (Art-Net nodes / system interfaces). opts.nodes = [{ id, label, productId }]; a run's
+    // dmx.node (rn.node) picks its node, unassigned runs go to the first node. Every node owns its own universes (U1, U2 …)
+    // and addresses restart per node universe.
+    var nodes = (Array.isArray(c.nodes) && c.nodes.length ? c.nodes : [{ id: 'N1', label: 'Node 1' }]).map(function (n, i) { return { id: String(n.id || ('N' + (i + 1))), label: n.label || ('Node ' + (i + 1)), productId: n.productId || null, location: n.location || null }; });
+    var nodeIds = nodes.map(function (n) { return n.id; });
+    out.forEach(function (e) { if (e.dmx && !e.dmx.data) { if (!e.dmx.node || nodeIds.indexOf(String(e.dmx.node)) < 0) { if (e.dmx.node) e.notes.push('DMX node ' + e.dmx.node + ' not in this project — patched to ' + nodes[0].label); e.dmx.node = nodes[0].id; } else e.dmx.node = String(e.dmx.node); } });
+    var used = {};   // node|universe → [[from,to]]
+    function uk(n, u) { return n + '|' + u; }
+    out.forEach(function (e) { if (e.dmx && !e.dmx.data && e.dmx.manual && e.dmx.channels) { var u = e.dmx.universe || 1; (used[uk(e.dmx.node, u)] = used[uk(e.dmx.node, u)] || []).push([e.dmx.address, e.dmx.address + e.dmx.channels - 1]); e.dmx.universe = u; } });
     // Zone-aware (Bryn 22:25: "based on rooms and zones, if there is one or 2 single channels in the same zone, they may
     // start at 007 or something"): runs are walked in floor · room groups; inside a group every MULTI-channel device
     // starts on a fresh xx1 block, and the group's SINGLE-channel devices pack straight after the last multi-channel
     // device (005, 006, 007 …) instead of each taking a block; a group of singles only starts on a fresh xx1 and packs.
     // The next room always starts on the next free xx1.
-    var cur = { u: 1, a: 1 }, pxOut = 0, blk = Math.max(1, num(c.dmxBlock, 10));
-    function free(u, a, n) { var r = used[u] || []; for (var i = 0; i < r.length; i++) { if (a <= r[i][1] && a + n - 1 >= r[i][0]) return false; } return true; }
+    var pxOut = 0, blk = Math.max(1, num(c.dmxBlock, 10));
+    var pxCtl = pickPixelController(c), pxPer = pxCtl ? Math.max(1, pxCtl.outputs) : Math.max(1, num(c.pixelControllerOutputs, 4));
+    function pxName(n) { return 'PX' + Math.ceil(n / pxPer) + '-' + (((n - 1) % pxPer) + 1); }
+    out.forEach(function (e) { if (e.pixel) { pxOut++; e.pixel.output = pxName(pxOut); e.pixel.controller = pxCtl ? pxCtl.label : 'Pixel controller'; } });
     function snap(a) { return Math.floor((a - 1) / blk) * blk + 1; }
     function nextBlock(a) { return snap(a) === a ? a : snap(a) + blk; }
-    function take(e, n, wantBlock) {
-      if (wantBlock) cur.a = nextBlock(cur.a);
-      while (true) {
-        if (cur.a + n - 1 > c.dmxUniverseSize) { cur.u++; cur.a = 1; }
-        if (free(cur.u, cur.a, n)) break;
-        cur.a = wantBlock ? nextBlock(cur.a + 1) : cur.a + 1;
+    nodes.forEach(function (nd) {
+      var cur = { u: 1, a: 1 };
+      function free(u, a, n) { var r = used[uk(nd.id, u)] || []; for (var i = 0; i < r.length; i++) { if (a <= r[i][1] && a + n - 1 >= r[i][0]) return false; } return true; }
+      function take(e, n, wantBlock) {
+        if (wantBlock) cur.a = nextBlock(cur.a);
+        while (true) {
+          if (cur.a + n - 1 > c.dmxUniverseSize) { cur.u++; cur.a = 1; }
+          if (free(cur.u, cur.a, n)) break;
+          cur.a = wantBlock ? nextBlock(cur.a + 1) : cur.a + 1;
+        }
+        e.dmx.universe = cur.u; e.dmx.address = cur.a; (used[uk(nd.id, cur.u)] = used[uk(nd.id, cur.u)] || []).push([cur.a, cur.a + n - 1]); cur.a += n;
       }
-      e.dmx.universe = cur.u; e.dmx.address = cur.a; (used[cur.u] = used[cur.u] || []).push([cur.a, cur.a + n - 1]); cur.a += n;
-    }
-    var groups = [], gIdx = {};
-    out.forEach(function (e) {
-      if (!e.dmx) return;
-      if (e.dmx.data) { pxOut++; e.dmx.universe = null; e.dmx.output = 'PX' + Math.ceil(pxOut / c.pixelControllerOutputs) + '-' + (((pxOut - 1) % c.pixelControllerOutputs) + 1); return; }
-      if (e.dmx.manual) return;
-      var gk = (e.floor || '') + ' · ' + (e.room || '');
-      if (gIdx[gk] == null) { gIdx[gk] = groups.length; groups.push({ key: gk, multi: [], single: [] }); }
-      groups[gIdx[gk]][e.dmx.channels > 1 ? 'multi' : 'single'].push(e);
+      var groups = [], gIdx = {};
+      out.forEach(function (e) {
+        if (!e.dmx || e.dmx.data || e.dmx.manual || e.dmx.node !== nd.id) return;
+        var gk = (e.floor || '') + ' · ' + (e.room || '');
+        if (gIdx[gk] == null) { gIdx[gk] = groups.length; groups.push({ key: gk, multi: [], single: [] }); }
+        groups[gIdx[gk]][e.dmx.channels > 1 ? 'multi' : 'single'].push(e);
+      });
+      groups.forEach(function (g) {
+        cur.a = nextBlock(cur.a);                                  // a new zone starts on a fresh xx1
+        g.multi.forEach(function (e) { take(e, e.dmx.channels, true); });
+        g.single.forEach(function (e, i) { take(e, 1, g.multi.length === 0 && i === 0); });   // singles pack after the zone's last multi-channel device (a singles-only zone opens its own xx1)
+      });
     });
-    groups.forEach(function (g) {
-      cur.a = nextBlock(cur.a);                                  // a new zone starts on a fresh xx1
-      g.multi.forEach(function (e) { take(e, e.dmx.channels, true); });
-      g.single.forEach(function (e, i) { take(e, 1, g.multi.length === 0 && i === 0); });   // singles pack after the zone's last multi-channel device (a singles-only zone opens its own xx1)
-      g.zoneAddr = null;
-    });
+    out.forEach(function (e) { if (e.dmx && e.dmx.data) { pxOut++; e.dmx.universe = null; e.dmx.output = pxName(pxOut); } });
+    var nodeLabel = {}; nodes.forEach(function (n) { nodeLabel[n.id] = n.label; });
+    out.forEach(function (e) { if (e.dmx && !e.dmx.data) e.dmx.nodeLabel = nodes.length > 1 ? nodeLabel[e.dmx.node] : null; });
     out.forEach(function (e) { if (e.dmx && !e.dmx.data) e.dmx.zone = (e.floor || '') + ' · ' + (e.room || ''); });
     var dmxRuns = out.filter(function (e) { return e.dmx && !e.dmx.data; }), dmxCh = dmxRuns.reduce(function (a, e) { return a + e.dmx.channels; }, 0);
     var byControl = {}; out.forEach(function (e) { byControl[e.control] = (byControl[e.control] || 0) + 1; });
@@ -360,12 +493,28 @@
       version: VERSION, runs: out,
       totals: { runs: out.length, metres: r1(totalM), load_w: r1(totalW), drivers: Object.keys(drivers).reduce(function (a, k) { return a + drivers[k]; }, 0), feeds: out.reduce(function (a, e) { return a + e.feeds.length; }, 0), flagged: out.filter(function (e) { return e.flags.length; }).length },
       byType: Object.keys(byType).map(function (k) { return byType[k]; }).sort(function (a, b) { return b.metres - a.metres; }),
+      stripCost: Object.keys(byType).reduce(function (a, k) { return a + (byType[k].cost_gbp || 0); }, 0) || null,   // 1.4.0
       drivers: Object.keys(drivers).sort(function (a, b) { return parseFloat(a) - parseFloat(b); }).map(function (k) { return { size: k, qty: drivers[k] }; }),
       driverProducts: Object.keys(dprod).map(function (k) { return dprod[k]; }).sort(function (a, b) { return a.size_w - b.size_w || String(a.label).localeCompare(String(b.label)); }),   // 1.3.0
       catalogue: catalogueInfo(),
-      controllers: { channelsByRoom: channels, decoders: decoders, decoderChannels: c.decoderChannels,
-        dmx: { runs: dmxRuns.length, channels: dmxCh, universes: Object.keys(used).length, decoders: Math.ceil(dmxCh / c.decoderChannels), pixelOutputs: pxOut, pixelControllers: Math.ceil(pxOut / c.pixelControllerOutputs) },
-        byControl: byControl, triacDrivers: out.filter(function (e) { return e.control === 'triac'; }).reduce(function (a, e) { return a + e.driver.drivers; }, 0) },
+      controllers: (function () {
+        var dec = chooseDecoders(out, c), universes = Object.keys(used).length;
+        var nodeOut = nodes.map(function (nd) {
+          var rs = dmxRuns.filter(function (e) { return e.dmx.node === nd.id; }), us = Object.keys(used).filter(function (k) { return k.indexOf(nd.id + '|') === 0; }).length;
+          var forced = nd.productId ? CAT.interfaces.filter(function (d) { return d.id === nd.productId; })[0] : null;
+          var pick = forced ? { system: (forced.systems[0] || c.controlSystem), product: { id: forced.id, label: forced.label, manufacturer: forced.manufacturer, universes: forced.universes }, qty: forced.universes ? Math.max(1, Math.ceil(us / forced.universes)) : 1, forced: true } : (rs.length ? chooseInterface(us, c) : null);
+          if (pick && pick.product && pick.product.universes && us > pick.product.universes * pick.qty) rs.forEach(function (e) { e.notes.push(nd.label + ' carries ' + us + ' universes — add a node'); });
+          return { id: nd.id, label: nd.label, location: nd.location, runs: rs.length, channels: rs.reduce(function (a, e) { return a + e.dmx.channels; }, 0), universes: us, interface: pick };
+        });
+        var used1 = nodeOut.filter(function (n) { return n.runs; });
+        var itf = used1.length ? (function () { var f = used1[0].interface || {}; var qty = used1.reduce(function (a, n) { return a + ((n.interface && n.interface.qty) || 0); }, 0); return { system: f.system, product: f.product || null, qty: qty, note: f.note, nodes: used1.length }; })() : null;
+        var pxQty = Math.ceil(pxOut / pxPer);
+        return { channelsByRoom: channels, decoders: dec.count != null ? dec.count : decoders, decoderChannels: c.decoderChannels,
+        decoderProducts: dec.products, interface: itf, nodes: nodeOut,
+        interfaceProducts: (function () { var m = {}; used1.forEach(function (n) { var it = n.interface; if (!it) return; var k = it.product ? it.product.id : 'none'; var x = m[k] = m[k] || { id: it.product ? it.product.id : null, label: it.product ? it.product.label : ('DMX interface (' + it.system + ')'), manufacturer: it.product ? it.product.manufacturer : null, qty: 0, nodes: [] }; x.qty += it.qty || 1; x.nodes.push(n.label); }); return Object.keys(m).map(function (k) { return m[k]; }); })(), controlSystem: c.controlSystem || 'artnet',
+        pixel: { runs: out.filter(function (e) { return e.pixel; }).length, outputs: pxOut, controllers: pxQty, product: pxCtl ? { id: pxCtl.id, label: pxCtl.label, outputs: pxCtl.outputs } : null },
+        dmx: { runs: dmxRuns.length, channels: dmxCh, universes: universes, decoders: dec.count != null ? dec.count : Math.ceil(dmxCh / c.decoderChannels), pixelOutputs: pxOut, pixelControllers: pxQty },
+        byControl: byControl, triacDrivers: out.filter(function (e) { return e.control === 'triac'; }).reduce(function (a, e) { return a + e.driver.drivers; }, 0) }; })(),
       cable: Object.keys(cable).sort(function (a, b) { return parseFloat(a) - parseFloat(b); }).map(function (k) { return { csa: k, metres: Math.ceil(cable[k] * 1.15) }; }),   // +15 % like every other cable estimate
       schedule: out.map(scheduleRow)
     };
@@ -378,14 +527,15 @@
     return [e.floor || '—', e.id || '—', e.room || '—', e.strip.label + ' · ' + e.strip.volts + ' V · ' + e.strip.wpm + ' W/m', e.metres.toFixed(1), e.load_w.toFixed(0), feeds, drv, e.driverAt || 'local (accessible)', cab, e.controlLabel || '—', dmxText(e), (e.flags.length ? e.flags.join(' · ') + ' — ' : '') + e.notes.join('; ')];
   }
   function dmxText(e) {
+    if (e.pixel) return 'pixel ' + (e.pixel.output || 'output');   // 1.4.0
     if (!e.dmx) return '—';
     if (e.dmx.data) return 'pixel ' + (e.dmx.output || 'output');
     if (!e.dmx.universe || !e.dmx.address) return e.dmx.channels + ' ch';
     var pad = function (n) { return ('00' + n).slice(-3); };
-    return 'U' + e.dmx.universe + ' · ' + pad(e.dmx.address) + (e.dmx.channels > 1 ? '–' + pad(e.dmx.address + e.dmx.channels - 1) : '') + (e.dmx.manual ? ' (set)' : '');
+    return (e.dmx.nodeLabel ? e.dmx.nodeLabel + ' · ' : '') + 'U' + e.dmx.universe + ' · ' + pad(e.dmx.address) + (e.dmx.channels > 1 ? '–' + pad(e.dmx.address + e.dmx.channels - 1) : '') + (e.dmx.manual ? ' (set)' : '');
   }
   var SCHEDULE_HEADERS = ['Floor', 'ID', 'Room', 'Strip', 'Metres', 'Load W', 'Feeds', 'Driver', 'Driver at', 'Feed cable', 'Control', 'DMX', 'Notes'];
 
   global.SonorLedEng = { VERSION: VERSION, DEFAULTS: DEFAULTS, CONTROLS: CONTROLS,
-    load: load, useCatalogue: useCatalogue, catalogue: catalogueInfo, strips: function () { return CAT.strips.slice(); }, drivers: function () { return CAT.drivers.slice(); }, strip: strip, stripsById: stripsById, pickDriver: pickDriver, fromTakeoffsFloors: fromTakeoffsFloors, rules: function () { return cfg(); }, controlFor: controlFor, dmxText: dmxText, run: run, project: project, driverFor: driverFor, feedCable: feedCable, stripMaxFeedM: function (st) { return stripMaxFeedM(st, cfg()); }, scheduleRow: scheduleRow, SCHEDULE_HEADERS: SCHEDULE_HEADERS };
+    load: load, useCatalogue: useCatalogue, decoders: function () { return CAT.decoders.slice(); }, interfaces: function () { return CAT.interfaces.slice(); }, pixelControllers: function () { return CAT.pixelCtl.slice(); }, chooseInterface: function (u, o) { return chooseInterface(u, cfg(o)); }, supplyOptions: function (t, q, o) { return supplyOptions(t, q, o); }, supplyFor: function (t, q, o) { return supplyFor(typeof t === 'string' ? strip(t) : t, q, o); }, effectiveStrip: effectiveStrip, houseStrips: function () { return CAT.strips.filter(function (s) { return !s.supply; }); }, supplierProducts: function () { return CAT.strips.filter(function (s) { return s.supply; }); }, catalogue: catalogueInfo, strips: function () { return CAT.strips.slice(); }, drivers: function () { return CAT.drivers.slice(); }, strip: strip, stripsById: stripsById, pickDriver: pickDriver, fromTakeoffsFloors: fromTakeoffsFloors, rules: function () { return cfg(); }, controlFor: controlFor, dmxText: dmxText, run: run, project: project, driverFor: driverFor, feedCable: feedCable, stripMaxFeedM: function (st) { return stripMaxFeedM(st, cfg()); }, scheduleRow: scheduleRow, SCHEDULE_HEADERS: SCHEDULE_HEADERS };
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
