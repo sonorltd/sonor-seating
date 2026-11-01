@@ -14,7 +14,10 @@
   var M = 48;
   var GOLD = [173, 153, 120], GOLDL = [200, 180, 142], PUR = [128, 88, 161],
       CREAM = [246, 242, 234], INK = [26, 24, 20], INK2 = [60, 55, 47], MUT = [120, 112, 96],
-      DARK = [9, 8, 7], DARK2 = [22, 19, 24], LINE = [214, 205, 188];
+      DARK = [9, 8, 7], DARK2 = [22, 19, 24], LINE = [214, 205, 188],
+      // v0.26.4 — PAPER: no cream page on any Sonor PDF (Bryn 2026-10-22: "yes all pdfs re cream") — the house paper is the
+      // very slight tint of sonor-pdf-luxury.js 1.4.0+ (251/250/247); CREAM stays only as the light ink on the dark cover.
+      PAPER = [251, 250, 247];
 
   var HOUSE = 'M92.02,38.41v51.4c0,2.63-2.13,4.75-4.75,4.75h-3.34c-2.62,0-4.75-2.12-4.75-4.75v-45.34c0-2.45-1.11-4.77-3.01-6.31l-25.23-20.41c-2.8-2.27-6.76-2.42-9.73-.36l-23.15,16.05.45,1.55c22.38,9.5,40.47,30.05,47.71,53.39.95,3.06-1.32,6.18-4.53,6.18h-5.36c-2.08,0-3.9-1.37-4.54-3.35-6.96-21.83-24.83-38.23-46.17-46.13-1.31-.49-2.31-1.5-2.79-2.75-.2-.51-.31-1.06-.32-1.64l-.12-9.11c-.02-1.58.75-3.06,2.05-3.96L28.74,10.74,42.11,1.45c.16-.11.32-.22.49-.31,2.35-1.4,5.22-1.5,7.64-.34.57.26,1.12.61,1.63,1.03l37.16,30.29c1.89,1.54,2.99,3.85,2.99,6.29Z ' +
     'M34.59,94.55h-5.25c-1.6,0-3.09-.81-3.97-2.15-5.47-8.37-11.98-15.35-20.72-20.32-1.5-.85-2.45-2.42-2.45-4.15v-5.58c0-3.52,3.68-5.79,6.85-4.26,12.79,6.15,23.95,16.91,29.85,29.73,1.45,3.14-.86,6.73-4.32,6.73h0Z ' +
@@ -221,7 +224,7 @@
 
   // ── PAGE 2 · SPECIFICATION + QUOTE + TERMS ───────────────────────────────────
   function quote(P, F, m, TOTAL_PAGES, rangeImg, swatchImg) {
-    P.rect(0, 0, A4.w, A4.h, CREAM);
+    P.rect(0, 0, A4.w, A4.h, PAPER);
     pageHead(P, F, m, 'SPECIFICATION & ESTIMATE', 2, TOTAL_PAGES);
 
     P.tracked((m.manufacturer || 'SONOR').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
@@ -368,7 +371,7 @@
 
   // ── PAGE 3 · DIMENSIONED SEATING PLAN (CAD-style) ────────────────────────────
   function drawing(P, F, m, TOTAL_PAGES, configImg) {
-    P.rect(0, 0, A4.w, A4.h, CREAM);
+    P.rect(0, 0, A4.w, A4.h, PAPER);
     pageHead(P, F, m, 'DIMENSIONED LAYOUT', 3, TOTAL_PAGES);
     P.text(m.range + ' — ' + (m.rows || 2) + ' rows × ' + (m.seatsPerRow || 3), M - 1, 106, 22, F.b, INK);
     if (m.spec && m.spec.configName) {
@@ -507,7 +510,7 @@
 
   // ── PAGE 4 · TECHNICAL SPECIFICATION ─────────────────────────────────────────
   function techspec(P, F, m, rangeImg, TOTAL_PAGES, mfrLogoImg) {
-    P.rect(0, 0, A4.w, A4.h, CREAM);
+    P.rect(0, 0, A4.w, A4.h, PAPER);
     pageHead(P, F, m, 'MODEL DATA', 4, TOTAL_PAGES);
     P.tracked((m.manufacturer || '').toUpperCase(), M, 92, 8.5, F.r, GOLD, 2.6);
     P.text(m.range || '', M - 1, 106, 26, F.b, INK);
@@ -574,7 +577,7 @@
 
   // ── PAGE 5 · ADDITIONAL OPTIONS — everything available that wasn't picked ─────
   function optionsPage(P, F, m, TOTAL_PAGES) {
-    P.rect(0, 0, A4.w, A4.h, CREAM);
+    P.rect(0, 0, A4.w, A4.h, PAPER);
     pageHead(P, F, m, 'ADDITIONAL OPTIONS', 5, TOTAL_PAGES);
     P.tracked('AVAILABLE ON THIS RANGE', M, 96, 8.5, F.r, GOLD, 2.6);
     var introLines = wrap('A menu of everything available on the ' + (m.range || '') + ' — in case anything was missed during configuration. Values show the change to this proposal’s total (ex VAT) if swapped in; ask us to add any of these to your formal quotation.', F.r, 9, A4.w - M * 2);
@@ -635,7 +638,7 @@
 
   // ── PAGE 6 · TERMS & PAYMENT — the full terms, on their own closing page ─────
   function termsPage(P, F, m, TOTAL_PAGES) {
-    P.rect(0, 0, A4.w, A4.h, CREAM);
+    P.rect(0, 0, A4.w, A4.h, PAPER);
     pageHead(P, F, m, 'TERMS & PAYMENT', 6, TOTAL_PAGES);
     // v0.22.0 — THE DETAIL leads, PAYMENT follows it; quote reference sits alone near
     // the foot of the page; everything given air.
@@ -685,7 +688,7 @@
     doc.setTitle('Sonor — ' + (m.range || 'Seating') + ' BOM (internal)');
     doc.setAuthor('Sonor'); doc.setCreator('Sonor Seating Configurator');
     var P = mk(doc.addPage([A4.w, A4.h]), doc);
-    P.rect(0, 0, A4.w, A4.h, CREAM);
+    P.rect(0, 0, A4.w, A4.h, PAPER);
     // head
     P.tracked('BILL OF MATERIALS', M, 56, 8.5, F.b, GOLD, 2.6);
     P.trackedRight('INTERNAL USE ONLY', A4.w - M, 56, 8.5, F.b, [178, 88, 66], 2.2);
