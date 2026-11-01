@@ -1,4 +1,7 @@
-/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.4.0, root master)
+/* Sonor PDF Luxury — SHARED client-proposal chrome (v1.5.2, root master)
+   v1.5.2 (2026-11-01, LED Calc): makeFonts embeds Gilroy with ligatures OFF (features liga / clig / dlig false). pdf-lib maps "ff" / "fi"
+   to Gilroy's ligature glyphs but advances by the single-letter widths, so "Takeoffs" printed as "Takeoff s" — the reason consumers
+   inserted "f f" spaces. Every pack on this chrome now sets "ff" correctly; the "f f" workaround in a consumer can go.
    v1.4.0 (2026-10-16): palette read from sonor-pdf-theme.js when present — ONE PDF theme workspace-wide (black/gold chrome, neutral greys).
    v1.3.1 (2026-10-16, Takeover): cover() wraps a title that is still too wide at 38 pt onto two lines (eyebrow lifts with it).
    v1.3.0 (2026-10-16, Takeover): footerMode('minimal', project) — page-number-only running footer; rearPage() — the closing contact page
@@ -175,9 +178,10 @@
     var PL = global.PDFLib, F = {};
     try { if (global.fontkit) doc.registerFontkit(global.fontkit); } catch (e) {}
     try {
-      F.b = await doc.embedFont(await fetchBytes(base + 'fonts/gilroy-extrabold.otf'), { subset: false });
-      F.r = await doc.embedFont(await fetchBytes(base + 'fonts/gilroy-regular.otf'), { subset: false });
-      F.l = await doc.embedFont(await fetchBytes(base + 'fonts/gilroy-ultralight.otf'), { subset: false });
+      var NOLIG = { subset: false, features: { liga: false, clig: false, dlig: false } };   // v1.5.2 — Gilroy ligatures mis-advance in pdf-lib
+      F.b = await doc.embedFont(await fetchBytes(base + 'fonts/gilroy-extrabold.otf'), NOLIG);
+      F.r = await doc.embedFont(await fetchBytes(base + 'fonts/gilroy-regular.otf'), NOLIG);
+      F.l = await doc.embedFont(await fetchBytes(base + 'fonts/gilroy-ultralight.otf'), NOLIG);
     } catch (e) {
       F.b = await doc.embedFont(PL.StandardFonts.HelveticaBold);
       F.r = await doc.embedFont(PL.StandardFonts.Helvetica);
@@ -371,7 +375,7 @@
   }
 
   global.SonorPdfLuxury = {
-    __version: '1.5.1', sheet: sheet, SHEETS: SHEETS, TW: TW, theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
+    __version: '1.5.2', sheet: sheet, SHEETS: SHEETS, TW: TW, theme: theme, THEMES: THEMES, footerMode: footerMode, rearPage: rearPage,
     A4: A4, M: M, COL: COL, HOUSE: HOUSE, WA: WA,
     col: col, hexRgb: hexRgb, fadePngDataUrl: fadePngDataUrl,
     fetchBytes: fetchBytes, loadImage: loadImage,

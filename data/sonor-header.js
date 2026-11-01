@@ -77,7 +77,7 @@ window.SonorHeader = (function() {
     const isLocal = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '';
     const hubUrl = opts.hubUrl || (isLocal
       ? (B.appUrls && B.appUrls.local ? B.appUrls.local.master : '../sonor-master/index.html')
-      : (B.appUrls && B.appUrls.hosted ? B.appUrls.hosted.master : 'https://sonorltd.github.io/sonor-master/'));
+      : (B.appUrls && B.appUrls.hosted ? B.appUrls.hosted.master : 'https://apps.sonor.co.uk/sonor-master/'));
 
     // 2026-09-29 (Bryn): the 10 service dots are GONE from the header by default — they ate right-hand space and said
     // nothing the app needed. Opt back in per app with opts.showDots === true (nothing does today).

@@ -12370,6 +12370,7 @@ const SonorPdf = (function () {
       _specialPlansEmitted.add('electrical');
       let added = 0;
       try {
+        try { if (typeof window !== 'undefined' && typeof window._ledSpecPrefetch === 'function') await window._ledSpecPrefetch(); } catch (_) {}   // v5.268.0 — LED Calc's led_spec.electrical
         const elec = (typeof window !== 'undefined' && typeof window._electricalRequirementsData === 'function')
           ? window._electricalRequirementsData()
           : { spurs: [], panels: [], racks: [], svc11Rows: [], svc11ByFloor: {}, floors: [] };

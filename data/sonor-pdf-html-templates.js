@@ -1401,12 +1401,13 @@
     const racks   = Array.isArray(d.racks)   ? d.racks   : [];
     const svc11   = Array.isArray(d.svc11Rows) ? d.svc11Rows : [];
     const hvac    = Array.isArray(d.hvac)    ? d.hvac    : [];   // v5.153.0
+    const led     = (d.led && Array.isArray(d.led.rows)) ? d.led.rows : [];   // v5.268.0 — SonorLedEng.electrical rows (LED Calc / engine)
 
     // v5.198.0 — the row cap is a PAGE budget shared across the populated
     // sections (a fixed 14 per section let 4 supplies + 12 stats push the
     // Standards block off the page); dense pages also get a compact class.
-    const _populated = [spurs, panels.concat(racks), svc11, hvac].filter(a => a && a.length).length;
-    const _totalRows = spurs.length + panels.length + racks.length + svc11.length + hvac.length;
+    const _populated = [spurs, panels.concat(racks), svc11, hvac, led].filter(a => a && a.length).length;
+    const _totalRows = spurs.length + panels.length + racks.length + svc11.length + hvac.length + led.length;
     const MAX_ROWS = Math.max(4, Math.floor(18 / Math.max(1, _populated)));
     const _compact = _totalRows > 10 ? ' er-compact' : '';
     const _rows = (arr, fn, emptyMsg, moreLabel) => {
@@ -1467,12 +1468,23 @@
         <td class="er-req">${h.esc(r.supply || '240 V side — BY ELECTRICAL')}</td>
       </tr>`, 'No HVAC electrical items on this takeoff.', 'see the HVAC Schedule for the full list');
 
+    // v5.268.0 — LED lighting 230 V side (head-end radials + dimmed feeds, local spurs / dimmed lives) from the one LED engine
+    const ledRows = _rows(led, r => `
+      <tr>
+        <td><span class="er-kind">${h.esc(r.kind || 'LED')}</span> ${h.esc(r.what || '—')}</td>
+        <td>${h.esc(r.floor || '—')}</td>
+        <td>${h.esc(r.room || '—')}</td>
+        <td class="er-req">${h.esc(r.req || '230 V supply — BY ELECTRICAL')}</td>
+      </tr>`, 'No LED strip drivers on this project.', 'see the LED pack (LED Calc) for every circuit');
+    const ledTot = (d.led && d.led.totals) || null;
+    const ledHead = 'LED LIGHTING — DRIVERS &amp; HEAD ENDS' + (ledTot ? ` <span class="er-dim">· ${h.esc(String(Math.round(ledTot.input_w || 0)))} W PSU input${d.led.source ? ' · ' + h.esc(d.led.source) : ''}</span>` : '');
     const chips = [
       { cap: 'Fused spurs',     val: spurs.length },
       { cap: 'Shade panels',    val: panels.filter(p => p.kind !== 'lighting').length },
       { cap: 'Lighting panels', val: panels.filter(p => p.kind === 'lighting').length },
       { cap: 'Racks',           val: racks.length },
       { cap: 'HVAC items',      val: hvac.length },   // v5.153.0
+      { cap: 'LED supplies',    val: led.length },    // v5.268.0
       { cap: '11 Electrical items', val: svc11.length }
     ].map(x => `
       <div class="er-chip">
@@ -1522,6 +1534,13 @@
               <tbody>${supplyRows}</tbody>
             </table>
           </section>
+          ${led.length ? `<section class="er-card">
+            <header class="er-card-head">${ledHead}</header>
+            <table class="er-table">
+              <thead><tr><th>Item</th><th>Floor</th><th>Room / Location</th><th>Requirement</th></tr></thead>
+              <tbody>${ledRows}</tbody>
+            </table>
+          </section>` : ''}
         </div>
         <div class="er-col er-col-side">
           <section class="er-card">

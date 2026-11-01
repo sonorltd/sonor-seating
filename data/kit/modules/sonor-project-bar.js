@@ -58,7 +58,7 @@
 //                  the pattern established on 1387 Andy Bell), the bar shows a
 //                  "📄 Brief" link next to the meta pills that opens the live
 //                  per-project brief page in a NEW TAB:
-//                  https://sonorltd.github.io/sonor-project-master/brief.html?pid={id}
+//                  https://apps.sonor.co.uk/sonor-project-master/brief.html?pid={id}
 //                  The page renders metadata.brief + the notes timeline, so it
 //                  needs no rebuild as more client info is logged. Shown in
 //                  BOTH normal and readOnly (host-mode) bars.
@@ -120,7 +120,7 @@
   const LS_KEY = 'sonor_active_project_id';
   // v1.5.0 — per-project client-brief page (repo-slug URL form per the
   // GITHUB PAGES URL LAW; page lives in the Project Master repo).
-  const BRIEF_URL = 'https://sonorltd.github.io/sonor-project-master/brief.html';
+  const BRIEF_URL = 'https://apps.sonor.co.uk/sonor-project-master/brief.html';
   function _briefLink(active) {
     if (!active || !active.metadata || !active.metadata.brief) return '';
     return `<a class="brief-link" href="${BRIEF_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Client brief for this project — opens in a new tab">📄 Brief</a>`;
@@ -136,7 +136,7 @@
   // provisional budget + trade works quote list, xlsx import/export, all
   // PDFs). trades.html is a redirect stub there. Shown when the project
   // carries either dataset (metadata.trades OR metadata.budget).
-  const COSTS_URL = 'https://sonorltd.github.io/sonor-project-master/budget.html';
+  const COSTS_URL = 'https://apps.sonor.co.uk/sonor-project-master/budget.html';
   function _tradesLink(active) {
     if (!active || !active.metadata || (!active.metadata.trades && !active.metadata.budget)) return '';
     return `<a class="brief-link" href="${COSTS_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Costs — provisional budget + builder/joiner trade works, opens in a new tab">💷 Costs</a>`;
@@ -146,7 +146,7 @@
   // boards, seating, takeoffs rooms + revisions, WeQuote quote links, trades,
   // snags, tasks, renders, schedules). Always shown for the active project —
   // "all projects should have the blueprint regardless of used or not".
-  const BLUEPRINT_URL = 'https://sonorltd.github.io/sonor-project-master/blueprint.html';
+  const BLUEPRINT_URL = 'https://apps.sonor.co.uk/sonor-project-master/blueprint.html';
   function _blueprintLink(active) {
     if (!active) return '';
     return `<a class="brief-link" href="${BLUEPRINT_URL}?pid=${encodeURIComponent(active.id)}" target="_blank" rel="noopener" title="Project blueprint — every surface from every app, opens in a new tab">🧭 Blueprint</a>`;

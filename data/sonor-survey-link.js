@@ -21,7 +21,7 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = factory(); else root.SonorSurveyLink = factory();
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var VERSION = '1.0.1', BUCKET = 'site-photos', HOSTED = 'https://sonorltd.github.io/sonor-survey/', LOCAL = '../APP - Survey/dashboard/sonor-survey.html';
+  var VERSION = '1.0.1', BUCKET = 'site-photos', HOSTED = 'https://apps.sonor.co.uk/sonor-survey/', LOCAL = '../APP - Survey/dashboard/sonor-survey.html';
   var PIN_LABEL = { rfi: 'RFI', snag: 'SNAG', client: 'CLIENT', note: 'NOTE', dim: 'DIM' };
   var PIN_NAME = { rfi: 'RFI / query', snag: 'Snag', client: 'Client comment', note: 'Site note', dim: 'Measurement' };
 

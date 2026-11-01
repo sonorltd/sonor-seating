@@ -177,86 +177,86 @@ window.__SONOR_BRAND__ = {
       'led-calc':     '../APP - LED Calc/dashboard/sonor-led-calc.html'
     },
     hosted: {
-      master:      'https://sonorltd.github.io/sonor-master/',
-      pm:          'https://sonorltd.github.io/sonor-project-master/',
-      takeoffs:    'https://sonorltd.github.io/sonor-takeoffs/',
-      takeoffsSite: 'https://sonorltd.github.io/sonor-takeoffs/site.html',   // read-only site view (Takeoffs v5.263.0+)
-      netmap:      'https://sonorltd.github.io/sonor-network-map/',
-      rams:        'https://sonorltd.github.io/sonor-rams/',
-      leads:       'https://sonorltd.github.io/sonor-leads/',
-      accounts:    'https://sonorltd.github.io/sonor-accounts/',
-      printworkwear: 'https://sonorltd.github.io/sonor-print-workwear/',
-      packs:       'https://sonorltd.github.io/sonor-packs/',
-      cinema:         'https://sonorltd.github.io/sonor-cinema/',
-      cinemaTakeoff:  'https://sonorltd.github.io/sonor-cinema/?tab=takeoff',
-      'cinema-takeoff': 'https://sonorltd.github.io/sonor-cinema-takeoff/',
-      engineering: 'https://sonorltd.github.io/sonor-engineering/',
-      'studio-hub': 'https://sonorltd.github.io/sonor-studio/',
-      cinecacfg:   'https://sonorltd.github.io/sonor-cineca/',
-      portal:      'https://sonorltd.github.io/sonor-portal/',
-      inventory:   'https://sonorltd.github.io/sonor-inventory/',
-      email:       'https://sonorltd.github.io/sonor-leads/dashboard/email-preview.html',
-      webHome:     'https://sonorltd.github.io/sonor-website/',
-      webAbout:    'https://sonorltd.github.io/sonor-website/about.html',
-      webPrice:    'https://sonorltd.github.io/sonor-website/pricing.html',
-      swatches:    'https://sonorltd.github.io/sonor-brand/brand-swatches.html',
-      tools:       'https://sonorltd.github.io/sonor-brand/brand-tools.html',
-      subcontractors: 'https://sonorltd.github.io/sonor-master/subcontractors.html',
-      board:        'https://sonorltd.github.io/sonor-master/board.html',
+      master:      'https://apps.sonor.co.uk/sonor-master/',
+      pm:          'https://apps.sonor.co.uk/sonor-project-master/',
+      takeoffs:    'https://apps.sonor.co.uk/sonor-takeoffs/',
+      takeoffsSite: 'https://apps.sonor.co.uk/sonor-takeoffs/site.html',   // read-only site view (Takeoffs v5.263.0+)
+      netmap:      'https://apps.sonor.co.uk/sonor-network-map/',
+      rams:        'https://apps.sonor.co.uk/sonor-rams/',
+      leads:       'https://apps.sonor.co.uk/sonor-leads/',
+      accounts:    'https://apps.sonor.co.uk/sonor-accounts/',
+      printworkwear: 'https://apps.sonor.co.uk/sonor-print-workwear/',
+      packs:       'https://apps.sonor.co.uk/sonor-packs/',
+      cinema:         'https://apps.sonor.co.uk/sonor-cinema/',
+      cinemaTakeoff:  'https://apps.sonor.co.uk/sonor-cinema/?tab=takeoff',
+      'cinema-takeoff': 'https://apps.sonor.co.uk/sonor-cinema-takeoff/',
+      engineering: 'https://apps.sonor.co.uk/sonor-engineering/',
+      'studio-hub': 'https://apps.sonor.co.uk/sonor-studio/',
+      cinecacfg:   'https://apps.sonor.co.uk/sonor-cineca/',
+      portal:      'https://apps.sonor.co.uk/sonor-portal/',
+      inventory:   'https://apps.sonor.co.uk/sonor-inventory/',
+      email:       'https://apps.sonor.co.uk/sonor-leads/dashboard/email-preview.html',
+      webHome:     'https://apps.sonor.co.uk/sonor-website/',
+      webAbout:    'https://apps.sonor.co.uk/sonor-website/about.html',
+      webPrice:    'https://apps.sonor.co.uk/sonor-website/pricing.html',
+      swatches:    'https://apps.sonor.co.uk/sonor-brand/brand-swatches.html',
+      tools:       'https://apps.sonor.co.uk/sonor-brand/brand-tools.html',
+      subcontractors: 'https://apps.sonor.co.uk/sonor-master/subcontractors.html',
+      board:        'https://apps.sonor.co.uk/sonor-master/board.html',
       dmx:          'https://github.com/sonorltd/sonor-dmx',
       wled:         'https://github.com/sonorltd/sonor-wled',
       arduino:      'https://github.com/sonorltd/sonor-arduino',
-      resDatasheets: 'https://sonorltd.github.io/sonor-resources/datasheets/product-datasheets.html',
-      workshop:    'https://sonorltd.github.io/sonor-workshop/',
-      library:     'https://sonorltd.github.io/sonor-library/',
-      tasks:       'https://sonorltd.github.io/sonor-tasks/',
-      studio:      'https://sonorltd.github.io/sonor-studio/',
+      resDatasheets: 'https://apps.sonor.co.uk/sonor-resources/datasheets/product-datasheets.html',
+      workshop:    'https://apps.sonor.co.uk/sonor-workshop/',
+      library:     'https://apps.sonor.co.uk/sonor-library/',
+      tasks:       'https://apps.sonor.co.uk/sonor-tasks/',
+      studio:      'https://apps.sonor.co.uk/sonor-studio/',
       studioPortal:'https://sonorltd.github.io/sonor-studio/studio-portal.html',
-      flyers:      'https://sonorltd.github.io/sonor-flyers/',
-      followup:    'https://sonorltd.github.io/sonor-followup-portal/',
-      tender:      'https://sonorltd.github.io/sonor-tender/',
-      seating:     'https://sonorltd.github.io/sonor-seating/',
-      'cinema-aesthetic': 'https://sonorltd.github.io/sonor-cinema-aesthetic/',
-      'lighting-design': 'https://sonorltd.github.io/sonor-lighting-design/',
-      'garden-lighting': 'https://sonorltd.github.io/sonor-garden-lighting/',
-      'stretched-fabric': 'https://sonorltd.github.io/sonor-stretched-fabric/',
-      survey: 'https://sonorltd.github.io/sonor-survey/',
-      'fractal-rig':     'https://sonorltd.github.io/sonor-fractal-rig/',
-      'elf-machine':     'https://sonorltd.github.io/sonor-elf-machine/',
-      crystowl:          'https://sonorltd.github.io/sonor-crystowl/',
-      'sacred-missions': 'https://sonorltd.github.io/sonor-sacred-missions-map/',
-      'missions-archive': 'https://sonorltd.github.io/sonor-missions-archive/',
-      'pixel-conductor': 'https://sonorltd.github.io/sonor-pixel-conductor/',
-      'artnet-node':     'https://sonorltd.github.io/sonor-artnet-node/',
-      cbus:              'https://sonorltd.github.io/sonor-cbus/',
-      'cinema-tools': 'https://sonorltd.github.io/sonor-cinema-tools/',
+      flyers:      'https://apps.sonor.co.uk/sonor-flyers/',
+      followup:    'https://apps.sonor.co.uk/sonor-followup-portal/',
+      tender:      'https://apps.sonor.co.uk/sonor-tender/',
+      seating:     'https://apps.sonor.co.uk/sonor-seating/',
+      'cinema-aesthetic': 'https://apps.sonor.co.uk/sonor-cinema-aesthetic/',
+      'lighting-design': 'https://apps.sonor.co.uk/sonor-lighting-design/',
+      'garden-lighting': 'https://apps.sonor.co.uk/sonor-garden-lighting/',
+      'stretched-fabric': 'https://apps.sonor.co.uk/sonor-stretched-fabric/',
+      survey: 'https://apps.sonor.co.uk/sonor-survey/',
+      'fractal-rig':     'https://apps.sonor.co.uk/sonor-fractal-rig/',
+      'elf-machine':     'https://apps.sonor.co.uk/sonor-elf-machine/',
+      crystowl:          'https://apps.sonor.co.uk/sonor-crystowl/',
+      'sacred-missions': 'https://apps.sonor.co.uk/sonor-sacred-missions-map/',
+      'missions-archive': 'https://apps.sonor.co.uk/sonor-missions-archive/',
+      'pixel-conductor': 'https://apps.sonor.co.uk/sonor-pixel-conductor/',
+      'artnet-node':     'https://apps.sonor.co.uk/sonor-artnet-node/',
+      cbus:              'https://apps.sonor.co.uk/sonor-cbus/',
+      'cinema-tools': 'https://apps.sonor.co.uk/sonor-cinema-tools/',
       // 2026-10-12 Hub audit — hosted forms for every Hub card key (repo-slug law; print = GitHub tree, renders PNGs inline)
       workmats:    'https://github.com/sonorltd/sonor-workmats/tree/main/output',
       bizcards:    'https://github.com/sonorltd/sonor-bizcards/tree/main/output',
       rackplates:  'https://github.com/sonorltd/sonor-rack-plates/tree/main/output',
       stickers:    'https://github.com/sonorltd/sonor-stickers/tree/main/output',
       igcards:     'https://github.com/sonorltd/sonor-ig-cards/tree/main',
-      resPinouts:  'https://sonorltd.github.io/sonor-resources/pinouts/connector-cheat-sheet.html',
-      resRacks:    'https://sonorltd.github.io/sonor-resources/racks/rack-best-practices.html',
-      resCabling:  'https://sonorltd.github.io/sonor-resources/cabling/av-cabling-guide.html',
-      resNetwork:  'https://sonorltd.github.io/sonor-resources/networking/av-networking-guide.html',
-      resXeroApi:  'https://sonorltd.github.io/sonor-resources/xero-api/',
+      resPinouts:  'https://apps.sonor.co.uk/sonor-resources/pinouts/connector-cheat-sheet.html',
+      resRacks:    'https://apps.sonor.co.uk/sonor-resources/racks/rack-best-practices.html',
+      resCabling:  'https://apps.sonor.co.uk/sonor-resources/cabling/av-cabling-guide.html',
+      resNetwork:  'https://apps.sonor.co.uk/sonor-resources/networking/av-networking-guide.html',
+      resXeroApi:  'https://apps.sonor.co.uk/sonor-resources/xero-api/',
       resWqApi:    'https://github.com/sonorltd/sonor-wq-api',
-      landingPages:   'https://sonorltd.github.io/sonor-master/landing-pages.html',
-      gbpPhotos:      'https://sonorltd.github.io/sonor-master/gbp-photos.html',
-      emailTemplates: 'https://sonorltd.github.io/sonor-master/email-templates.html',
-      manufacturers:  'https://sonorltd.github.io/sonor-master/manufacturers.html',
-      c4Demo:         'https://sonorltd.github.io/sonor-master/c4-demo.html',
-      igstrategy:     'https://sonorltd.github.io/sonor-master/ig-strategy.html',
-      listrategy:     'https://sonorltd.github.io/sonor-master/li-strategy.html',
-      business:       'https://sonorltd.github.io/sonor-master/business-snapshot.html',
-      audit:          'https://sonorltd.github.io/sonor-master/audit-snapshot.html',
-      health:         'https://sonorltd.github.io/sonor-master/health.html',
-      kit:            'https://sonorltd.github.io/sonor-kit/catalogue/',
-      partners:       'https://sonorltd.github.io/sonor-partners/',
-      'service-contracts': 'https://sonorltd.github.io/sonor-service-contracts/',
-      takeover:       'https://sonorltd.github.io/sonor-takeover/',
-      'led-calc':     'https://sonorltd.github.io/sonor-led-calc/'
+      landingPages:   'https://apps.sonor.co.uk/sonor-master/landing-pages.html',
+      gbpPhotos:      'https://apps.sonor.co.uk/sonor-master/gbp-photos.html',
+      emailTemplates: 'https://apps.sonor.co.uk/sonor-master/email-templates.html',
+      manufacturers:  'https://apps.sonor.co.uk/sonor-master/manufacturers.html',
+      c4Demo:         'https://apps.sonor.co.uk/sonor-master/c4-demo.html',
+      igstrategy:     'https://apps.sonor.co.uk/sonor-master/ig-strategy.html',
+      listrategy:     'https://apps.sonor.co.uk/sonor-master/li-strategy.html',
+      business:       'https://apps.sonor.co.uk/sonor-master/business-snapshot.html',
+      audit:          'https://apps.sonor.co.uk/sonor-master/audit-snapshot.html',
+      health:         'https://apps.sonor.co.uk/sonor-master/health.html',
+      kit:            'https://apps.sonor.co.uk/sonor-kit/catalogue/',
+      partners:       'https://apps.sonor.co.uk/sonor-partners/',
+      'service-contracts': 'https://apps.sonor.co.uk/sonor-service-contracts/',
+      takeover:       'https://apps.sonor.co.uk/sonor-takeover/',
+      'led-calc':     'https://apps.sonor.co.uk/sonor-led-calc/'
     }
   },
 
@@ -320,7 +320,7 @@ window.__SONOR_BRAND__ = {
   // ── Helpers ──────────────────────────────────────────
   // Build a deep link from app key + contract id + param object.
   // Example: deepLink('pm', 'rackRow', {project: '1343', rack: 'AV1'})
-  //       → 'https://sonorltd.github.io/sonor-project-master/?project=1343&rack=AV1#sched-rack-spec'
+  //       → 'https://apps.sonor.co.uk/sonor-project-master/?project=1343&rack=AV1#sched-rack-spec'
   // Defaults to hosted; pass {source: 'local'} to use the Drive path instead.
   deepLink: function(appKey, contractId, params) {
     var src    = (params && params.source === 'local') ? 'local' : 'hosted';
@@ -337,13 +337,13 @@ window.__SONOR_BRAND__ = {
   },
 
   // ── Print render outputs (2026-10-31) ─────────────────
-  // PRINT repos serve their versioned renders from GitHub Pages at
-  // https://sonorltd.github.io/<slug>/output/… — the slug comes from
+  // PRINT repos serve their versioned renders from the apps gateway at
+  // https://apps.sonor.co.uk/<slug>/output/… — the slug comes from
   // appUrls.hosted[key] (github.com/sonorltd/<slug>/…), the folder from
   // appUrls.local[key] ('../PRINT - X/output/'). No second list.
   // printAsset('bizcards', 'v1.1.0/300dpi/dark/front_300dpi.png')
   //   → local:  '../PRINT - Biz Cards/output/v1.1.0/300dpi/…'  (prefix opts.up extra '../')
-  //   → hosted: 'https://sonorltd.github.io/sonor-bizcards/output/v1.1.0/300dpi/…'
+  //   → hosted: 'https://apps.sonor.co.uk/sonor-bizcards/output/v1.1.0/300dpi/…'
   // Source: opts.source, else file: → local, anything else → hosted.
   printAsset: function(appKey, relPath, opts) {
     opts = opts || {};
@@ -352,8 +352,8 @@ window.__SONOR_BRAND__ = {
       var loc = (this.appUrls.local || {})[appKey];
       return loc ? (new Array((opts.up || 0) + 1).join('../')) + loc + relPath : null;
     }
-    var m = String((this.appUrls.hosted || {})[appKey] || '').match(/sonorltd(?:\.github\.io)?\/([a-z0-9-]+)/);
-    return m ? 'https://sonorltd.github.io/' + m[1] + '/output/' + relPath : null;
+    var m = String((this.appUrls.hosted || {})[appKey] || '').match(/(?:sonorltd(?:\.github\.io)?|apps\.sonor\.co\.uk)\/([a-z0-9-]+)/);
+    return m ? 'https://apps.sonor.co.uk/' + m[1] + '/output/' + relPath : null;
   },
   // Any path containing 'PRINT - X/output/…' (relative, %20-encoded or not) → its Pages URL, or null.
   printHosted: function(path) {

@@ -59,7 +59,7 @@
   // Built locally by `wasm-pack build` in sonor-svg2pdf-wasm/, output is
   // copied to Branding-CORE/dist/wasm/svg2pdf/ and pushed to sonor-brand
   // (GitHub Pages serves it via the CDN). Per Spine S-4.21 brand-CDN-first.
-  const WASM_CDN_BASE = 'https://sonorltd.github.io/sonor-brand/dist/wasm/svg2pdf/';
+  const WASM_CDN_BASE = 'https://apps.sonor.co.uk/sonor-brand/dist/wasm/svg2pdf/';
   const WASM_LOCAL_FALLBACKS = [
     '../../Branding - CORE/dist/wasm/svg2pdf/',  // local dev from dashboard/
     '../Branding - CORE/dist/wasm/svg2pdf/',      // local dev from app root

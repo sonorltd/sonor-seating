@@ -6,7 +6,7 @@
  *   'slate' = the light fallback). Service colours never change. Client-facing surfaces opt out with data-theme-lock.
  *
  *   Load EARLY (classic script, before the app's CSS paints) — the kit loader also loads it, but for a flash-free boot
- *   put it first:  <script src="https://sonorltd.github.io/sonor-kit/v1/modules/sonor-theme.js"></script>
+ *   put it first:  <script src="https://apps.sonor.co.uk/sonor-kit/v1/modules/sonor-theme.js"></script>
  *   Persists the choice in localStorage 'sonor-theme' (shared by every app on the same origin… and, because every app
  *   is its own GitHub Pages origin, also mirrored into the URL-free cookie 'sonor_theme' on .github.io so the choice
  *   follows you across apps). A ◐ toggle mounts itself into the shared header (.header-right) or project bar when present.

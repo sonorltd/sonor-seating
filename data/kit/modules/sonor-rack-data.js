@@ -27,7 +27,7 @@
   }
   function editUrl(projectId) {
     var B = global.__SONOR_BRAND__ || {}; var local = /^(file:|http:\/\/localhost)/.test(location.href);
-    var base = (B.appUrls && B.appUrls[local ? 'local' : 'hosted'] && B.appUrls[local ? 'local' : 'hosted'].engineering) || 'https://sonorltd.github.io/sonor-engineering/';
+    var base = (B.appUrls && B.appUrls[local ? 'local' : 'hosted'] && B.appUrls[local ? 'local' : 'hosted'].engineering) || 'https://apps.sonor.co.uk/sonor-engineering/';
     if (local && /^\.\.\//.test(base) && /\/dashboard\//.test(location.pathname)) base = '../' + base;   // dashboard/ pages sit one level deeper than appUrls.local assumes
     return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'pid=' + encodeURIComponent(projectId || '');
   }

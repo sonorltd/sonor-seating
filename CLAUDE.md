@@ -263,7 +263,7 @@
 > That file is the binding cross-session contract (Library ↔ Configurator ↔ WeQuote).
 > After any such work, append a dated entry to its §8 Log in the same commit.
 >
-> **Spine version: 1.3** (SonorShell) · Repo: `sonor-seating` · Pages: https://sonorltd.github.io/sonor-seating/
+> **Spine version: 1.3** (SonorShell) · Repo: `sonor-seating` · Pages: https://apps.sonor.co.uk/sonor-seating/
 
 ## What this is
 Customer-facing **cinema-seating configurator**. Data-driven, zero hardcoded catalogue.
@@ -313,3 +313,5 @@ documented Brand Override (deviates from SLATE-FIRST / S-4.1; raw hex confined t
 3. No raw hex outside `.sc`; no hardcoded catalogue data.
 4. Version bump = atomic (`/version-bump`); never hand-write `app_versions` (S-4.5).
 5. New-app / first-publish + Pages: see git-push skill **Scenario F**.
+
+- 2026-11-01 — links → apps.sonor.co.uk (github.io retired)

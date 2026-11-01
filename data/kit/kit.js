@@ -1,4 +1,4 @@
-// Sonor Kit loader — ONE line in every app:  <script type="module" src="https://sonorltd.github.io/sonor-kit/v1/kit.js"></script>
+// Sonor Kit loader — ONE line in every app:  <script type="module" src="https://apps.sonor.co.uk/sonor-kit/v1/kit.js"></script>
 // (B-485 Spine v1.4: shared code is SERVED, not copied.) Loads the kit CSS into the `sonor-kit` cascade layer (the app's own
 // unlayered rules always win), then the modules in dependency order as classic scripts (they are IIFE masters that define
 // window globals), and exposes window.SonorKit = { version, base, ready }. Local dev: ?kit=local on the page URL, or

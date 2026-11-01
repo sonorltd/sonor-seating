@@ -54,7 +54,7 @@
   // CORS: GitHub Pages serves with `Access-Control-Allow-Origin: *` for
   // static assets, so cross-origin font fetches succeed without manual
   // CORS headers.
-  const BRAND_CDN_BASE = 'https://sonorltd.github.io/sonor-brand/FONT/';
+  const BRAND_CDN_BASE = 'https://apps.sonor.co.uk/sonor-brand/FONT/';
   const DEFAULT_BASE_URLS = [
     BRAND_CDN_BASE,                                    // SSOT — sonor-brand GitHub Pages
     '../../Branding - CORE/FONT/',                     // local-dev fallback (from APP - X/dashboard/)
@@ -182,7 +182,7 @@
     fonts.bold  = await pdfDoc.embedFont(SF.HelveticaBold);
     fonts._gilroy = false;
     fonts._family = 'Helvetica';
-    console.warn('[SonorPdfV6Fonts] ⚠ Gilroy unavailable — using Helvetica fallback. PDF will not carry Sonor brand font. Per Spine S-4.21 the canonical source is https://sonorltd.github.io/sonor-brand/FONT/ — verify (a) sonor-brand Pages is enabled, (b) FONT/ folder is on origin/main, (c) no firewall is blocking github.io from this session.');
+    console.warn('[SonorPdfV6Fonts] ⚠ Gilroy unavailable — using Helvetica fallback. PDF will not carry Sonor brand font. Per Spine S-4.21 the canonical source is https://apps.sonor.co.uk/sonor-brand/FONT/ — verify (a) sonor-brand Pages is enabled, (b) FONT/ folder is on origin/main, (c) no firewall is blocking github.io from this session.');
     return fonts;
   }
 
